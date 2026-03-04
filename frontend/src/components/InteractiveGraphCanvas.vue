@@ -41,6 +41,30 @@
           </button>
         </div>
       </div>
+      <div class="toolbar-divider"></div>
+      <div class="layout-section">
+        <span class="toolbar-label">Snap:</span>
+        <div class="snap-options">
+          <button 
+            class="snap-btn"
+            :class="{ active: snapToGrid }"
+            @click="snapToGrid = !snapToGrid"
+            title="Snap to grid (20px)"
+          >
+            <span class="snap-icon">⊞</span>
+            <span>Grid</span>
+          </button>
+          <button 
+            class="snap-btn"
+            :class="{ active: snapToGuides }"
+            @click="snapToGuides = !snapToGuides"
+            title="Smart alignment guidelines"
+          >
+            <span class="snap-icon">⫼</span>
+            <span>Align</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Zoom/Pan Container -->
@@ -144,9 +168,9 @@
         </mask>
       </defs>
       
-      <!-- Grid Background -->
+      <!-- Grid Background (controlled by Grid snap toggle) -->
       <rect 
-        v-if="props.showGrid" 
+        v-if="snapToGrid" 
         x="-5000" 
         y="-5000" 
         width="10000" 
@@ -251,6 +275,18 @@
         </g>
       </g>
       
+      <!-- Alignment Guidelines -->
+      <g v-if="activeGuidelines.length > 0" class="guidelines-layer">
+        <line 
+          v-for="(guide, idx) in activeGuidelines" 
+          :key="'guide-' + idx"
+          :x1="guide.x1" :y1="guide.y1" 
+          :x2="guide.x2" :y2="guide.y2"
+          class="alignment-guideline"
+          :class="guide.type"
+        />
+      </g>
+
       <!-- Temporary link during creation -->
       <path 
         v-if="tempLink"
@@ -441,13 +477,11 @@ interface Props {
   links: Link[];
   isEditMode?: boolean;
   selectedNodeId?: string | null;
-  showGrid?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isEditMode: false,
-  selectedNodeId: null,
-  showGrid: false
+  selectedNodeId: null
 });
 
 const emit = defineEmits([
@@ -471,6 +505,21 @@ const maxScale = 2;
 const currentLayout = ref<'dagre' | 'layered' | 'force' | 'grid'>('dagre');
 const layoutDirection = ref<'TB' | 'LR' | 'BT' | 'RL'>('TB');
 const isInitialLoad = ref(true); // Track if this is the first data load
+
+// Snap alignment configuration
+const snapToGrid = ref(false);
+const snapToGuides = ref(true);
+const GRID_SIZE = 20;
+const GUIDE_SNAP_THRESHOLD = 8; // px distance to trigger snap
+const NODE_WIDTH = 180;
+const NODE_HEIGHT = 64;
+
+interface Guideline {
+  x1: number; y1: number;
+  x2: number; y2: number;
+  type: 'horizontal' | 'vertical';
+}
+const activeGuidelines = ref<Guideline[]>([]);
 
 const layoutOptions = [
   { value: 'layered', label: 'Layered', icon: '📊', description: 'Auto-arrange by service layer (recommended)' },
@@ -1121,12 +1170,131 @@ const startDragNode = (e: MouseEvent, node: Node) => {
   window.addEventListener('mouseup', stopDragNode);
 };
 
+// Snap a position to grid
+const snapPositionToGrid = (x: number, y: number): { x: number; y: number } => {
+  return {
+    x: Math.round(x / GRID_SIZE) * GRID_SIZE,
+    y: Math.round(y / GRID_SIZE) * GRID_SIZE
+  };
+};
+
+// Calculate smart alignment guidelines and snap positions
+const calcGuideSnap = (nodeId: string, rawX: number, rawY: number): { x: number; y: number; guidelines: Guideline[] } => {
+  const guidelines: Guideline[] = [];
+  let snappedX = rawX;
+  let snappedY = rawY;
+  
+  // Current node edges and center
+  const curLeft = rawX;
+  const curCenterX = rawX + NODE_WIDTH / 2;
+  const curRight = rawX + NODE_WIDTH;
+  const curTop = rawY;
+  const curCenterY = rawY + NODE_HEIGHT / 2;
+  const curBottom = rawY + NODE_HEIGHT;
+  
+  let bestDx = GUIDE_SNAP_THRESHOLD + 1;
+  let bestDy = GUIDE_SNAP_THRESHOLD + 1;
+  let snapXTarget = rawX;
+  let snapYTarget = rawY;
+  let snapXType: 'left' | 'center' | 'right' = 'left';
+  let snapYType: 'top' | 'center' | 'bottom' = 'top';
+  
+  // Compare against all other nodes
+  for (const other of props.nodes) {
+    if (other.id === nodeId) continue;
+    const ox = other.x || 100;
+    const oy = other.y || 100;
+    const oLeft = ox;
+    const oCenterX = ox + NODE_WIDTH / 2;
+    const oRight = ox + NODE_WIDTH;
+    const oTop = oy;
+    const oCenterY = oy + NODE_HEIGHT / 2;
+    const oBottom = oy + NODE_HEIGHT;
+    
+    // X-axis alignment checks: left-left, center-center, right-right, left-right, right-left
+    const xChecks: Array<{ cur: number; ref: number; type: 'left' | 'center' | 'right'; offset: number }> = [
+      { cur: curLeft, ref: oLeft, type: 'left', offset: 0 },
+      { cur: curCenterX, ref: oCenterX, type: 'center', offset: -NODE_WIDTH / 2 },
+      { cur: curRight, ref: oRight, type: 'right', offset: -NODE_WIDTH },
+      { cur: curLeft, ref: oRight, type: 'left', offset: 0 },
+      { cur: curRight, ref: oLeft, type: 'right', offset: -NODE_WIDTH },
+    ];
+    
+    for (const check of xChecks) {
+      const dx = Math.abs(check.cur - check.ref);
+      if (dx < bestDx) {
+        bestDx = dx;
+        snapXTarget = check.ref + check.offset;
+        snapXType = check.type;
+      }
+    }
+    
+    // Y-axis alignment checks: top-top, center-center, bottom-bottom, top-bottom, bottom-top
+    const yChecks: Array<{ cur: number; ref: number; type: 'top' | 'center' | 'bottom'; offset: number }> = [
+      { cur: curTop, ref: oTop, type: 'top', offset: 0 },
+      { cur: curCenterY, ref: oCenterY, type: 'center', offset: -NODE_HEIGHT / 2 },
+      { cur: curBottom, ref: oBottom, type: 'bottom', offset: -NODE_HEIGHT },
+      { cur: curTop, ref: oBottom, type: 'top', offset: 0 },
+      { cur: curBottom, ref: oTop, type: 'bottom', offset: -NODE_HEIGHT },
+    ];
+    
+    for (const check of yChecks) {
+      const dy = Math.abs(check.cur - check.ref);
+      if (dy < bestDy) {
+        bestDy = dy;
+        snapYTarget = check.ref + check.offset;
+        snapYType = check.type;
+      }
+    }
+  }
+  
+  // Apply X snap if within threshold
+  if (bestDx <= GUIDE_SNAP_THRESHOLD) {
+    snappedX = snapXTarget;
+    // Determine the guide line X coordinate
+    let guideX: number;
+    if (snapXType === 'left') guideX = snappedX;
+    else if (snapXType === 'center') guideX = snappedX + NODE_WIDTH / 2;
+    else guideX = snappedX + NODE_WIDTH;
+    guidelines.push({ x1: guideX, y1: -5000, x2: guideX, y2: 5000, type: 'vertical' });
+  }
+  
+  // Apply Y snap if within threshold
+  if (bestDy <= GUIDE_SNAP_THRESHOLD) {
+    snappedY = snapYTarget;
+    let guideY: number;
+    if (snapYType === 'top') guideY = snappedY;
+    else if (snapYType === 'center') guideY = snappedY + NODE_HEIGHT / 2;
+    else guideY = snappedY + NODE_HEIGHT;
+    guidelines.push({ x1: -5000, y1: guideY, x2: 5000, y2: guideY, type: 'horizontal' });
+  }
+  
+  return { x: snappedX, y: snappedY, guidelines };
+};
+
 const onDragNode = (e: MouseEvent) => {
   if (!draggingNode.value) return;
   
-  // Calculate new position for the dragging node
-  const newX = Math.max(-50, e.clientX - dragOffset.value.x);
-  const newY = Math.max(-20, e.clientY - dragOffset.value.y);
+  // Calculate raw position for the dragging node
+  let newX = Math.max(-50, e.clientX - dragOffset.value.x);
+  let newY = Math.max(-20, e.clientY - dragOffset.value.y);
+  
+  // Apply grid snap
+  if (snapToGrid.value) {
+    const gridSnapped = snapPositionToGrid(newX, newY);
+    newX = gridSnapped.x;
+    newY = gridSnapped.y;
+  }
+  
+  // Apply smart guide snap (single node only)
+  if (snapToGuides.value && dragStartPositions.value.size <= 1) {
+    const guideResult = calcGuideSnap(draggingNode.value.id, newX, newY);
+    newX = guideResult.x;
+    newY = guideResult.y;
+    activeGuidelines.value = guideResult.guidelines;
+  } else {
+    activeGuidelines.value = [];
+  }
   
   // If multi-selection, move all selected nodes together
   if (dragStartPositions.value.size > 1) {
@@ -1152,6 +1320,7 @@ const onDragNode = (e: MouseEvent) => {
 const stopDragNode = () => {
   draggingNode.value = null;
   dragStartPositions.value.clear();
+  activeGuidelines.value = []; // Clear guidelines on drop
   window.removeEventListener('mousemove', onDragNode);
   window.removeEventListener('mouseup', stopDragNode);
   // Emit update to parent to save if needed
@@ -2354,6 +2523,62 @@ onUnmounted(() => {
     background: #eff6ff;
     border-color: #409EFF;
     color: #409EFF;
+}
+
+/* Snap alignment controls */
+.snap-options {
+    display: flex;
+    gap: 6px;
+}
+
+.snap-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 10px;
+    border: 1px solid #e4e7ec;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    color: #344054;
+    transition: all 0.15s;
+}
+
+.snap-btn:hover {
+    background: #f9fafb;
+    border-color: #d0d5dd;
+}
+
+.snap-btn.active {
+    background: #f0fdf4;
+    border-color: #10b981;
+    color: #10b981;
+}
+
+.snap-icon {
+    font-size: 14px;
+}
+
+/* Alignment Guidelines */
+.guidelines-layer {
+    pointer-events: none;
+    z-index: 100;
+}
+
+.alignment-guideline {
+    stroke-width: 1;
+    stroke-dasharray: 6 3;
+    opacity: 0.8;
+    pointer-events: none;
+}
+
+.alignment-guideline.vertical {
+    stroke: #f04438;
+}
+
+.alignment-guideline.horizontal {
+    stroke: #3b82f6;
 }
 
 /* Direction options in link context menu */

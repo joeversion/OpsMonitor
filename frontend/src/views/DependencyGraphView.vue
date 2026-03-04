@@ -235,16 +235,7 @@
             {{ isEditMode ? 'Exit Customization' : 'Customize Layout' }}
           </el-button>
           
-          <!-- Grid Toggle Button (only visible in edit mode) -->
-          <el-button
-            v-if="isEditMode && isAdmin"
-            size="small"
-            :type="showGrid ? 'primary' : 'default'"
-            @click="showGrid = !showGrid"
-            title="Toggle grid lines for alignment reference"
-          >
-            <span style="font-size: 16px;">{{ showGrid ? '⊞' : '⊡' }}</span>
-          </el-button>
+
           
           <!-- Keyboard Shortcuts Hint (inline with header) -->
           <transition name="slide-down">
@@ -288,7 +279,7 @@
           :links="graphLinks"
           :is-edit-mode="isEditMode && isAdmin"
           :selected-node-id="selectedNode?.id"
-          :show-grid="showGrid"
+
           :readonly="!isAdmin"
           @select-node="handleNodeSelect"
           @add-link="handleAddLink"
@@ -638,7 +629,6 @@ const showSecurityPanel = ref(true);
 const securityFilter = ref<'all' | 'expiring'>('all');
 const allGlobalServices = ref<{ id: string; name: string; project_name?: string }[]>([]);
 const showShortcutsHint = ref(true);
-const showGrid = ref(false);
 
 // Get service IDs of current project
 const currentProjectServiceIds = computed(() => {
