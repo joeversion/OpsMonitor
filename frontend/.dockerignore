@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Build output (will be generated during Docker build)
+dist
+
+# Development files
+.git
+.gitignore
+.env.local
+.env.development
+.env.production
+*.log
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+coverage
+.nyc_output
+*.test.ts
+*.spec.ts
+tests/
+
+# Documentation
+*.md
+README*.md
+
+# Development scripts
+*.sh
+*.ps1

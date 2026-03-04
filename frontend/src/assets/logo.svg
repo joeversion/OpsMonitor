@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1890ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#096dd9;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#52c41a;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#73d13d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#52c41a;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.95);stop-opacity:1" />
+      <stop offset="100%" style="stop-color:rgba(255,255,255,0.8);stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#096dd9" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background rounded square -->
+  <rect x="32" y="32" width="448" height="448" rx="96" ry="96" fill="url(#bgGrad)" filter="url(#shadow)"/>
+  
+  <!-- Subtle grid pattern overlay -->
+  <g opacity="0.08">
+    <line x1="128" y1="80" x2="128" y2="432" stroke="white" stroke-width="1"/>
+    <line x1="256" y1="80" x2="256" y2="432" stroke="white" stroke-width="1"/>
+    <line x1="384" y1="80" x2="384" y2="432" stroke="white" stroke-width="1"/>
+    <line x1="80" y1="160" x2="432" y2="160" stroke="white" stroke-width="1"/>
+    <line x1="80" y1="256" x2="432" y2="256" stroke="white" stroke-width="1"/>
+    <line x1="80" y1="352" x2="432" y2="352" stroke="white" stroke-width="1"/>
+  </g>
+  
+  <!-- Shield shape (monitoring/protection) -->
+  <path d="M256 108 L370 158 L370 272 C370 340 320 396 256 420 C192 396 142 340 142 272 L142 158 Z" 
+        fill="url(#shieldGrad)" opacity="0.15"/>
+  <path d="M256 108 L370 158 L370 272 C370 340 320 396 256 420 C192 396 142 340 142 272 L142 158 Z" 
+        stroke="rgba(255,255,255,0.4)" stroke-width="2" fill="none"/>
+  
+  <!-- Central monitor/server icon -->
+  <rect x="196" y="172" width="120" height="88" rx="8" ry="8" fill="white" opacity="0.95"/>
+  <rect x="204" y="180" width="104" height="64" rx="4" ry="4" fill="#001529"/>
+  
+  <!-- Heartbeat/pulse line on screen -->
+  <polyline points="216,218 232,218 240,198 252,238 264,206 272,218 296,218" 
+            stroke="url(#pulseGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Monitor stand -->
+  <rect x="242" y="260" width="28" height="12" rx="2" fill="white" opacity="0.9"/>
+  <rect x="228" y="270" width="56" height="6" rx="3" fill="white" opacity="0.85"/>
+  
+  <!-- Status dots (top of shield) -->
+  <circle cx="220" cy="144" r="6" fill="#52c41a"/>
+  <circle cx="256" cy="136" r="6" fill="#52c41a"/>
+  <circle cx="292" cy="144" r="6" fill="#52c41a"/>
+  
+  <!-- Connection nodes around shield -->
+  <!-- Top left node -->
+  <circle cx="172" cy="176" r="10" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+  <circle cx="172" cy="176" r="4" fill="white"/>
+  
+  <!-- Top right node -->
+  <circle cx="340" cy="176" r="10" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+  <circle cx="340" cy="176" r="4" fill="white"/>
+  
+  <!-- Bottom left node -->
+  <circle cx="176" cy="320" r="10" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+  <circle cx="176" cy="320" r="4" fill="white"/>
+  
+  <!-- Bottom right node -->
+  <circle cx="336" cy="320" r="10" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+  <circle cx="336" cy="320" r="4" fill="white"/>
+  
+  <!-- Connection lines from nodes to center -->
+  <line x1="182" y1="180" x2="200" y2="200" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="330" y1="180" x2="312" y2="200" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="182" y1="316" x2="210" y2="270" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="330" y1="316" x2="302" y2="270" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  
+  <!-- Bottom text area -->
+  <text x="256" y="380" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" 
+        font-size="36" font-weight="700" fill="white" letter-spacing="3">OPS</text>
+  <text x="256" y="408" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" 
+        font-size="18" font-weight="400" fill="rgba(255,255,255,0.75)" letter-spacing="6">MONITOR</text>
+</svg>
