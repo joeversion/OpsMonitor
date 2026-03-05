@@ -46,7 +46,7 @@
               ></span>
             </div>
           </el-dropdown-item>
-          <el-dropdown-item divided command="add">
+          <el-dropdown-item v-if="isAdmin" divided command="add">
             <div class="dropdown-item-content add-project">
               <el-icon><Plus /></el-icon>
               <span>New Project</span>
@@ -69,6 +69,7 @@ import { ref, computed, onMounted, watch, inject } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowDown, Plus, Setting } from '@element-plus/icons-vue';
 import { getProjects, type ProjectWithStats } from '../api/projects';
+import { authUtils } from '../utils/auth';
 
 const props = defineProps<{
   modelValue?: string;
@@ -84,6 +85,7 @@ const emit = defineEmits<{
 const router = useRouter();
 const triggerAddProject = inject<() => void>('triggerAddProject');
 const projectsVersion = inject<import('vue').Ref<number>>('projectsVersion');
+const isAdmin = computed(() => authUtils.isAdmin());
 const projects = ref<ProjectWithStats[]>([]);
 const currentProjectId = ref<string | undefined>(props.modelValue);
 
@@ -147,9 +149,11 @@ async function loadProjects() {
   }
 }
 
-function handleSelect(command: string) {
+async function handleSelect(command: string) {
   if (command === 'add') {
-    router.push('/projects');
+    await router.push('/projects');
+    // Wait for ProjectsView to mount and register its watcher
+    await new Promise(resolve => setTimeout(resolve, 100));
     triggerAddProject?.();
     return;
   }
