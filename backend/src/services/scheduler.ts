@@ -5,6 +5,7 @@ import { SSHService } from './ssh-service';
 import logger from '../utils/logger';
 import { DynamicScheduler } from './dynamic-scheduler';
 import { ScheduleConfig } from '../types/schedule';
+import { checkEventBus } from './check-event-bus';
 
 export class Scheduler {
   private static intervals: Map<string, NodeJS.Timeout> = new Map();
@@ -656,13 +657,24 @@ export class Scheduler {
       
       const transaction = db.transaction(() => {
         for (const service of services) {
-          // Insert a check record with 'unknown' status
+          // Insert a check record with 'down' status
           const id = require('uuid').v4();
           insertStmt.run(id, service.id, `Host ${hostName} is offline: ${errorMessage}`, now);
         }
       });
       
       transaction();
+      
+      // Broadcast SSE events so frontend (topology, etc.) gets real-time updates
+      for (const service of services) {
+        checkEventBus.broadcast({
+          serviceId: service.id,
+          status: 'down',
+          responseTime: null,
+          errorMessage: `Host ${hostName} is offline: ${errorMessage}`,
+          checkedAt: now,
+        });
+      }
       
       logger.scheduler.info(`Updated ${services.length} services to DOWN due to host ${hostName} offline`);
     } catch (error) {

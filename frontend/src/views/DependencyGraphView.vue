@@ -630,6 +630,112 @@ const securityFilter = ref<'all' | 'expiring'>('all');
 const allGlobalServices = ref<{ id: string; name: string; project_name?: string }[]>([]);
 const showShortcutsHint = ref(true);
 
+// SSE for real-time status updates
+let sseConnection: EventSource | null = null;
+let sseThrottle: ReturnType<typeof setTimeout> | null = null;
+let statusPollTimer: ReturnType<typeof setInterval> | null = null;
+
+// Lightweight status refresh: only update node status without rebuilding graph layout
+const refreshNodeStatuses = async () => {
+  if (graphNodes.value.length === 0) return;
+  try {
+    const checksRes = await api.get('/checks/latest');
+    const latestChecks = checksRes.data as Record<string, { 
+      status: string; response_time: number; error_message?: string; checked_at?: string 
+    }>;
+    
+    // Also fetch services to check enabled status
+    const svcRes = await api.get('/services');
+    const svcMap: Record<string, any> = {};
+    (svcRes.data as any[]).forEach(s => { svcMap[s.id] = s; });
+
+    // Update graphNodes in-place to preserve positions
+    graphNodes.value.forEach(node => {
+      const svc = svcMap[node.id];
+      const isDisabled = svc && svc.enabled === 0;
+      const check = latestChecks[node.id];
+      if (isDisabled) {
+        node.status = 'unknown';
+        if (node.data) node.data.status = 'unknown';
+      } else if (check) {
+        node.status = check.status;
+        node.responseTime = check.response_time;
+        node.errorMessage = check.error_message;
+        if (node.data) {
+          node.data.status = check.status;
+          node.data.responseTime = check.response_time;
+          node.data.errorMessage = check.error_message;
+          node.data.lastCheck = check.checked_at;
+        }
+      } else {
+        node.status = 'unknown';
+        if (node.data) node.data.status = 'unknown';
+      }
+    });
+    
+    // Also update allServices for stats/impact panel
+    allServices.value.forEach(s => {
+      const svc = svcMap[s.id];
+      const isDisabled = svc && svc.enabled === 0;
+      if (isDisabled) {
+        s.status = 'unknown' as any;
+      } else {
+        const check = latestChecks[s.id];
+        if (check) {
+          s.status = check.status as any;
+          s.responseTime = check.response_time;
+          s.errorMessage = check.error_message;
+          s.lastCheck = check.checked_at;
+        } else {
+          s.status = 'unknown';
+        }
+      }
+    });
+    
+    // Trigger reactivity
+    graphNodes.value = [...graphNodes.value];
+  } catch (error) {
+    console.error('Failed to refresh node statuses:', error);
+  }
+};
+
+const setupSSE = () => {
+  const token = authUtils.getToken();
+  const apiBase = (api.defaults.baseURL || '/api').replace(/\/$/, '');
+  sseConnection = new EventSource(`${apiBase}/checks/events${token ? '?token=' + encodeURIComponent(token) : ''}`);
+  sseConnection.onmessage = () => {
+    // Throttle: at most one refresh per 3 seconds
+    if (sseThrottle) return;
+    sseThrottle = setTimeout(() => {
+      refreshNodeStatuses();
+      sseThrottle = null;
+    }, 3000);
+  };
+  sseConnection.onerror = () => {
+    // Auto-reconnect handled by EventSource, just log
+    console.warn('SSE connection error in DependencyGraphView');
+  };
+  // Periodic status poll as safety net (every 30s)
+  statusPollTimer = setInterval(() => {
+    refreshNodeStatuses();
+  }, 30000);
+};
+
+const teardownSSE = () => {
+  if (sseConnection) {
+    sseConnection.close();
+    sseConnection = null;
+  }
+  if (sseThrottle) {
+    clearTimeout(sseThrottle);
+    sseThrottle = null;
+  }
+  if (statusPollTimer) {
+    clearInterval(statusPollTimer);
+    statusPollTimer = null;
+  }
+};
+
 // Get service IDs of current project
 const currentProjectServiceIds = computed(() => {
   return allServices.value.map(s => s.id);
@@ -1563,10 +1669,11 @@ const refreshGraph = async () => {
         name: s.name,
         host: s.host,
         port: s.port,
-        status: latestChecks[s.id]?.status || 'unknown',
+        status: s.enabled === 0 ? 'unknown' : (latestChecks[s.id]?.status || 'unknown'),
         responseTime: latestChecks[s.id]?.response_time,
         errorMessage: latestChecks[s.id]?.error_message,
         lastCheck: latestChecks[s.id]?.checked_at,
+        enabled: s.enabled,
         riskLevel: s.risk_level,
         layer: isCrossProjectService ? 'external' : (s.layer || 'backend'), // Mark external services
         dependencies: deps,
@@ -1803,11 +1910,14 @@ onMounted(() => {
   }, 100);
   window.addEventListener('resize', handleResize);
   window.addEventListener('click', closeContextMenu);
+  // Start SSE for real-time status updates
+  setupSSE();
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
   window.removeEventListener('click', closeContextMenu);
+  teardownSSE();
   if (graph) {
     graph.destroy();
   }
