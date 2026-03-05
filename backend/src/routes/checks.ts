@@ -77,7 +77,22 @@ router.get('/latest', (req, res) => {
 // Trigger a manual check
 router.post('/:id/run', async (req, res) => {
   const { id } = req.params;
-  const service = db.prepare('SELECT * FROM services WHERE id = ?').get(id) as any;
+  const service = db.prepare(`
+    SELECT s.*, 
+      h.connection_type as host_connection_type,
+      h.ssh_host as host_ssh_host,
+      h.ssh_port as host_ssh_port,
+      h.ssh_username as host_ssh_username,
+      h.ssh_auth_type as host_ssh_auth_type,
+      h.ssh_password as host_ssh_password,
+      h.ssh_private_key as host_ssh_private_key,
+      h.ssh_passphrase as host_ssh_passphrase,
+      h.ssh_proxy_host as host_ssh_proxy_host,
+      h.ssh_proxy_port as host_ssh_proxy_port
+    FROM services s
+    LEFT JOIN hosts h ON s.host_id = h.id
+    WHERE s.id = ?
+  `).get(id) as any;
 
   if (!service) {
     return res.status(404).json({ error: 'Service not found' });
