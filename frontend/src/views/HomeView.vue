@@ -5,8 +5,8 @@
       <div class="page-title-section">
         <div class="page-icon">📊</div>
         <div class="page-info">
-          <div class="page-title">Overview Dashboard</div>
-          <div class="page-subtitle">System Global Monitoring View</div>
+          <div class="page-title">{{ $t('home.title') }}</div>
+          <div class="page-subtitle">{{ $t('home.subtitle') }}</div>
         </div>
       </div>
       
@@ -15,7 +15,7 @@
         <div class="last-updated">
           <el-icon v-if="loading" class="is-loading"><Loading /></el-icon>
           <span v-else>🕐</span>
-          <span>Last updated: {{ lastUpdatedText }}</span>
+          <span>{{ $t('home.lastUpdated') }} {{ lastUpdatedText }}</span>
         </div>
         
         <div class="countdown-container" v-if="autoRefresh">
@@ -28,8 +28,8 @@
         <el-switch 
           v-model="autoRefresh" 
           inline-prompt 
-          active-text="Auto" 
-          inactive-text="Manual" 
+          :active-text="$t('home.autoMode')" 
+          :inactive-text="$t('home.manualMode')" 
           @change="handleAutoRefreshChange" 
         />
         
@@ -39,17 +39,17 @@
           </el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item :command="15">15 seconds</el-dropdown-item>
-              <el-dropdown-item :command="30">30 seconds</el-dropdown-item>
-              <el-dropdown-item :command="60">1 minute</el-dropdown-item>
-              <el-dropdown-item :command="300">5 minutes</el-dropdown-item>
+              <el-dropdown-item :command="15">{{ $t('home.interval15s') }}</el-dropdown-item>
+              <el-dropdown-item :command="30">{{ $t('home.interval30s') }}</el-dropdown-item>
+              <el-dropdown-item :command="60">{{ $t('home.interval1m') }}</el-dropdown-item>
+              <el-dropdown-item :command="300">{{ $t('home.interval5m') }}</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
         
         <el-button type="primary" :loading="loading" @click="refreshData">
           <el-icon v-if="!loading"><Refresh /></el-icon>
-          <span>{{ loading ? 'Loading...' : 'Refresh' }}</span>
+          <span>{{ loading ? $t('common.loading') : $t('common.refresh') }}</span>
         </el-button>
       </div>
     </div>
@@ -59,7 +59,7 @@
       <el-col :span="6">
         <div class="stat-card total">
           <div class="stat-header">
-            <div class="stat-label">Total Services</div>
+            <div class="stat-label">{{ $t('home.totalServices') }}</div>
             <div class="stat-icon total">🖥️</div>
           </div>
           <div class="stat-value-section">
@@ -70,7 +70,7 @@
               <div class="progress-fill" :style="{ width: '100%', background: '#409EFF' }"></div>
             </div>
             <div class="stat-progress">
-              <span>All services</span>
+              <span>{{ $t('home.allServices') }}</span>
             </div>
           </div>
         </div>
@@ -79,7 +79,7 @@
       <el-col :span="6">
         <div class="stat-card healthy">
           <div class="stat-header">
-            <div class="stat-label">Healthy</div>
+            <div class="stat-label">{{ $t('home.healthy') }}</div>
             <div class="stat-icon healthy">✅</div>
           </div>
           <div class="stat-value-section">
@@ -90,7 +90,7 @@
               <div class="progress-fill" :style="{ width: healthyPercent + '%', background: '#67C23A' }"></div>
             </div>
             <div class="stat-progress">
-              <span>{{ healthyPercent }}% of total</span>
+              <span>{{ healthyPercent }}{{ $t('home.percentOfTotal') }}</span>
             </div>
           </div>
         </div>
@@ -99,7 +99,7 @@
       <el-col :span="6">
         <div class="stat-card warning">
           <div class="stat-header">
-            <div class="stat-label">Warning</div>
+            <div class="stat-label">{{ $t('home.warning') }}</div>
             <div class="stat-icon warning">⚠️</div>
           </div>
           <div class="stat-value-section">
@@ -110,7 +110,7 @@
               <div class="progress-fill" :style="{ width: warningPercent + '%', background: '#E6A23C' }"></div>
             </div>
             <div class="stat-progress">
-              <span>{{ warningPercent }}% of total</span>
+              <span>{{ warningPercent }}{{ $t('home.percentOfTotal') }}</span>
             </div>
           </div>
         </div>
@@ -119,7 +119,7 @@
       <el-col :span="6">
         <div class="stat-card down">
           <div class="stat-header">
-            <div class="stat-label">Down / Unknown</div>
+            <div class="stat-label">{{ $t('home.downUnknown') }}</div>
             <div class="stat-icon down">❌</div>
           </div>
           <div class="stat-value-section">
@@ -130,8 +130,8 @@
               <div class="progress-fill" :style="{ width: downPercent + '%', background: '#F56C6C' }"></div>
             </div>
             <div class="stat-progress">
-              <span v-if="stats.unknown > 0">{{ stats.down }} down, {{ stats.unknown }} unknown</span>
-              <span v-else>{{ downPercent }}% of total</span>
+              <span v-if="stats.unknown > 0">{{ stats.down }} {{ $t('home.down') }}, {{ stats.unknown }} {{ $t('home.unknown') }}</span>
+              <span v-else>{{ downPercent }}{{ $t('home.percentOfTotal') }}</span>
             </div>
           </div>
         </div>
@@ -147,7 +147,7 @@
             <div class="card-header">
               <div class="card-title">
                 <span>📊</span>
-                <span>Status Distribution</span>
+                <span>{{ $t('home.statusDistribution') }}</span>
               </div>
             </div>
           </template>
@@ -162,9 +162,9 @@
             <div class="card-header">
               <div class="card-title">
                 <span>🌐</span>
-                <span>Resources Distribution</span>
+                <span>{{ $t('home.resourcesDistribution') }}</span>
               </div>
-              <el-button text size="small" @click="$router.push('/projects')">Details →</el-button>
+              <el-button text size="small" @click="$router.push('/projects')">{{ $t('home.details') }}</el-button>
             </div>
           </template>
           <div class="chart-container" ref="resourceChartRef"></div>
@@ -178,7 +178,7 @@
         <div class="card-header">
           <div class="card-title">
             <span>⚡</span>
-            <span>System Overview</span>
+            <span>{{ $t('home.systemOverview') }}</span>
           </div>
         </div>
       </template>
@@ -188,7 +188,7 @@
             <div class="overview-icon projects">🌐</div>
             <div class="overview-content">
               <div class="overview-value">{{ metrics.projects }}</div>
-              <div class="overview-label">Projects</div>
+              <div class="overview-label">{{ $t('home.projects') }}</div>
               <div class="overview-detail">{{ projectHealthSummary }}</div>
             </div>
           </div>
@@ -198,7 +198,7 @@
             <div class="overview-icon hosts">🖥️</div>
             <div class="overview-content">
               <div class="overview-value">{{ metrics.hosts }}</div>
-              <div class="overview-label">Hosts</div>
+              <div class="overview-label">{{ $t('home.hosts') }}</div>
               <div class="overview-detail">{{ hostStatusSummary }}</div>
             </div>
           </div>
@@ -208,8 +208,8 @@
             <div class="overview-icon dependencies">🔗</div>
             <div class="overview-content">
               <div class="overview-value">{{ metrics.dependencies }}</div>
-              <div class="overview-label">Dependencies</div>
-              <div class="overview-detail">Cross-project links</div>
+              <div class="overview-label">{{ $t('home.dependencies') }}</div>
+              <div class="overview-detail">{{ $t('home.crossProjectLinks') }}</div>
             </div>
           </div>
         </el-col>
@@ -218,8 +218,8 @@
             <div class="overview-icon dashboards">📊</div>
             <div class="overview-content">
               <div class="overview-value">{{ metrics.dashboards }}</div>
-              <div class="overview-label">Dashboards</div>
-              <div class="overview-detail">Grafana integrated</div>
+              <div class="overview-label">{{ $t('home.dashboards') }}</div>
+              <div class="overview-detail">{{ $t('home.grafanaIntegrated') }}</div>
             </div>
           </div>
         </el-col>
@@ -228,8 +228,8 @@
             <div class="overview-icon security">🔐</div>
             <div class="overview-content">
               <div class="overview-value">{{ metrics.securityConfigs }}</div>
-              <div class="overview-label">Security Configs</div>
-              <div class="overview-detail">{{ securityWarnings }} need attention</div>
+              <div class="overview-label">{{ $t('home.securityConfigs') }}</div>
+              <div class="overview-detail">{{ securityWarnings }} {{ $t('home.needAttention') }}</div>
             </div>
           </div>
         </el-col>
@@ -238,8 +238,8 @@
             <div class="overview-icon issues">⚠️</div>
             <div class="overview-content">
               <div class="overview-value">{{ stats.warning + stats.down }}</div>
-              <div class="overview-label">Issues</div>
-              <div class="overview-detail">{{ stats.down }} critical</div>
+              <div class="overview-label">{{ $t('home.issues') }}</div>
+              <div class="overview-detail">{{ stats.down }} {{ $t('home.critical') }}</div>
             </div>
           </div>
         </el-col>
@@ -251,6 +251,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, inject, watch, reactive, nextTick, type Ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { Refresh, Loading, ArrowDown } from '@element-plus/icons-vue';
 import { getProjects, type ProjectWithStats } from '../api/projects';
 import { getHosts } from '../api/hosts';
@@ -262,6 +263,7 @@ import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 
 const router = useRouter();
+const { t, locale } = useI18n();
 const currentProjectId = inject<Ref<number | null>>('currentProjectId');
 
 // 数据状态
@@ -281,7 +283,7 @@ const metrics = reactive({
 const autoRefresh = ref(localStorage.getItem('dashboard_autoRefresh') === 'true');
 const refreshInterval = ref(parseInt(localStorage.getItem('dashboard_refreshInterval') || '30'));
 const countdown = ref(parseInt(localStorage.getItem('dashboard_refreshInterval') || '30'));
-const lastUpdatedText = ref('Never');
+const lastUpdatedText = ref(t('common.never'));
 let countdownTimer: number | null = null;
 
 // Chart refs
@@ -310,11 +312,11 @@ const progressPercent = computed(() => {
 
 const projectHealthSummary = computed(() => {
   const healthy = projects.value.filter(p => p.healthy_count === p.service_count).length;
-  return `${healthy} healthy`;
+  return `${healthy} ${t('home.hostHealthy')}`;
 });
 
 const hostStatusSummary = computed(() => {
-  return 'All monitored';
+  return t('home.allMonitored');
 });
 
 const securityWarnings = computed(() => {
@@ -368,10 +370,10 @@ const updateStatusChart = () => {
           }
         },
         data: [
-          { value: stats.up, name: 'Healthy', itemStyle: { color: '#67C23A' } },
-          { value: stats.warning, name: 'Warning', itemStyle: { color: '#E6A23C' } },
-          { value: stats.down, name: 'Down', itemStyle: { color: '#F56C6C' } },
-          { value: stats.unknown, name: 'Unknown', itemStyle: { color: '#909399' } }
+          { value: stats.up, name: t('statusLabels.healthy'), itemStyle: { color: '#67C23A' } },
+          { value: stats.warning, name: t('statusLabels.warning'), itemStyle: { color: '#E6A23C' } },
+          { value: stats.down, name: t('statusLabels.down'), itemStyle: { color: '#F56C6C' } },
+          { value: stats.unknown, name: t('statusLabels.unknown'), itemStyle: { color: '#909399' } }
         ].filter(d => d.value > 0)
       }
     ]
@@ -398,7 +400,10 @@ const updateResourceChart = () => {
       axisPointer: {
         type: 'shadow'
       },
-      formatter: '{b}: {c} services'
+      formatter: (params: any) => {
+        const d = Array.isArray(params) ? params[0] : params;
+        return `${d.name}: ${d.value} ${t('home.services')}`;
+      }
     },
     grid: {
       left: '5%',
@@ -576,6 +581,12 @@ onBeforeUnmount(() => {
 watch(currentProjectId, () => {
   refreshData();
 }, { deep: true });
+
+// 监听语言切换，重新渲染图表标签
+watch(locale, () => {
+  updateStatusChart();
+  updateResourceChart();
+});
 </script>
 
 <style scoped>

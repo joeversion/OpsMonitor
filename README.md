@@ -387,6 +387,13 @@ This will automatically build and start all services:
 
 > **Note:** No manual `npm run build` required — Docker handles the entire build process.
 
+**Default admin credentials**:
+
+| Field | Value |
+|-------|-------|
+| Username | `admin` |
+| Password | `admin123` |
+
 ## Configuration
 
 **No configuration files are required for any deployment mode.** All defaults are built into the project and work out of the box.

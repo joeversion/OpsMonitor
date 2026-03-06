@@ -8,7 +8,7 @@
             <el-icon :size="24"><DataBoard /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Total Dashboards</div>
+            <div class="stat-label">{{ $t('grafana.totalDashboards') }}</div>
             <div class="stat-value">{{ dashboards.length }}</div>
           </div>
         </div>
@@ -19,7 +19,7 @@
             <el-icon :size="24"><CircleCheckFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Enabled</div>
+            <div class="stat-label">{{ $t('grafana.enabled') }}</div>
             <div class="stat-value" style="color: #67C23A">{{ enabledCount }}</div>
           </div>
         </div>
@@ -30,7 +30,7 @@
             <el-icon :size="24"><FolderOpened /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Project Linked</div>
+            <div class="stat-label">{{ $t('grafana.projectLinked') }}</div>
             <div class="stat-value" style="color: #E6A23C">{{ projectLinkedCount }}</div>
           </div>
         </div>
@@ -41,13 +41,13 @@
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="card-title">📊 Grafana Dashboards</span>
+          <span class="card-title">📊 {{ $t('grafana.title') }}</span>
           <div class="actions">
             <el-button @click="loadData">
-              <el-icon><Refresh /></el-icon> Refresh
+              <el-icon><Refresh /></el-icon> {{ $t('common.refresh') }}
             </el-button>
             <el-button type="primary" @click="handleAdd" v-if="isAdmin">
-              <el-icon><Plus /></el-icon> Add Dashboard
+              <el-icon><Plus /></el-icon> {{ $t('grafana.addDashboard') }}
             </el-button>
           </div>
         </div>
@@ -55,14 +55,14 @@
 
       <!-- Filters -->
       <div class="filter-bar">
-        <el-input v-model="searchQuery" placeholder="Search name..." :prefix-icon="Search" style="width: 250px;" clearable />
-        <el-select v-model="filterProject" placeholder="Filter by Project" clearable multiple collapse-tags style="width: 200px;">
+        <el-input v-model="searchQuery" :placeholder="$t('grafana.searchPlaceholder')" :prefix-icon="Search" style="width: 250px;" clearable />
+        <el-select v-model="filterProject" :placeholder="$t('grafana.filterByProject')" clearable multiple collapse-tags style="width: 200px;">
           <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
         </el-select>
-        <el-select v-model="filterEnabled" placeholder="Status" clearable style="width: 120px;">
-          <el-option label="All" value="" />
-          <el-option label="Enabled" value="enabled" />
-          <el-option label="Disabled" value="disabled" />
+        <el-select v-model="filterEnabled" :placeholder="$t('common.status')" clearable style="width: 120px;">
+          <el-option :label="$t('common.all')" value="" />
+          <el-option :label="$t('grafana.enabled')" value="enabled" />
+          <el-option :label="$t('grafana.disabled')" value="disabled" />
         </el-select>
       </div>
 
@@ -107,7 +107,7 @@
                 <el-icon><Link /></el-icon> {{ dashboard.dashboard_uid }}
               </span>
               <span v-if="dashboard.panel_id" class="meta-item">
-                Panel: #{{ dashboard.panel_id }}
+                {{ $t('grafana.panelLabel') }}: #{{ dashboard.panel_id }}
               </span>
             </div>
             <div class="embed-options" v-if="dashboard.embed_options">
@@ -118,65 +118,65 @@
                 {{ dashboard.embed_options.refresh }}
               </el-tag>
               <el-tag size="small" type="success" v-if="dashboard.embed_options.kiosk">
-                Kiosk
+                {{ $t('grafana.kiosk') }}
               </el-tag>
             </div>
           </div>
           
           <div class="dashboard-actions">
             <el-button type="primary" link @click="handleView(dashboard)">
-              <el-icon><View /></el-icon> View
+              <el-icon><View /></el-icon> {{ $t('grafana.viewDashboard') }}
             </el-button>
             <el-button type="info" link @click="handleOpenGrafana(dashboard)">
-              <el-icon><TopRight /></el-icon> Open Original
+              <el-icon><TopRight /></el-icon> {{ $t('grafana.openOriginal') }}
             </el-button>
             <template v-if="isAdmin">
               <el-button type="warning" link @click="handleEdit(dashboard)">
-                <el-icon><Edit /></el-icon> Edit
+                <el-icon><Edit /></el-icon> {{ $t('grafana.editDashboard') }}
               </el-button>
               <el-button type="danger" link @click="handleDelete(dashboard)">
-                <el-icon><Delete /></el-icon> Delete
+                <el-icon><Delete /></el-icon> {{ $t('grafana.deleteDashboard') }}
               </el-button>
             </template>
           </div>
         </el-card>
         
         <div v-if="filteredDashboards.length === 0 && !loading" class="empty-state">
-          <el-empty description="No Dashboard configured">
-            <el-button type="primary" @click="handleAdd" v-if="isAdmin">Add First Dashboard</el-button>
+          <el-empty :description="$t('grafana.noDashboards')">
+            <el-button type="primary" @click="handleAdd" v-if="isAdmin">{{ $t('grafana.addFirstDashboard') }}</el-button>
           </el-empty>
         </div>
       </div>
     </el-card>
 
     <!-- Add/Edit Dialog -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? 'Edit Dashboard' : 'Add Dashboard'" width="700px">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? t('grafana.dialogEdit') : t('grafana.dialogCreate')" width="700px">
       <el-form :model="form" label-width="120px" ref="formRef">
-        <el-divider content-position="left">Grafana Configuration</el-divider>
+        <el-divider content-position="left">{{ $t('grafana.grafanaConfig') }}</el-divider>
         
-        <el-form-item label="Grafana URL" required>
+        <el-form-item :label="$t('grafana.labelGrafanaUrl')" required>
           <div style="display: flex; gap: 10px; width: 100%;">
-            <el-input v-model="form.grafana_url" placeholder="https://grafana.example.com" style="flex: 1;" />
+            <el-input v-model="form.grafana_url" :placeholder="$t('grafana.placeholderGrafanaUrl')" style="flex: 1;" />
             <el-button 
               type="primary" 
               @click="handleTestConnection" 
               :loading="testing"
               :disabled="!form.grafana_url"
             >
-              <el-icon><Connection /></el-icon> Test Connection
+              <el-icon><Connection /></el-icon> {{ $t('grafana.testConnection') }}
             </el-button>
           </div>
         </el-form-item>
         
-        <el-form-item label="API Key">
+        <el-form-item :label="$t('grafana.labelApiKey')">
           <el-input 
             v-model="form.api_key" 
-            placeholder="Optional, for private Dashboard access" 
+            :placeholder="$t('grafana.placeholderApiKey')" 
             type="password"
             show-password
           />
           <template #extra>
-            <span class="form-tip">Enter API Key if Grafana requires authentication</span>
+            <span class="form-tip">{{ $t('grafana.tipApiKey') }}</span>
           </template>
         </el-form-item>
 
@@ -191,10 +191,10 @@
         </el-form-item>
 
         <!-- Dashboard selector from Grafana -->
-        <el-form-item label="Dashboard" required v-if="remoteDashboards.length > 0">
+        <el-form-item :label="$t('grafana.labelDashboard')" required v-if="remoteDashboards.length > 0">
           <el-select 
             v-model="selectedRemoteDashboard" 
-            placeholder="Select Dashboard from Grafana"
+            :placeholder="$t('grafana.placeholderSelectDashboard')"
             style="width: 100%;"
             filterable
             @change="handleRemoteDashboardSelect"
@@ -213,22 +213,22 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item label="Dashboard UID" required v-else>
-          <el-input v-model="form.dashboard_uid" placeholder="Dashboard UID (e.g. abc123xyz)" />
+        <el-form-item :label="$t('grafana.labelDashboardUid')" required v-else>
+          <el-input v-model="form.dashboard_uid" :placeholder="$t('grafana.placeholderDashboardUid')" />
           <template #extra>
-            <span class="form-tip">Get from Grafana Dashboard URL, e.g. /d/<strong>abc123xyz</strong>/dashboard-name</span>
+            <span class="form-tip" v-html="$t('grafana.tipDashboardUid')"></span>
           </template>
         </el-form-item>
 
         <!-- Panel selector -->
-        <el-form-item label="Panel" v-if="remotePanels.length > 0">
+        <el-form-item :label="$t('grafana.labelPanel')" v-if="remotePanels.length > 0">
           <el-select 
             v-model="form.panel_id" 
-            placeholder="Select Panel (leave empty for full Dashboard)"
+            :placeholder="$t('grafana.placeholderSelectPanel')"
             style="width: 100%;"
             clearable
           >
-            <el-option :value="undefined" label="Full Dashboard" />
+            <el-option :value="undefined" :label="$t('grafana.fullDashboard')" />
             <el-option 
               v-for="p in remotePanels" 
               :key="p.id" 
@@ -241,30 +241,30 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item label="Panel ID" v-else>
-          <el-input-number v-model="form.panel_id" :min="0" placeholder="Leave empty for full Dashboard" />
+        <el-form-item :label="$t('grafana.labelPanelId')" v-else>
+          <el-input-number v-model="form.panel_id" :min="0" :placeholder="$t('grafana.placeholderPanelId')" />
           <template #extra>
-            <span class="form-tip">Only embed this panel when Panel ID is specified</span>
+            <span class="form-tip">{{ $t('grafana.tipPanelId') }}</span>
           </template>
         </el-form-item>
 
-        <el-divider content-position="left">Basic Info</el-divider>
+        <el-divider content-position="left">{{ $t('grafana.basicInfo') }}</el-divider>
         
-        <el-form-item label="Name" required>
-          <el-input v-model="form.name" placeholder="e.g. Nova Server Metrics" />
+        <el-form-item :label="$t('grafana.labelName')" required>
+          <el-input v-model="form.name" :placeholder="$t('grafana.placeholderName')" />
         </el-form-item>
-        <el-form-item label="Description">
-          <el-input v-model="form.description" type="textarea" :rows="2" placeholder="Dashboard description..." />
+        <el-form-item :label="$t('grafana.labelDesc')">
+          <el-input v-model="form.description" type="textarea" :rows="2" :placeholder="$t('grafana.placeholderDesc')" />
         </el-form-item>
 
-        <el-divider content-position="left">Association</el-divider>
-        <el-form-item label="Projects">
+        <el-divider content-position="left">{{ $t('grafana.association') }}</el-divider>
+        <el-form-item :label="$t('grafana.labelProjects')">
           <el-select 
             v-model="form.project_ids" 
             :multiple="projectMultiSelect" 
             :collapse-tags="projectMultiSelect"
             :collapse-tags-tooltip="projectMultiSelect"
-            placeholder="Select Project(s)" 
+            :placeholder="$t('grafana.placeholderSelectProjects')" 
             clearable 
             style="width: 100%;"
           >
@@ -272,78 +272,78 @@
           </el-select>
           <div style="margin-top: 5px;">
             <el-switch v-model="projectMultiSelect" size="small" />
-            <span style="margin-left: 8px; color: #909399; font-size: 12px;">Multi-select mode</span>
+            <span style="margin-left: 8px; color: #909399; font-size: 12px;">{{ $t('grafana.multiSelectMode') }}</span>
           </div>
         </el-form-item>
-        <el-form-item label="Service">
-          <el-select v-model="form.service_id" placeholder="Select Service" clearable style="width: 100%;">
+        <el-form-item :label="$t('grafana.labelService')">
+          <el-select v-model="form.service_id" :placeholder="$t('grafana.placeholderSelectService')" clearable style="width: 100%;">
             <el-option v-for="s in services" :key="s.id" :label="s.name" :value="s.id" />
           </el-select>
         </el-form-item>
         
-        <el-divider content-position="left">Embed Options</el-divider>
-        <el-form-item label="Theme">
+        <el-divider content-position="left">{{ $t('grafana.embedOptions') }}</el-divider>
+        <el-form-item :label="$t('grafana.labelTheme')">
           <el-radio-group v-model="form.embed_options.theme">
-            <el-radio value="dark">Dark</el-radio>
-            <el-radio value="light">Light</el-radio>
+            <el-radio value="dark">{{ $t('grafana.themeDark') }}</el-radio>
+            <el-radio value="light">{{ $t('grafana.themeLight') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="Time Range">
-          <el-select v-model="form.embed_options.from" placeholder="Start Time" style="width: 45%;">
-            <el-option label="Last 1 hour" value="now-1h" />
-            <el-option label="Last 6 hours" value="now-6h" />
-            <el-option label="Last 12 hours" value="now-12h" />
-            <el-option label="Last 24 hours" value="now-24h" />
-            <el-option label="Last 7 days" value="now-7d" />
+        <el-form-item :label="$t('grafana.labelTimeRange')">
+          <el-select v-model="form.embed_options.from" :placeholder="$t('grafana.placeholderStartTime')" style="width: 45%;">
+            <el-option :label="$t('grafana.timeLast1h')" value="now-1h" />
+            <el-option :label="$t('grafana.timeLast6h')" value="now-6h" />
+            <el-option :label="$t('grafana.timeLast12h')" value="now-12h" />
+            <el-option :label="$t('grafana.timeLast24h')" value="now-24h" />
+            <el-option :label="$t('grafana.timeLast7d')" value="now-7d" />
           </el-select>
-          <span style="margin: 0 10px;">to</span>
+          <span style="margin: 0 10px;">{{ $t('common.to') }}</span>
           <el-input v-model="form.embed_options.to" placeholder="now" style="width: 25%;" />
         </el-form-item>
-        <el-form-item label="Auto Refresh">
-          <el-select v-model="form.embed_options.refresh" placeholder="Select Interval" clearable style="width: 200px;">
-            <el-option label="Off" value="" />
-            <el-option label="5 seconds" value="5s" />
-            <el-option label="10 seconds" value="10s" />
-            <el-option label="30 seconds" value="30s" />
-            <el-option label="1 minute" value="1m" />
-            <el-option label="5 minutes" value="5m" />
+        <el-form-item :label="$t('grafana.labelAutoRefresh')">
+          <el-select v-model="form.embed_options.refresh" :placeholder="$t('grafana.placeholderSelectInterval')" clearable style="width: 200px;">
+            <el-option :label="$t('grafana.refreshOff')" value="" />
+            <el-option :label="$t('grafana.refresh5s')" value="5s" />
+            <el-option :label="$t('grafana.refresh10s')" value="10s" />
+            <el-option :label="$t('grafana.refresh30s')" value="30s" />
+            <el-option :label="$t('grafana.refresh1m')" value="1m" />
+            <el-option :label="$t('grafana.refresh5m')" value="5m" />
           </el-select>
         </el-form-item>
-        <el-form-item label="Kiosk Mode">
+        <el-form-item :label="$t('grafana.labelKioskMode')">
           <el-switch v-model="form.embed_options.kiosk" />
-          <span style="margin-left: 10px; color: #909399;">Hide Grafana navigation bar</span>
+          <span style="margin-left: 10px; color: #909399;">{{ $t('grafana.tipKioskMode') }}</span>
         </el-form-item>
-        <el-form-item label="Display Order">
+        <el-form-item :label="$t('grafana.labelDisplayOrder')">
           <el-input-number v-model="form.display_order" :min="0" :max="999" />
         </el-form-item>
-        <el-form-item label="Enabled">
+        <el-form-item :label="$t('grafana.enabled')">
           <el-switch v-model="form.enabled" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">Cancel</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">Save</el-button>
+        <el-button @click="dialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSubmit" :loading="submitting">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- View Dashboard Dialog -->
     <el-dialog 
       v-model="viewDialogVisible" 
-      :title="viewingDashboard?.name || 'Dashboard'" 
+      :title="viewingDashboard?.name || t('grafana.dashboard')" 
       width="95%" 
       fullscreen
       class="dashboard-view-dialog"
     >
       <div class="dashboard-toolbar">
         <el-button @click="viewDialogVisible = false" type="default">
-          <el-icon><Back /></el-icon> Back
+          <el-icon><Back /></el-icon> {{ $t('common.back') }}
         </el-button>
         <div class="toolbar-divider"></div>
         <el-button @click="handleOpenGrafana(viewingDashboard!)" type="primary" link>
-          <el-icon><TopRight /></el-icon> Open in Grafana
+          <el-icon><TopRight /></el-icon> {{ $t('grafana.openInGrafana') }}
         </el-button>
         <el-button @click="refreshIframe" link>
-          <el-icon><Refresh /></el-icon> Refresh
+          <el-icon><Refresh /></el-icon> {{ $t('common.refresh') }}
         </el-button>
       </div>
       <div class="iframe-container">
@@ -361,6 +361,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, reactive } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
   DataBoard, CircleCheckFilled, FolderOpened, Plus, Refresh, Search,
@@ -376,6 +377,9 @@ import {
 import { getProjects, type Project } from '../api/projects';
 import { getServices, type Service } from '../api/services';
 import authUtils from '../utils/auth';
+
+// i18n
+const { t } = useI18n();
 
 // Permission check
 const isAdmin = computed(() => authUtils.isAdmin());
@@ -497,7 +501,7 @@ const loadData = async () => {
     projects.value = projectsData;
     services.value = servicesData;
   } catch (error: any) {
-    ElMessage.error('Failed to load data: ' + error.message);
+    ElMessage.error(t('grafana.loadFailed') + ': ' + error.message);
   } finally {
     loading.value = false;
   }
@@ -524,7 +528,7 @@ const resetForm = () => {
 
 const handleTestConnection = async () => {
   if (!form.grafana_url) {
-    ElMessage.warning('Please enter Grafana URL first');
+    ElMessage.warning(t('grafana.enterGrafanaUrlFirst'));
     return;
   }
 
@@ -539,7 +543,7 @@ const handleTestConnection = async () => {
     
     if (result.success && result.dashboards) {
       remoteDashboards.value = result.dashboards;
-      ElMessage.success(`Connected! Found ${result.dashboards.length} Dashboard(s)`);
+      ElMessage.success(t('grafana.connectionSuccess', { count: result.dashboards.length }));
     }
   } catch (error: any) {
     connectionTestResult.value = { 
@@ -618,7 +622,7 @@ const handleEdit = (dashboard: GrafanaDashboard) => {
 
 const handleSubmit = async () => {
   if (!form.name || !form.grafana_url || !form.dashboard_uid) {
-    ElMessage.warning('Please fill in required fields');
+    ElMessage.warning(t('grafana.fillRequired'));
     return;
   }
   
@@ -648,15 +652,15 @@ const handleSubmit = async () => {
     
     if (isEdit.value) {
       await updateGrafanaDashboard(editingId.value, data);
-      ElMessage.success('Dashboard updated successfully');
+      ElMessage.success(t('grafana.updateSuccess'));
     } else {
       await createGrafanaDashboard(data);
-      ElMessage.success('Dashboard created successfully');
+      ElMessage.success(t('grafana.createSuccess'));
     }
     dialogVisible.value = false;
     await loadData();
   } catch (error: any) {
-    ElMessage.error('Failed to save: ' + error.message);
+    ElMessage.error(t('grafana.saveFailed') + ': ' + error.message);
   } finally {
     submitting.value = false;
   }
@@ -665,16 +669,16 @@ const handleSubmit = async () => {
 const handleDelete = async (dashboard: GrafanaDashboard) => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete Dashboard "${dashboard.name}"?`,
-      'Confirm Delete',
+      t('grafana.deleteConfirm', { name: dashboard.name }),
+      t('grafana.confirmDeleteTitle'),
       { type: 'warning' }
     );
     await deleteGrafanaDashboard(dashboard.id);
-    ElMessage.success('Deleted successfully');
+    ElMessage.success(t('grafana.deleteSuccess'));
     await loadData();
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('Failed to delete: ' + error.message);
+      ElMessage.error(t('grafana.deleteFailed') + ': ' + error.message);
     }
   }
 };
@@ -683,7 +687,7 @@ const handleToggle = async (dashboard: GrafanaDashboard) => {
   try {
     await toggleGrafanaDashboard(dashboard.id);
   } catch (error: any) {
-    ElMessage.error('Operation failed: ' + error.message);
+    ElMessage.error(t('grafana.operationFailed') + ': ' + error.message);
     dashboard.enabled = !dashboard.enabled;
   }
 };

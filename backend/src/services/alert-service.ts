@@ -2,6 +2,7 @@ import db from '../db/database';
 import { v4 as uuidv4 } from 'uuid';
 import { NotificationService } from './notification-service';
 import { logger } from '../utils/logger';
+import { nt, getTypeLabel } from '../utils/notification-i18n';
 
 interface CheckResult {
   status: 'up' | 'down' | 'warning' | 'unknown';
@@ -52,43 +53,52 @@ export class AlertService {
     
     // Get failure threshold (user configurable, default 3)
     const failureThreshold = (service as any).failure_threshold ?? 3;
-    let currentFailureCount = (service as any).current_failure_count ?? 0;
 
-    // Update failure count based on current status
+    // Bug fix: Atomically read & update current_failure_count from DB to prevent
+    // duplicate alerts when two concurrent performCheck() calls race each other.
+    // Previously we read from the (potentially stale) service object passed in.
+
     if (currentStatus === 'down' || currentStatus === 'warning') {
-      // Increment failure count
-      currentFailureCount++;
+      // Atomically increment and return the new count
+      const newCount = db.transaction(() => {
+        const row = db.prepare('SELECT current_failure_count FROM services WHERE id = ?').get(service.id) as any;
+        const count = (row?.current_failure_count ?? 0) + 1;
+        db.prepare('UPDATE services SET current_failure_count = ? WHERE id = ?').run(count, service.id);
+        return count;
+      })();
       
-      // Update count in database
-      db.prepare('UPDATE services SET current_failure_count = ? WHERE id = ?').run(currentFailureCount, service.id);
+      logger.alert.debug(`Service ${service.name} failure count: ${newCount}/${failureThreshold}`);
       
-      logger.alert.debug(`Service ${service.name} failure count: ${currentFailureCount}/${failureThreshold}`);
-      
-      // Only alert if threshold is reached
-      if (currentFailureCount === failureThreshold) {
-        // Threshold reached, send alert
+      // Only alert if threshold is reached exactly (prevents duplicate alerts)
+      if (newCount === failureThreshold) {
         if (currentStatus === 'down') {
-          await this.createAlert(service, 'down', `Service ${service.name} is DOWN after ${currentFailureCount} consecutive failures. Error: ${result.error || 'Unknown error'}`);
+          await this.createAlert(service, 'down', nt('alert.serviceDown', { name: service.name, count: newCount, error: result.error || 'Unknown error' }));
         } else if (currentStatus === 'warning') {
-          await this.createAlert(service, 'warning', `Service ${service.name} is in WARNING state after ${currentFailureCount} consecutive slow responses. Response time: ${result.responseTime}ms`);
+          await this.createAlert(service, 'warning', nt('alert.serviceWarning', { name: service.name, count: newCount, time: result.responseTime }));
         }
-      } else if (currentFailureCount > failureThreshold) {
+      } else if (newCount > failureThreshold) {
         // Already alerted, don't spam
         logger.alert.debug(`Service ${service.name} still down/warning, suppressing repeat alert`);
       }
       // If count < threshold, no alert yet (transient failure)
       
     } else if (currentStatus === 'up') {
-      // Service is healthy
-      if (currentFailureCount >= failureThreshold) {
+      // Atomically read count and reset to prevent duplicate recovery alerts
+      const prevCount = db.transaction(() => {
+        const row = db.prepare('SELECT current_failure_count FROM services WHERE id = ?').get(service.id) as any;
+        const count = row?.current_failure_count ?? 0;
+        if (count > 0) {
+          db.prepare('UPDATE services SET current_failure_count = 0 WHERE id = ?').run(service.id);
+        }
+        return count;
+      })();
+
+      if (prevCount >= failureThreshold) {
         // Was in alerted state, now recovered - send recovery
-        await this.createAlert(service, 'recovery', `Service ${service.name} has recovered after ${currentFailureCount} consecutive failures.`);
-      }
-      
-      // Reset failure count
-      if (currentFailureCount > 0) {
-        db.prepare('UPDATE services SET current_failure_count = 0 WHERE id = ?').run(service.id);
+        await this.createAlert(service, 'recovery', nt('alert.serviceRecovery', { name: service.name, count: prevCount }));
         logger.alert.debug(`Service ${service.name} recovered, reset failure count`);
+      } else if (prevCount > 0) {
+        logger.alert.debug(`Service ${service.name} recovered (below threshold), reset failure count`);
       }
     }
   }
@@ -97,19 +107,17 @@ export class AlertService {
     let alertLevel: 'warning' | 'critical' | 'expired';
     let message: string;
     
-    const typeLabel = config.type === 'accesskey' ? 'AccessKey' : 
-                      config.type === 'ftp' ? 'FTP Password' : 
-                      config.type === 'ssh' ? 'SSH Credential' : 'SSL Certificate';
+    const typeLabel = getTypeLabel(config.type);
     
     if (daysRemaining <= 0) {
       alertLevel = 'expired';
-      message = `⚠️ ${typeLabel} "${config.name}" has EXPIRED! Please update immediately.`;
+      message = nt('sec.expired', { typeLabel, name: config.name });
     } else if (daysRemaining <= 3) {
       alertLevel = 'critical';
-      message = `🔴 ${typeLabel} "${config.name}" will expire in ${daysRemaining} day(s)! Please update as soon as possible.`;
+      message = nt('sec.critical', { typeLabel, name: config.name, days: daysRemaining });
     } else {
       alertLevel = 'warning';
-      message = `⚠️ ${typeLabel} "${config.name}" will expire in ${daysRemaining} day(s). Please take note.`;
+      message = nt('sec.warning', { typeLabel, name: config.name, days: daysRemaining });
     }
 
     // Get affected services names
@@ -127,11 +135,9 @@ export class AlertService {
   }
 
   static async processSecurityConfigRecovery(config: SecurityConfig, previousStatus: string) {
-    const typeLabel = config.type === 'accesskey' ? 'AccessKey' : 
-                      config.type === 'ftp' ? 'FTP Password' : 
-                      config.type === 'ssh' ? 'SSH Credential' : 'SSL Certificate';
+    const typeLabel = getTypeLabel(config.type);
     
-    const message = `✅ ${typeLabel} "${config.name}" has been renewed and is now valid.`;
+    const message = nt('sec.renewed', { typeLabel, name: config.name });
     
     // Get affected services names
     let affectedServiceNames: string[] = [];
@@ -164,7 +170,7 @@ export class AlertService {
     // Send Notifications
     const defaultEmail = await this.getSystemConfig('smtp_to');
     if (defaultEmail) {
-      const subject = `[RECOVERY] ${config.name} Renewed`;
+      const subject = nt('email.subjectRecoveryRenewed', { name: config.name });
       const html = this.buildEmailHtml(subject, detailedData, '#67C23A');
       
       await NotificationService.sendEmail(defaultEmail, subject, html);
@@ -177,7 +183,7 @@ export class AlertService {
     const teamsWebhook = await this.getSystemConfig('teams_webhook');
     if (teamsWebhook) {
        try {
-         const title = `✅ [RECOVERY] ${config.name}`;
+         const title = nt('teams.recoveryTitle', { name: config.name });
          await NotificationService.sendTeamsNotification(teamsWebhook, detailedData.message, title, '5cb85c', detailedData);
        } catch (error: any) {
          logger.notification.error('Failed to send Teams notification for recovery', { 
@@ -192,39 +198,37 @@ export class AlertService {
   }
 
   private static gatherRecoveryContext(config: SecurityConfig, previousStatus: string, affectedServices: string[], now: string) {
-    const typeLabel = config.type === 'accesskey' ? 'AccessKey' : 
-                      config.type === 'ftp' ? 'FTP Password' : 
-                      config.type === 'ssh' ? 'SSH Credential' : 'SSL Certificate';
+    const typeLabel = getTypeLabel(config.type);
 
     // Calculate new days remaining
     const daysRemaining = Math.ceil((new Date(config.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
 
     // Build facts
     const facts: any[] = [
-      { title: "🔑 Config Type", value: typeLabel },
-      { title: "✅ Current Status", value: 'Normal' },
-      { title: "⚠️ Previous Status", value: previousStatus.toUpperCase() },
-      { title: "📅 New Expiry Date", value: config.expiry_date },
-      { title: "📊 Days Remaining", value: `${daysRemaining} days` }
+      { title: nt('fact.configType'), value: typeLabel },
+      { title: nt('fact.currentStatus'), value: nt('val.normal') },
+      { title: nt('fact.previousStatus'), value: previousStatus.toUpperCase() },
+      { title: nt('fact.newExpiryDate'), value: config.expiry_date },
+      { title: nt('fact.daysRemaining'), value: nt('val.daysUnit', { days: daysRemaining }) }
     ];
 
     // Build timeline
     const timeline: any[] = [
       {
         icon: '✅',
-        label: 'Configuration Renewed',
+        label: nt('tl.configRenewed'),
         value: now
       },
       {
         icon: '📅',
-        label: 'Valid Until',
+        label: nt('tl.validUntil'),
         value: config.expiry_date,
         valueColor: 'good'
       },
       {
         icon: '📊',
-        label: 'Validity Period',
-        value: `${daysRemaining} days remaining`,
+        label: nt('tl.validityPeriod'),
+        value: nt('val.daysRemaining', { days: daysRemaining }),
         valueColor: 'good'
       }
     ];
@@ -232,16 +236,16 @@ export class AlertService {
     if (config.last_reset_at) {
       timeline.push({
         icon: '🔄',
-        label: 'Last Reset',
+        label: nt('tl.lastReset'),
         value: config.last_reset_at
       });
     }
 
     // Build impact message
-    const impact = `The ${typeLabel} has been successfully renewed. All services using this credential will continue to operate normally. No action required.`;
+    const impact = nt('sec.recoveryImpact', { typeLabel });
 
     // Build message
-    const messageText = `Security configuration **${config.name}** has been renewed and is now valid for ${daysRemaining} more days.`;
+    const messageText = nt('sec.recoveryMessage', { name: config.name, days: daysRemaining });
 
     return {
       alertType: 'recovery',
@@ -272,7 +276,7 @@ export class AlertService {
     // Send Notifications
     const defaultEmail = await this.getSystemConfig('smtp_to');
     if (defaultEmail) {
-      const subject = `[${level.toUpperCase()}] ${config.name} Expiry Reminder`;
+      const subject = nt('email.subjectExpiryReminder', { level: level.toUpperCase(), name: config.name });
       const color = level === 'expired' ? '#ff0000' : (level === 'critical' ? '#ff4500' : '#ffa500');
       const html = this.buildEmailHtml(subject, detailedData, color);
       
@@ -287,7 +291,7 @@ export class AlertService {
     if (teamsWebhook) {
        try {
          const color = level === 'expired' ? 'd9534f' : (level === 'critical' ? 'f0ad4e' : 'ffc107');
-         const title = `🔐 [${level.toUpperCase()}] ${config.name}`;
+         const title = nt('teams.expiryTitle', { level: level.toUpperCase(), name: config.name });
          await NotificationService.sendTeamsNotification(teamsWebhook, detailedData.message, title, color, detailedData);
        } catch (error: any) {
          logger.notification.error('Failed to send Teams notification for expiry', { 
@@ -303,45 +307,45 @@ export class AlertService {
   }
 
   private static gatherExpiryContext(config: SecurityConfig, level: string, daysRemaining: number, affectedServices: string[], now: string) {
-    const typeLabel = config.type === 'accesskey' ? 'AccessKey' : 
-                      config.type === 'ftp' ? 'FTP Password' : 
-                      config.type === 'ssh' ? 'SSH Credential' : 'SSL Certificate';
+    const typeLabel = getTypeLabel(config.type);
 
     // Build facts
     const facts: any[] = [
-      { title: "🔑 Config Type", value: typeLabel },
-      { title: "⚠️ Expiry Status", value: daysRemaining <= 0 ? 'EXPIRED' : `Expires in ${daysRemaining} day(s)` },
-      { title: "📅 Expiry Date", value: config.expiry_date },
-      { title: "📅 Created Date", value: config.created_at || 'N/A' }
+      { title: nt('fact.configType'), value: typeLabel },
+      { title: nt('fact.expiryStatus'), value: daysRemaining <= 0 ? nt('val.expired') : nt('val.expiresInDays', { days: daysRemaining }) },
+      { title: nt('fact.expiryDate'), value: config.expiry_date },
+      { title: nt('fact.createdDate'), value: config.created_at || nt('val.na') }
     ];
 
     // Build timeline
     const timeline: any[] = [
       {
         icon: '📅',
-        label: 'Days Remaining',
-        value: daysRemaining <= 0 ? 'EXPIRED' : `${daysRemaining} day(s)`,
+        label: nt('tl.daysRemainingLabel'),
+        value: daysRemaining <= 0 ? nt('val.expired') : nt('val.daysUnit', { days: daysRemaining }),
         valueColor: daysRemaining <= 0 ? 'attention' : (daysRemaining <= 3 ? 'warning' : 'default')
       },
       {
         icon: '🔔',
-        label: 'Reminder Schedule',
-        value: config.reminder_days ? `Reminders at: ${JSON.parse(config.reminder_days).join(', ')} days before expiry` : 'Default schedule'
+        label: nt('tl.reminderSchedule'),
+        value: config.reminder_days ? nt('val.remindersAt', { days: JSON.parse(config.reminder_days).join(', ') }) : nt('val.defaultSchedule')
       },
       {
         icon: '📊',
-        label: 'Usage Statistics',
-        value: affectedServices.length > 0 ? `${affectedServices.length} service(s) using this credential` : 'No services linked'
+        label: nt('tl.usageStats'),
+        value: affectedServices.length > 0 ? nt('val.servicesUsing', { count: affectedServices.length }) : nt('val.noServicesLinked')
       }
     ];
 
     // Build impact message
     const impact = daysRemaining <= 0 ?
-      `This credential has EXPIRED. All services using this ${typeLabel} will fail to authenticate. Please update the credential configuration immediately.` :
-      `This ${typeLabel} will expire soon. After expiration, all services using this credential will be unable to access the required resources. Please update in advance to avoid service interruptions.`;
+      nt('sec.expiryImpactExpired', { typeLabel }) :
+      nt('sec.expiryImpactSoon', { typeLabel });
 
     // Build message
-    const messageText = `Security configuration **${config.name}** ${daysRemaining <= 0 ? 'has expired' : `will expire in ${daysRemaining} day(s)`}. ${daysRemaining <= 3 ? 'Immediate action required!' : 'Please plan for renewal.'}`;
+    const messageText = daysRemaining <= 0
+      ? nt('sec.expiryMessageExpired', { name: config.name })
+      : nt('sec.expiryMessageSoon', { name: config.name, days: daysRemaining, urgency: daysRemaining <= 3 ? nt('sec.urgencyImmediate') : nt('sec.urgencyPlan') });
 
     return {
       alertType: 'expiry',
@@ -372,7 +376,7 @@ export class AlertService {
     // 3. Send Notifications
     const defaultEmail = await this.getSystemConfig('smtp_to');
     if (defaultEmail) {
-      const subject = `[${type.toUpperCase()}] ${service.name}`;
+      const subject = nt('email.subjectServiceAlert', { type: type.toUpperCase(), name: service.name });
       const color = type === 'down' ? '#ff0000' : (type === 'recovery' ? '#00ff00' : '#ffa500');
       const html = this.buildEmailHtml(subject, detailedData, color);
       
@@ -403,9 +407,9 @@ export class AlertService {
   }
 
   private static buildAlertTitle(serviceName: string, type: string): string {
-    const prefix = type === 'down' ? '🔴 [DOWN]' :
-                   type === 'recovery' ? '🟢 [RECOVERY]' :
-                   '🟡 [WARNING]';
+    const prefix = type === 'down' ? nt('teams.prefixDown') :
+                   type === 'recovery' ? nt('teams.prefixRecovery') :
+                   nt('teams.prefixWarning');
     return `${prefix} ${serviceName}`;
   }
 
@@ -443,10 +447,10 @@ export class AlertService {
 
     // Build facts
     const facts: any[] = [
-      { title: "📁 Project", value: project?.name || 'N/A' },
-      { title: "⚠️ Risk Level", value: this.formatRiskLevel(service.risk_level) },
-      { title: "🌐 Address", value: `${service.host}:${service.port}` },
-      { title: "🔍 Check Type", value: service.check_type?.toUpperCase() || 'N/A' }
+      { title: nt('fact.project'), value: project?.name || nt('val.na') },
+      { title: nt('fact.riskLevel'), value: this.formatRiskLevel(service.risk_level) },
+      { title: nt('fact.address'), value: `${service.host}:${service.port}` },
+      { title: nt('fact.checkType'), value: service.check_type?.toUpperCase() || nt('val.na') }
     ];
 
     // Build timeline
@@ -455,7 +459,7 @@ export class AlertService {
     if (type === 'down') {
       timeline.push({
         icon: '❌',
-        label: 'Failure Detected',
+        label: nt('tl.failureDetected'),
         value: now
       });
       if (prevCheck) {
@@ -463,14 +467,14 @@ export class AlertService {
         const lastCheckLocal = this.toLocalTime(prevCheck.checked_at);
         timeline.push({
           icon: '📊',
-          label: 'Last Successful Check',
-          value: `${lastCheckLocal} (${minutesAgo} minutes ago)`
+          label: nt('tl.lastSuccessfulCheck'),
+          value: nt('tl.lastCheckAgo', { time: lastCheckLocal, minutes: minutesAgo })
         });
       }
       if (latestCheck?.error_message) {
         timeline.push({
           icon: '🔧',
-          label: 'Error Message',
+          label: nt('tl.errorMessage'),
           value: latestCheck.error_message,
           valueColor: 'attention'
         });
@@ -478,7 +482,7 @@ export class AlertService {
     } else if (type === 'recovery') {
       timeline.push({
         icon: '✅',
-        label: 'Service Recovered',
+        label: nt('tl.serviceRecovered'),
         value: now
       });
       if (prevCheck && latestCheck) {
@@ -487,26 +491,26 @@ export class AlertService {
         const seconds = downDuration % 60;
         timeline.push({
           icon: '⏱️',
-          label: 'Downtime Duration',
-          value: `${minutes}m ${seconds}s`
+          label: nt('tl.downtimeDuration'),
+          value: nt('tl.downtimeValue', { m: minutes, s: seconds })
         });
       }
       if (latestCheck) {
         timeline.push({
           icon: '📈',
-          label: 'Current Status',
-          value: `Healthy (Response: ${latestCheck.response_time}ms)`,
+          label: nt('tl.currentStatus'),
+          value: nt('tl.healthyResponse', { time: latestCheck.response_time }),
           valueColor: 'good'
         });
       }
     } else if (type === 'warning') {
       facts.push(
-        { title: "📊 Response Time", value: `${latestCheck?.response_time || 'N/A'}ms` },
-        { title: "⏱️ Warning Threshold", value: `${service.warning_threshold}s` }
+        { title: nt('fact.responseTime'), value: `${latestCheck?.response_time || nt('val.na')}ms` },
+        { title: nt('fact.warningThreshold'), value: `${service.warning_threshold}s` }
       );
       timeline.push({
         icon: '⚠️',
-        label: 'Slow Response Detected',
+        label: nt('tl.slowResponse'),
         value: now
       });
     }
@@ -519,10 +523,10 @@ export class AlertService {
 
     // Build message
     const messageText = type === 'down' ?
-      `Service **${service.name}** is currently unavailable. Immediate attention required!` :
+      nt('alert.serviceDownMsg', { name: service.name }) :
       type === 'recovery' ?
-      `Service **${service.name}** has recovered and is now operational.` :
-      `Service **${service.name}** is experiencing slow response times.`;
+      nt('alert.serviceRecoveryMsg', { name: service.name }) :
+      nt('alert.serviceWarningMsg', { name: service.name });
 
     return {
       alertType: type,
@@ -538,21 +542,21 @@ export class AlertService {
 
   private static formatRiskLevel(level: string): string {
     const map: any = {
-      'critical': 'Critical (Severe)',
-      'high': 'High',
-      'medium': 'Medium',
-      'low': 'Low'
+      'critical': nt('risk.critical'),
+      'high': nt('risk.high'),
+      'medium': nt('risk.medium'),
+      'low': nt('risk.low')
     };
     return map[level] || level;
   }
 
   private static getDefaultImpact(type: string, serviceName: string): string {
     if (type === 'down') {
-      return `Service disruption detected. Users may be unable to access ${serviceName}. Please check server status and network connectivity immediately.`;
+      return nt('impact.down', { name: serviceName });
     } else if (type === 'warning') {
-      return `Performance degradation detected. Slow response times may affect user experience. Consider checking database queries, server load, and network conditions.`;
+      return nt('impact.warning');
     } else {
-      return `Service has returned to normal operation. All functionality is now available.`;
+      return nt('impact.recovery');
     }
   }
   
@@ -596,7 +600,7 @@ export class AlertService {
     if (detailedData.facts && detailedData.facts.length > 0) {
       html += `
         <div class="section">
-          <div class="section-title">📊 Details</div>
+          <div class="section-title">${nt('html.details')}</div>
           <div style="background: white; padding: 15px; border-radius: 5px;">
       `;
       detailedData.facts.forEach((fact: any) => {
@@ -614,7 +618,7 @@ export class AlertService {
     if (detailedData.timeline && detailedData.timeline.length > 0) {
       html += `
         <div class="section">
-          <div class="section-title">⏰ Timeline</div>
+          <div class="section-title">${nt('html.timeline')}</div>
       `;
       detailedData.timeline.forEach((item: any) => {
         const valueColor = item.valueColor === 'attention' ? 'color: #d9534f;' :
@@ -635,7 +639,7 @@ export class AlertService {
     if (detailedData.impact) {
       html += `
         <div class="section">
-          <div class="section-title">⚠️ Impact</div>
+          <div class="section-title">${nt('html.impact')}</div>
           <div class="impact">${detailedData.impact}</div>
         </div>
       `;
@@ -645,7 +649,7 @@ export class AlertService {
     if (detailedData.affectedServices && detailedData.affectedServices.length > 0) {
       html += `
         <div class="section">
-          <div class="section-title">🔗 Affected Services (${detailedData.affectedServices.length})</div>
+          <div class="section-title">${nt('html.affectedServices', { count: detailedData.affectedServices.length })}</div>
           <div class="services-list">
       `;
       detailedData.affectedServices.forEach((service: string) => {
@@ -657,8 +661,8 @@ export class AlertService {
     // Links section
     html += `
       <div class="links">
-        <a href="${detailedData.dashboardUrl || 'http://localhost:5173/#/dashboard'}" class="link-button">View Dashboard</a>
-        <a href="${detailedData.consoleUrl || 'http://localhost:5173/#/dashboard'}" class="link-button">Open Console</a>
+        <a href="${detailedData.dashboardUrl || 'http://localhost:5173/#/dashboard'}" class="link-button">${nt('html.viewDashboard')}</a>
+        <a href="${detailedData.consoleUrl || 'http://localhost:5173/#/dashboard'}" class="link-button">${nt('html.openConsole')}</a>
       </div>
     `;
 

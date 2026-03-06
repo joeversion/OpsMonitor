@@ -4,11 +4,11 @@
     <div v-if="!selectedHost">
       <div class="page-header">
         <div>
-          <h2>Host Management</h2>
-          <p class="page-subtitle">Manage remote servers and monitoring targets</p>
+          <h2>{{ $t('hosts.title') }}</h2>
+          <p class="page-subtitle">{{ $t('hosts.subtitle') }}</p>
         </div>
         <div style="display: flex; gap: 10px; align-items: center;">
-          <el-button v-if="isAdmin" type="primary" :icon="Plus" @click="handleAdd">Add Host</el-button>
+          <el-button v-if="isAdmin" type="primary" :icon="Plus" @click="handleAdd">{{ $t('hosts.titleAdd') }}</el-button>
         </div>
       </div>
       
@@ -16,39 +16,39 @@
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-value">{{ filteredHosts.length }}</div>
-          <div class="stat-label">Total Hosts</div>
+          <div class="stat-label">{{ $t('hosts.totalHosts') }}</div>
         </div>
         <div class="stat-card success">
           <div class="stat-value">{{ onlineHosts }}</div>
-          <div class="stat-label">Online</div>
+          <div class="stat-label">{{ $t('hosts.online') }}</div>
         </div>
         <div class="stat-card error">
           <div class="stat-value">{{ offlineHosts }}</div>
-          <div class="stat-label">Offline</div>
+          <div class="stat-label">{{ $t('hosts.offline') }}</div>
         </div>
         <div class="stat-card" style="border-color: #909399;">
           <div class="stat-value" style="color: #909399;">{{ disabledHosts }}</div>
-          <div class="stat-label">Disabled</div>
+          <div class="stat-label">{{ $t('hosts.disabled') }}</div>
         </div>
         <div class="stat-card">
           <div class="stat-value">{{ totalServices }}</div>
-          <div class="stat-label">Total Services</div>
+          <div class="stat-label">{{ $t('hosts.totalServices') }}</div>
         </div>
       </div>
 
       <!-- Filter Bar -->
       <div class="filter-bar">
         <div class="filter-item">
-          <span class="filter-label">Status:</span>
+          <span class="filter-label">{{ $t('hosts.filterStatus') }}</span>
           <el-select v-model="filterStatus" size="small" style="width: 120px;">
-            <el-option label="All" value="all"></el-option>
-            <el-option label="Online" value="healthy"></el-option>
-            <el-option label="Offline" value="unhealthy"></el-option>
+            <el-option :label="$t('hosts.filterAll')" value="all"></el-option>
+            <el-option :label="$t('hosts.filterOnline')" value="healthy"></el-option>
+            <el-option :label="$t('hosts.filterOffline')" value="unhealthy"></el-option>
           </el-select>
         </div>
         <div class="filter-item">
-          <span class="filter-label">Search:</span>
-          <el-input v-model="searchQuery" placeholder="Host name or IP" size="small" style="width: 200px;" clearable />
+          <span class="filter-label">{{ $t('hosts.filterSearch') }}</span>
+          <el-input v-model="searchQuery" :placeholder="$t('hosts.placeholderSearch')" size="small" style="width: 200px;" clearable />
         </div>
         <div class="filter-item" style="margin-left: auto;">
           <el-radio-group v-model="viewMode" size="small">
@@ -68,8 +68,8 @@
       <div v-if="viewMode === 'card'" class="hosts-grid" v-loading="loading">
         <div v-if="filteredHosts.length === 0" class="empty-state">
           <div class="empty-icon">🖥️</div>
-          <div class="empty-text">No hosts found</div>
-          <div class="empty-hint">Add your first SSH host to start monitoring</div>
+          <div class="empty-text">{{ $t('hosts.emptyTitle') }}</div>
+          <div class="empty-hint">{{ $t('hosts.emptyDesc') }}</div>
         </div>
         
         <div 
@@ -89,13 +89,13 @@
                   v-if="getConnectionStatus(host) !== 'none'" 
                   class="quick-badge" 
                   :class="`badge-conn-${getConnectionStatus(host)}`">
-                  <span>●</span>CONN
+                  <span>●</span>{{ $t('hosts.badgeConn') }}
                 </span>
                 <span 
                   class="quick-badge" 
                   :class="`badge-svc-${getServiceStatus(host)}`">
                   <span v-if="getServiceStatus(host) !== 'none'">●</span>
-                  <span v-else>−</span>{{ getServiceStatus(host) === 'none' ? 'SVC' : 'SVC' }}
+                  <span v-else>−</span>{{ $t('hosts.badgeSvc') }}
                 </span>
               </div>
             </div>
@@ -108,40 +108,40 @@
           
           <div class="card-content">
             <div class="content-row">
-              <div class="content-label">Services</div>
+              <div class="content-label">{{ $t('hosts.labelServices') }}</div>
               <div class="content-value">
-                <span v-if="!host.service_count" class="no-services">No services configured</span>
+                <span v-if="!host.service_count" class="no-services">{{ $t('hosts.noServices') }}</span>
                 <template v-else>
-                  <span class="info-text">{{ host.service_count }} monitored</span>
-                  <el-button type="text" size="small" @click.stop="goToHostDetail(host)" style="margin-left:8px">View Services</el-button>
+                  <span class="info-text">{{ host.service_count }} {{ $t('hosts.monitored') }}</span>
+                  <el-button type="text" size="small" @click.stop="goToHostDetail(host)" style="margin-left:8px">{{ $t('hosts.btnViewServices') }}</el-button>
                   <span v-if="host.health_stats?.up_count > 0" class="stat-chip up">
                     <span>✓</span>
-                    <span>{{ host.health_stats.up_count }} UP</span>
+                    <span>{{ host.health_stats.up_count }} {{ $t('statusLabels.up') }}</span>
                   </span>
                   <span v-if="host.health_stats?.warning_count > 0" class="stat-chip warning">
                     <span>⚠</span>
-                    <span>{{ host.health_stats.warning_count }} WARN</span>
+                    <span>{{ host.health_stats.warning_count }} {{ $t('statusLabels.warning') }}</span>
                   </span>
                   <span v-if="host.health_stats?.down_count > 0" class="stat-chip down">
                     <span>✗</span>
-                    <span>{{ host.health_stats.down_count }} DOWN</span>
+                    <span>{{ host.health_stats.down_count }} {{ $t('statusLabels.down') }}</span>
                   </span>
                   <span v-if="host.health_stats?.unknown_count > 0" class="stat-chip unknown">
                     <span>?</span>
-                    <span>{{ host.health_stats.unknown_count }} UNKNOWN</span>
+                    <span>{{ host.health_stats.unknown_count }} {{ $t('statusLabels.unknown') }}</span>
                   </span>
                 </template>
               </div>
             </div>
             <div class="content-row">
-              <div class="content-label">Connection</div>
+              <div class="content-label">{{ $t('hosts.labelConnection') }}</div>
               <div class="content-value">
                 <div class="info-tags">
                   <span class="info-tag">{{ getConnectionTypeLabel(host.connection_type) }}</span>
                   <template v-if="host.connection_type === 'ssh'">
                     <span v-if="host.ssh_auth_type" class="info-tag">{{ getAuthLabel(host.ssh_auth_type) }}</span>
-                    <span v-if="host.ssh_proxy_host" class="info-tag">Via {{ host.ssh_proxy_host }}</span>
-                    <span v-if="host.ssh_port && host.ssh_port !== 22" class="info-tag">Port {{ host.ssh_port }}</span>
+                    <span v-if="host.ssh_proxy_host" class="info-tag">{{ $t('hosts.viaProxy', { host: host.ssh_proxy_host }) }}</span>
+                    <span v-if="host.ssh_port && host.ssh_port !== 22" class="info-tag">{{ $t('hosts.portN', { port: host.ssh_port }) }}</span>
                   </template>
                 </div>
               </div>
@@ -149,11 +149,11 @@
           </div>
           
           <div class="card-footer" @click.stop>
-            <div class="last-check">🕐 {{ host.last_test_at ? formatTime(host.last_test_at) : 'Never tested' }}</div>
+            <div class="last-check">🕐 {{ host.last_test_at ? formatTime(host.last_test_at) : $t('hosts.neverTested') }}</div>
             <div class="card-actions">
               <!-- Spec 027: Host monitoring toggle -->
               <div v-if="isAdmin" class="monitoring-toggle" @click.stop>
-                <el-tooltip :content="host.enabled ? 'Click to disable monitoring' : 'Click to enable monitoring'">
+                <el-tooltip :content="host.enabled ? $t('hosts.tooltipDisable') : $t('hosts.tooltipEnable')">
                   <el-switch
                     :model-value="host.enabled === 1"
                     @change="(val: boolean) => handleToggleMonitoring(host, val)"
@@ -163,10 +163,10 @@
                   />
                 </el-tooltip>
                 <span class="monitoring-status">
-                  {{ host.enabled ? 'Monitoring' : 'Disabled' }}
+                  {{ host.enabled ? $t('hosts.monitoring') : $t('common.disabled') }}
                 </span>
               </div>
-              <el-button v-if="isAdmin" size="small" @click.stop="handleEdit(host)">Edit</el-button>
+              <el-button v-if="isAdmin" size="small" @click.stop="handleEdit(host)">{{ $t('common.edit') }}</el-button>
             </div>
           </div>
         </div>
@@ -174,44 +174,44 @@
 
       <!-- Table View -->
       <el-table v-else :data="filteredHosts" style="width: 100%" v-loading="loading" @row-click="selectHost">
-        <el-table-column prop="name" label="Hostname" sortable />
-        <el-table-column prop="ip" label="IP Address" width="150" />
-        <el-table-column label="Connection" width="250">
+        <el-table-column prop="name" :label="$t('hosts.colHostname')" sortable />
+        <el-table-column prop="ip" :label="$t('hosts.colIPAddress')" width="150" />
+        <el-table-column :label="$t('hosts.labelConnection')" width="250">
           <template #default="scope">
             <template v-if="scope.row.connection_type === 'ssh'">
               <span v-if="scope.row.ssh_host">
                 {{ scope.row.ssh_username }}@{{ scope.row.ssh_host }}:{{ scope.row.ssh_port }}
                 <el-tag v-if="scope.row.ssh_proxy_host" size="small" type="info" style="margin-left: 5px">
-                  via {{ scope.row.ssh_proxy_host }}
+                  {{ $t('hosts.viaProxy', { host: scope.row.ssh_proxy_host }) }}
                 </el-tag>
               </span>
-              <el-tag v-else type="warning" size="small">No SSH Config</el-tag>
+              <el-tag v-else type="warning" size="small">{{ $t('hosts.noSSHConfig') }}</el-tag>
             </template>
-            <el-tag v-else type="info" size="small">Local Connection</el-tag>
+            <el-tag v-else type="info" size="small">{{ $t('hosts.localConnection') }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="project_name" label="Project" width="150" />
-        <el-table-column prop="status" label="Status" width="100">
+        <el-table-column prop="project_name" :label="$t('hosts.labelProject')" width="150" />
+        <el-table-column prop="status" :label="$t('common.status')" width="100">
           <template #default="scope">
             <el-tag 
               :type="getHostStatus(scope.row) === 'healthy' ? 'success' : 'danger'"
               size="small">
-              {{ getHostStatus(scope.row) }}
+              {{ $t('statusLabels.' + getHostStatus(scope.row)) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Monitoring" width="120">
+        <el-table-column :label="$t('hosts.monitoring')" width="120">
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
-              {{ row.enabled ? 'Enabled' : 'Disabled' }}
+              {{ row.enabled ? $t('common.enabled') : $t('common.disabled') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="service_count" label="Services" width="100" align="center" /> 
-        <el-table-column label="Actions" width="200" align="right">
+        <el-table-column prop="service_count" :label="$t('hosts.labelServices')" width="100" align="center" /> 
+        <el-table-column :label="$t('common.actions')" width="200" align="right">
           <template #default="scope">
-            <el-button v-if="isAdmin" size="small" @click.stop="handleEdit(scope.row)">Edit</el-button>
-            <el-button v-if="isAdmin" size="small" type="danger" @click.stop="handleDelete(scope.row)">Delete</el-button>
+            <el-button v-if="isAdmin" size="small" @click.stop="handleEdit(scope.row)">{{ $t('common.edit') }}</el-button>
+            <el-button v-if="isAdmin" size="small" type="danger" @click.stop="handleDelete(scope.row)">{{ $t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -225,15 +225,15 @@
             <div class="detail-title">
               <span>🖥️ {{ selectedHost.name }}</span>
               <el-tag :type="getHostStatus(selectedHost) === 'healthy' ? 'success' : 'danger'" style="margin-left: 12px;">
-                {{ getHostStatus(selectedHost) }}
+                {{ $t('statusLabels.' + getHostStatus(selectedHost)) }}
               </el-tag>
             </div>
           </template>
         </el-page-header>
         <div class="detail-actions">
-          <el-button @click="testConnection(selectedHost)">Test Connection</el-button>
-          <el-button v-if="isAdmin" @click="handleEdit(selectedHost)">Edit Configuration</el-button>
-          <el-button v-if="isAdmin" type="danger" @click="handleDelete(selectedHost)">Delete Host</el-button>
+          <el-button @click="testConnection(selectedHost)">{{ $t('hosts.btnTestConn') }}</el-button>
+          <el-button v-if="isAdmin" @click="handleEdit(selectedHost)">{{ $t('hosts.btnEditConfig') }}</el-button>
+          <el-button v-if="isAdmin" type="danger" @click="handleDelete(selectedHost)">{{ $t('hosts.btnDeleteHost') }}</el-button>
         </div>
       </div>
 
@@ -257,20 +257,20 @@
     <!-- Add/Edit Host Dialog -->
     <el-dialog 
       v-model="showDialog" 
-      :title="isEditing ? 'Edit Host' : 'Add Host'"
+      :title="isEditing ? $t('hosts.titleEdit') : $t('hosts.titleAdd')"
       width="600px"
       @close="resetForm">
       <el-form :model="hostForm" label-width="140px" :rules="formRules" ref="formRef">
-        <el-form-item label="Host Name" prop="name">
-          <el-input v-model="hostForm.name" placeholder="prod-web-01" />
+        <el-form-item :label="$t('hosts.labelHostName')" prop="name">
+          <el-input v-model="hostForm.name" :placeholder="$t('hosts.placeholderHostName')" />
         </el-form-item>
         
-        <el-form-item label="IP / Hostname" prop="ip">
-          <el-input v-model="hostForm.ip" placeholder="192.168.1.100 or example.com" />
+        <el-form-item :label="$t('hosts.labelIP')" prop="ip">
+          <el-input v-model="hostForm.ip" :placeholder="$t('hosts.placeholderIP')" />
         </el-form-item>
         
-        <el-form-item label="Project">
-          <el-select v-model="hostForm.project_id" placeholder="Select project" clearable style="width: 100%">
+        <el-form-item :label="$t('hosts.labelProject')">
+          <el-select v-model="hostForm.project_id" :placeholder="$t('hosts.placeholderProject')" clearable style="width: 100%">
             <el-option 
               v-for="project in projects" 
               :key="project.id" 
@@ -279,80 +279,80 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item label="Connection Type">
+        <el-form-item :label="$t('hosts.labelConnType')">
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
             <div 
               class="connection-card"
               :class="{ active: hostForm.connection_type === 'ssh' }"
               @click="hostForm.connection_type = 'ssh'">
               <div class="connection-icon">🔐</div>
-              <div class="connection-name">SSH</div>
-              <div class="connection-desc">Remote access</div>
+              <div class="connection-name">{{ $t('hosts.cardSSH') }}</div>
+              <div class="connection-desc">{{ $t('hosts.cardSSHDesc') }}</div>
             </div>
             <div 
               class="connection-card"
               :class="{ active: hostForm.connection_type === 'local' }"
               @click="hostForm.connection_type = 'local'">
               <div class="connection-icon">💻</div>
-              <div class="connection-name">Local</div>
-              <div class="connection-desc">Ping check</div>
+              <div class="connection-name">{{ $t('hosts.cardLocal') }}</div>
+              <div class="connection-desc">{{ $t('hosts.cardLocalDesc') }}</div>
             </div>
           </div>
           <div style="margin-top: 8px; font-size: 12px; color: #909399;">
-            SSH: Remote server access | Local: Network ping check
+            {{ $t('hosts.hintSSHLocal') }}
           </div>
         </el-form-item>
         
         <!-- SSH Configuration Section -->
         <template v-if="hostForm.connection_type === 'ssh'">
-          <el-divider content-position="left">SSH Configuration</el-divider>
+          <el-divider content-position="left">{{ $t('hosts.dividerSSH') }}</el-divider>
           
-          <el-form-item label="SSH Port" prop="ssh_port">
+          <el-form-item :label="$t('hosts.labelSSHPort')" prop="ssh_port">
             <el-input-number v-model="hostForm.ssh_port" :min="1" :max="65535" style="width: 150px" />
-            <span style="margin-left: 12px; color: #909399;">Default: 22</span>
+            <span style="margin-left: 12px; color: #909399;">{{ $t('hosts.noteDefault22') }}</span>
           </el-form-item>
           
-          <el-form-item label="Username" prop="ssh_username">
-            <el-input v-model="hostForm.ssh_username" placeholder="root or admin" />
+          <el-form-item :label="$t('hosts.labelUsername')" prop="ssh_username">
+            <el-input v-model="hostForm.ssh_username" :placeholder="$t('hosts.placeholderUsername')" />
           </el-form-item>
           
-          <el-form-item label="Auth Type" prop="ssh_auth_type">
+          <el-form-item :label="$t('hosts.labelAuthType')" prop="ssh_auth_type">
             <el-radio-group v-model="hostForm.ssh_auth_type">
-              <el-radio value="password">Password</el-radio>
-              <el-radio value="private_key">Private Key</el-radio>
+              <el-radio value="password">{{ $t('hosts.optPassword') }}</el-radio>
+              <el-radio value="private_key">{{ $t('hosts.optPrivateKey') }}</el-radio>
             </el-radio-group>
           </el-form-item>
           
-          <el-form-item v-if="hostForm.ssh_auth_type === 'password'" label="Password">
+          <el-form-item v-if="hostForm.ssh_auth_type === 'password'" :label="$t('hosts.labelPassword')">
             <el-input 
               v-model="hostForm.ssh_password" 
               type="password" 
               show-password 
-              placeholder="SSH password" />
+              :placeholder="$t('hosts.placeholderPassword')" />
           </el-form-item>
           
-          <el-form-item v-if="hostForm.ssh_auth_type === 'private_key'" label="Private Key">
+          <el-form-item v-if="hostForm.ssh_auth_type === 'private_key'" :label="$t('hosts.labelPrivateKey')">
             <el-input 
               v-model="hostForm.ssh_private_key" 
               type="textarea" 
               :rows="6"
-              placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----" />
+              :placeholder="$t('hosts.placeholderPrivateKey')" />
           </el-form-item>
           
-          <el-form-item v-if="hostForm.ssh_auth_type === 'private_key'" label="Passphrase">
+          <el-form-item v-if="hostForm.ssh_auth_type === 'private_key'" :label="$t('hosts.labelPassphrase')">
             <el-input 
               v-model="hostForm.ssh_passphrase" 
               type="password" 
               show-password 
-              placeholder="Leave empty if no passphrase" />
+              :placeholder="$t('hosts.placeholderPassphrase')" />
           </el-form-item>
           
-          <el-divider content-position="left">Proxy (Optional)</el-divider>
+          <el-divider content-position="left">{{ $t('hosts.dividerProxy') }}</el-divider>
           
-          <el-form-item label="Proxy Host">
+          <el-form-item :label="$t('hosts.labelProxyHost')">
             <el-select 
               v-model="hostForm.ssh_proxy_host" 
-              placeholder="Select existing SSH host or enter manually"
+              :placeholder="$t('hosts.placeholderProxyHost')"
               filterable
               allow-create
               clearable
@@ -370,89 +370,89 @@
               </el-option>
             </el-select>
             <div style="margin-top: 4px; font-size: 12px; color: #909399;">
-              Select an existing SSH host as jump server, or manually enter hostname
+              {{ $t('hosts.hintProxySelect') }}
             </div>
           </el-form-item>
           
-          <el-form-item v-if="hostForm.ssh_proxy_host" label="Proxy Port">
+          <el-form-item v-if="hostForm.ssh_proxy_host" :label="$t('hosts.labelProxyPort')">
             <el-input-number v-model="hostForm.ssh_proxy_port" :min="1" :max="65535" style="width: 150px" />
-            <span style="margin-left: 12px; color: #909399;">Auto-filled from selected host</span>
+            <span style="margin-left: 12px; color: #909399;">{{ $t('hosts.hintAutoFilled') }}</span>
           </el-form-item>
           
-          <el-divider content-position="left">Advanced Settings</el-divider>
+          <el-divider content-position="left">{{ $t('hosts.dividerAdvanced') }}</el-divider>
           
-          <el-form-item label="Max Retries">
+          <el-form-item :label="$t('hosts.labelMaxRetries')">
             <el-input-number v-model="hostForm.ssh_max_retries" :min="1" :max="10" style="width: 150px" />
-            <span style="margin-left: 12px; color: #909399;">Retry attempts for unstable networks (1-10)</span>
+            <span style="margin-left: 12px; color: #909399;">{{ $t('hosts.hintRetries') }}</span>
           </el-form-item>
           
-          <el-form-item label="Retry Delay (s)">
+          <el-form-item :label="$t('hosts.labelRetryDelay')">
             <el-input-number v-model="hostForm.ssh_retry_delay" :min="1" :max="10" :step="1" style="width: 150px" /> s
-            <span style="margin-left: 12px; color: #909399;">Delay between retries (1-10s)</span>
+            <span style="margin-left: 12px; color: #909399;">{{ $t('hosts.hintRetryDelay') }}</span>
           </el-form-item>
           
-          <el-form-item label="Connection Timeout (s)">
+          <el-form-item :label="$t('hosts.labelConnTimeout')">
             <el-input-number v-model="hostForm.ssh_connection_timeout" :min="5" :max="60" :step="1" style="width: 150px" /> s
-            <span style="margin-left: 12px; color: #909399;">SSH handshake timeout (5-60s)</span>
+            <span style="margin-left: 12px; color: #909399;">{{ $t('hosts.hintConnTimeout') }}</span>
           </el-form-item>
           
-          <el-form-item label="Command Timeout (s)">
+          <el-form-item :label="$t('hosts.labelCmdTimeout')">
             <el-input-number v-model="hostForm.ssh_command_timeout" :min="10" :max="300" :step="5" style="width: 150px" /> s
-            <span style="margin-left: 12px; color: #909399;">Command execution timeout (10-300s)</span>
+            <span style="margin-left: 12px; color: #909399;">{{ $t('hosts.hintCmdTimeout') }}</span>
           </el-form-item>
         </template>
         
         <!-- Host Check Interval (for both SSH and Local types) -->
-        <el-divider content-position="left">Monitoring Settings</el-divider>
+        <el-divider content-position="left">{{ $t('hosts.dividerMonitoring') }}</el-divider>
         
-        <el-form-item label="Host Check Interval">
-          <el-input-number v-model="hostForm.check_interval" :min="60" :max="3600" :step="60" style="width: 150px" /> seconds
+        <el-form-item :label="$t('hosts.labelCheckInterval')">
+          <el-input-number v-model="hostForm.check_interval" :min="60" :max="3600" :step="60" style="width: 150px" /> {{ $t('common.seconds') }}
           <span style="margin-left: 12px; color: #909399;">
-            How often to check this host's connectivity (60-3600s)
-            <template v-if="hostForm.connection_type === 'ssh'">via SSH</template>
-            <template v-else>via Ping</template>
+            {{ $t('hosts.hintCheckInterval') }}
+            <template v-if="hostForm.connection_type === 'ssh'">{{ $t('hosts.viaSSH') }}</template>
+            <template v-else>{{ $t('hosts.viaPing') }}</template>
           </span>
         </el-form-item>
         
-        <el-form-item label="Description">
+        <el-form-item :label="$t('hosts.labelDesc')">
           <el-input 
             v-model="hostForm.description" 
             type="textarea" 
             :rows="3"
-            placeholder="Optional description" />
+            :placeholder="$t('hosts.placeholderDesc')" />
         </el-form-item>
         
-        <el-form-item label="Tags">
+        <el-form-item :label="$t('hosts.labelTags')">
           <el-select 
             v-model="hostForm.tags" 
             multiple 
             filterable 
             allow-create 
-            placeholder="Add tags"
+            :placeholder="$t('hosts.placeholderTags')"
             style="width: 100%">
           </el-select>
         </el-form-item>
         
         <!-- Test Connection Section (only for editing) -->
-        <el-form-item v-if="isEditing" label="Connection Test">
+        <el-form-item v-if="isEditing" :label="$t('hosts.labelConnTest')">
           <el-button 
             @click="testConnectionDialog" 
             :loading="testing"
             :disabled="hostForm.connection_type === 'ssh' && (!hostForm.ssh_host || !hostForm.ssh_username || (hostForm.ssh_auth_type === 'password' && !hostForm.ssh_password) || (hostForm.ssh_auth_type === 'private_key' && !hostForm.ssh_private_key))"
             style="width: 100%">
             <template v-if="hostForm.connection_type === 'ssh'">
-              🔌 Test SSH Connection
+              🔌 {{ $t('hosts.btnTestSSH') }}
             </template>
             <template v-else>
-              📡 Test Ping
+              📡 {{ $t('hosts.btnTestPing') }}
             </template>
           </el-button>
           <div style="margin-top: 8px; font-size: 12px; color: #909399;">
             <template v-if="hostForm.connection_type === 'ssh'">
-              Test SSH connection with current configuration
+              {{ $t('hosts.hintTestSSH') }}
             </template>
             <template v-else>
-              Test network connectivity via ping
+              {{ $t('hosts.hintTestPing') }}
             </template>
           </div>
         </el-form-item>
@@ -460,9 +460,9 @@
       
       <template #footer>
         <div style="display: flex; justify-content: space-between; width: 100%;">
-          <el-button @click="showDialog = false">Close</el-button>
+          <el-button @click="showDialog = false">{{ $t('common.close') }}</el-button>
           <el-button type="primary" @click="handleSave" :loading="saving">
-            {{ isEditing ? 'Update' : 'Create' }}
+            {{ isEditing ? $t('common.update') : $t('common.create') }}
           </el-button>
         </div>
       </template>
@@ -475,6 +475,7 @@ import { ref, computed, inject, onMounted, watch, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { Plus, Search, Grid, List, Connection } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox, ElLoading, type FormInstance, type FormRules } from 'element-plus';
+import { useI18n } from 'vue-i18n';
 import hostsApi from '../api/hosts';
 import type { Host, CreateHostDto } from '../types/host';
 import { getProjects, type ProjectWithStats } from '../api/projects';
@@ -486,6 +487,9 @@ import ServiceListView from './ServiceListView.vue';
 // Router
 const router = useRouter();
 const route = useRoute();
+
+// i18n
+const { t } = useI18n();
 
 // Inject context
 const currentProjectId = inject('currentProjectId');
@@ -536,14 +540,14 @@ const hostForm = ref<CreateHostDto>({
   tags: []
 });
 
-const formRules: FormRules = {
+const formRules = computed<FormRules>(() => ({
   name: [
-    { required: true, message: 'Please enter host name', trigger: 'blur' }
+    { required: true, message: t('hosts.ruleNameRequired'), trigger: 'blur' }
   ],
   ip: [
-    { required: true, message: 'Please enter IP address or hostname', trigger: 'blur' },
+    { required: true, message: t('hosts.ruleAddressRequired'), trigger: 'blur' },
     { 
-      validator: (rule, value, callback) => {
+      validator: (rule: any, value: any, callback: any) => {
         // Allow IP address (e.g., 192.168.1.100) or hostname/domain (e.g., example.com, localhost)
         const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
         const hostnamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
@@ -551,13 +555,13 @@ const formRules: FormRules = {
         if (ipPattern.test(value) || hostnamePattern.test(value)) {
           callback();
         } else {
-          callback(new Error('Please enter a valid IP address or hostname'));
+          callback(new Error(t('hosts.ruleInvalidAddress')));
         }
       },
       trigger: 'blur'
     }
   ]
-};
+}));
 
 const checkRouteParams = () => {
   const hostId = route.params.hostId as string;
@@ -600,7 +604,7 @@ const fetchHosts = async () => {
     }
   } catch (err: any) {
     console.error('Failed to fetch hosts:', err);
-    error.value = err.response?.data?.error || 'Failed to load hosts';
+    error.value = err.response?.data?.error || t('hosts.msgLoadFailed');
   } finally {
     loading.value = false;
   }
@@ -656,9 +660,9 @@ const handleAutoRefreshChange = (enabled: boolean) => {
     refreshTimer = window.setInterval(() => {
       fetchHosts();
     }, 30000);
-    ElMessage.success('Auto refresh enabled (every 30 seconds)');
+    ElMessage.success(t('hosts.msgAutoRefresh'));
   } else {
-    ElMessage.info('Auto refresh stopped');
+    ElMessage.info(t('hosts.msgAutoRefreshStopped'));
   }
 };
 
@@ -817,14 +821,14 @@ const getHostStatus = (host: Host): string => {
 };
 
 const getConnectionTypeLabel = (type: string | null | undefined): string => {
-  if (type === 'ssh') return 'SSH';
-  if (type === 'local') return 'Local (Ping)';
-  return 'Unknown';
+  if (type === 'ssh') return t('hosts.typeSSH');
+  if (type === 'local') return t('hosts.typeLocal');
+  return t('statusLabels.unknown');
 };
 
 const getAuthLabel = (authType: string): string => {
-  if (authType === 'password') return 'Password';
-  if (authType === 'private_key') return 'Key Auth';
+  if (authType === 'password') return t('hosts.authPassword');
+  if (authType === 'private_key') return t('hosts.authKey');
   return authType;
 };
 
@@ -926,25 +930,25 @@ const formatTime = (timestamp: string): string => {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
   
-  if (seconds < 60) return `${seconds}s ago`;
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  return `${days}d ago`;
+  if (seconds < 60) return t('common.timeAgoS', { n: seconds });
+  if (minutes < 60) return t('common.timeAgoM', { n: minutes });
+  if (hours < 24) return t('common.timeAgoH', { n: hours });
+  return t('common.timeAgoD', { n: days });
 };
 
 const testConnection = async (host: Host) => {
   if (host.connection_type === 'ssh' && !host.ssh_host && !host.ip) {
-    ElMessage.warning('No SSH configuration for this host');
+    ElMessage.warning(t('hosts.msgNoSSHConfig'));
     return;
   }
   
   testing.value = true;
-  const typeLabel = host.connection_type === 'ssh' ? 'SSH connection' : 'Ping';
+  const typeLabel = host.connection_type === 'ssh' ? t('hosts.typeSSH') : 'Ping';
   
   // 显示 Loading 提示
   const loadingInstance = ElLoading.service({
     lock: true,
-    text: `Testing ${typeLabel} to ${host.name}...\nPlease wait, this may take up to 15 seconds`,
+    text: t('hosts.msgTesting', { type: typeLabel, name: host.name }) + '\n' + t('hosts.msgTestWait'),
     background: 'rgba(0, 0, 0, 0.7)'
   });
   
@@ -955,7 +959,7 @@ const testConnection = async (host: Host) => {
   const timeoutWarning = setTimeout(() => {
     if (testing.value) {
       warningMessageInstance = ElMessage.warning({
-        message: 'Connection test is taking longer than expected. Please wait...',
+        message: t('hosts.msgTestTimeout'),
         duration: 0,
         showClose: true
       });
@@ -991,12 +995,12 @@ const testConnection = async (host: Host) => {
     if (response.data.success) {
       const latencyInfo = response.data.latency ? ` (${response.data.latency}ms)` : '';
       ElMessage.success({
-        message: `✅ ${response.data.message}${latencyInfo}`,
+        message: `✅ ${t('hosts.msgTestSuccess')}${latencyInfo}`,
         duration: 3000
       });
     } else {
       ElMessage.error({
-        message: `❌ ${response.data.message}`,
+        message: `❌ ${t('hosts.msgTestError')}`,
         duration: 5000,
         showClose: true
       });
@@ -1014,7 +1018,7 @@ const testConnection = async (host: Host) => {
     const detailMsg = err.response?.data?.details ? `\n${err.response.data.details}` : '';
     
     ElMessage.error({
-      message: `❌ Failed to test connection: ${errorMsg}${detailMsg}`,
+      message: `❌ ${t('hosts.msgTestFailed', { error: errorMsg })}${detailMsg}`,
       duration: 8000,
       showClose: true
     });
@@ -1025,14 +1029,14 @@ const testConnection = async (host: Host) => {
 
 const testConnectionDialog = async () => {
   if (!editingId.value) {
-    ElMessage.warning('Please save the host first');
+    ElMessage.warning(t('hosts.msgSaveFirst'));
     return;
   }
   
   // For SSH type, check SSH configuration
   if (hostForm.value.connection_type === 'ssh') {
     if (!hostForm.value.ssh_host || !hostForm.value.ssh_username) {
-      ElMessage.warning('Please configure SSH host and username');
+      ElMessage.warning(t('hosts.msgConfigSSH'));
       return;
     }
   }
@@ -1102,7 +1106,7 @@ const handleProxyHostChange = (value: string) => {
   if (selectedProxyHost) {
     // 自动填充端口
     hostForm.value.ssh_proxy_port = selectedProxyHost.ssh_port || 22;
-    ElMessage.success(`Auto-filled proxy port: ${hostForm.value.ssh_proxy_port}`);
+    ElMessage.success(t('hosts.msgProxyPort', { port: hostForm.value.ssh_proxy_port }));
   }
 };
 
@@ -1122,13 +1126,13 @@ const handleToggleMonitoring = async (host: Host, enabled: boolean) => {
     });
     
     ElMessage.success(
-      enabled ? 'Monitoring enabled' : 'Monitoring disabled'
+      enabled ? t('hosts.msgMonitorEnabled', { name: host.name }) : t('hosts.msgMonitorDisabled', { name: host.name })
     );
     
     // 刷新列表
     await fetchHosts();
   } catch (err: any) {
-    ElMessage.error('Operation failed: ' + (err.response?.data?.error || err.message));
+    ElMessage.error(t('hosts.msgOperationFailed', { error: err.response?.data?.error || err.message }));
     // 刷新列表以恢复UI状态
     await fetchHosts();
   }
@@ -1197,7 +1201,7 @@ const handleSave = async () => {
         
         // 立即显示成功消息
         ElMessage.success({
-          message: '✅ Host updated successfully',
+          message: '✅ ' + t('hosts.msgUpdated'),
           duration: 2000
         });
         
@@ -1237,7 +1241,7 @@ const handleSave = async () => {
         }, 3000);
       } else {
         const newHost = await hostsApi.create(submitData);
-        ElMessage.success('Host created successfully');
+        ElMessage.success(t('hosts.msgCreated'));
         // 新建时切换到编辑模式，方便用户测试
         isEditing.value = true;
         editingId.value = newHost.id;
@@ -1245,7 +1249,7 @@ const handleSave = async () => {
       }
     } catch (err: any) {
       console.error('Failed to save host:', err);
-      ElMessage.error(err.response?.data?.error || 'Failed to save host');
+      ElMessage.error(err.response?.data?.error || t('hosts.msgSaveFailed'));
     } finally {
       saving.value = false;
     }
@@ -1255,24 +1259,24 @@ const handleSave = async () => {
 const handleDelete = async (host: Host) => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure to delete host "${host.name}"? This action cannot be undone.`,
-      'Confirm Delete',
+      t('hosts.confirmDeleteMsg', { name: host.name }),
+      t('hosts.confirmDeleteTitle'),
       {
-        confirmButtonText: 'Delete',
-        cancelButtonText: 'Cancel',
+        confirmButtonText: t('common.delete'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning',
         confirmButtonClass: 'el-button--danger'
       }
     );
     
     await hostsApi.delete(host.id);
-    ElMessage.success('Host deleted successfully');
+    ElMessage.success(t('hosts.msgDeleted'));
     selectedHost.value = null; // Close detail view if open
     await fetchHosts();
   } catch (err: any) {
     if (err !== 'cancel') {
       console.error('Failed to delete host:', err);
-      ElMessage.error(err.response?.data?.error || 'Failed to delete host');
+      ElMessage.error(err.response?.data?.error || t('hosts.msgDeleteFailed'));
     }
   }
 };

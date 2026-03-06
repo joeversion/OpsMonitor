@@ -1,6 +1,6 @@
 <template>
   <div class="project-selector" :class="{ collapsed: collapsed }">
-    <div class="selector-label" v-show="!collapsed">Current Project</div>
+    <div class="selector-label" v-show="!collapsed">{{ $t('projectSelector.currentProject') }}</div>
     <el-dropdown trigger="click" @command="handleSelect" class="selector-dropdown">
       <div class="selector-button" :class="{ 'collapsed-btn': collapsed }">
         <div class="project-info">
@@ -11,7 +11,7 @@
           >
             {{ currentProject?.name?.charAt(0) || 'A' }}
           </div>
-          <span class="project-name" v-show="!collapsed">{{ currentProject?.name || 'All Projects' }}</span>
+          <span class="project-name" v-show="!collapsed">{{ currentProject?.name || $t('projectSelector.allProjects') }}</span>
         </div>
         <el-icon class="arrow-icon" v-show="!collapsed"><ArrowDown /></el-icon>
       </div>
@@ -22,7 +22,7 @@
               <div class="project-icon small" style="background: linear-gradient(135deg, #409EFF, #667eea);">
                 🌐
               </div>
-              <span>All Projects</span>
+              <span>{{ $t('projectSelector.allProjects') }}</span>
               <span class="status-indicator all"></span>
             </div>
           </el-dropdown-item>
@@ -49,13 +49,13 @@
           <el-dropdown-item v-if="isAdmin" divided command="add">
             <div class="dropdown-item-content add-project">
               <el-icon><Plus /></el-icon>
-              <span>New Project</span>
+              <span>{{ $t('projectSelector.newProject') }}</span>
             </div>
           </el-dropdown-item>
           <el-dropdown-item command="manage">
             <div class="dropdown-item-content manage-project">
               <el-icon><Setting /></el-icon>
-              <span>Manage Projects</span>
+              <span>{{ $t('projectSelector.manageProjects') }}</span>
             </div>
           </el-dropdown-item>
         </el-dropdown-menu>
@@ -67,6 +67,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, inject } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { ArrowDown, Plus, Setting } from '@element-plus/icons-vue';
 import { getProjects, type ProjectWithStats } from '../api/projects';
 import { authUtils } from '../utils/auth';
@@ -83,6 +84,7 @@ const emit = defineEmits<{
 }>();
 
 const router = useRouter();
+const { t } = useI18n();
 const triggerAddProject = inject<() => void>('triggerAddProject');
 const projectsVersion = inject<import('vue').Ref<number>>('projectsVersion');
 const isAdmin = computed(() => authUtils.isAdmin());

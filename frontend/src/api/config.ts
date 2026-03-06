@@ -25,6 +25,10 @@ export const updateNotificationConfig = async (config: any) => {
   await api.put('/config/notifications', config);
 };
 
+export const syncNotificationLang = async (lang: string) => {
+  await api.put('/config/notification-lang', { lang });
+};
+
 export const testEmail = async (target: string) => {
   await api.post('/config/notifications/test', { type: 'email', target });
 };

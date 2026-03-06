@@ -1,22 +1,22 @@
 <template>
   <div class="dependency-graph">
     <div class="page-header">
-      <h1>🔗 Service Topology</h1>
+      <h1>🔗 {{ $t('graph.serviceTopology') }}</h1>
       <div class="header-controls">
         <el-switch 
           v-model="showImpactAnalysis" 
-          active-text="Impact Analysis"
+          :active-text="$t('graph.impactAnalysis')"
           inactive-text=""
           style="margin-right: 12px;"
           :disabled="isAllProjectsMode"
         />
         <el-button @click="migrateDependencies" type="warning" v-if="hasLegacyDependencies && !isAllProjectsMode">
           <el-icon><Upload /></el-icon>
-          Migrate Legacy Dependencies
+          {{ $t('graph.migrateLegacy') }}
         </el-button>
         <el-button @click="refreshGraph" type="primary" :disabled="isAllProjectsMode">
           <el-icon><Refresh /></el-icon>
-          Refresh
+          {{ $t('graph.refresh') }}
         </el-button>
       </div>
     </div>
@@ -25,13 +25,12 @@
     <div v-if="isAllProjectsMode" class="empty-state-container">
       <div class="empty-state-card">
         <div class="empty-icon">🔍</div>
-        <h3 class="empty-title">Select a Project to View Topology</h3>
+        <h3 class="empty-title">{{ $t('graph.selectProject') }}</h3>
         <p class="empty-description">
-          Service topology visualization requires a specific project context.
-          Please select a project from the dropdown menu above to continue.
+          {{ $t('graph.selectProjectDesc') }}
         </p>
         <div class="empty-hint">
-          💡 Tip: You can switch projects using the project selector in the sidebar
+          💡 {{ $t('graph.selectProjectTip') }}
         </div>
       </div>
     </div>
@@ -45,7 +44,7 @@
           :type="showDemoAlert ? 'warning' : 'info'" 
           @click="toggleDemoMode"
         >
-          {{ showDemoAlert ? '🔴 Exit Demo Mode' : '👁️ Preview Impact Alert (Demo)' }}
+          {{ showDemoAlert ? '🔴 ' + $t('graph.exitDemoMode') : '👁️ ' + $t('graph.previewImpactAlert') }}
         </el-button>
       </div>
       
@@ -63,19 +62,19 @@
           <!-- Impact Summary Badges -->
           <div class="impact-summary">
             <span v-if="alert.breakdown.critical > 0" class="impact-badge critical">
-              🔴 {{ alert.breakdown.critical }} Critical
+              🔴 {{ alert.breakdown.critical }} {{ $t('graph.criticalNode') }}
             </span>
             <span v-if="alert.breakdown.high > 0" class="impact-badge high">
-              🟠 {{ alert.breakdown.high }} High
+              🟠 {{ alert.breakdown.high }} {{ $t('graph.high') }}
             </span>
             <span v-if="alert.breakdown.medium > 0" class="impact-badge medium">
-              🟡 {{ alert.breakdown.medium }} Medium
+              🟡 {{ alert.breakdown.medium }} {{ $t('graph.medium') }}
             </span>
             <span v-if="alert.breakdown.low > 0" class="impact-badge low">
-              🟢 {{ alert.breakdown.low }} Low
+              🟢 {{ alert.breakdown.low }} {{ $t('graph.low') }}
             </span>
             <span v-if="alert.affectedCount === 0" class="impact-badge none">
-              No services affected
+              {{ $t('graph.noServicesAffected') }}
             </span>
           </div>
           
@@ -84,13 +83,13 @@
             @click.stop="toggleAlertExpansion(alertIndex)"
             v-if="alert.affectedCount > 0 || alert.impactDescription"
           >
-            {{ alert.expanded ? 'Hide Details ▲' : 'View Details ▼' }}
+            {{ alert.expanded ? $t('graph.hideDetails') : $t('graph.viewDetailsExpand') }}
           </button>
         </div>
         
         <!-- Service Impact Description (shown directly when no services affected) -->
         <div v-if="alert.affectedCount === 0 && alert.impactDescription && !alert.expanded" class="direct-impact-desc">
-          <div class="impact-section-title">📝 Service Impact</div>
+          <div class="impact-section-title">📝 {{ $t('graph.serviceImpact') }}</div>
           <div class="impact-description-content">
             {{ alert.impactDescription }}
           </div>
@@ -101,26 +100,26 @@
           <div v-if="alert.expanded" class="impact-details">
             <!-- Impact Summary Section (only show if there are affected services) -->
             <div v-if="alert.affectedCount > 0" class="impact-section">
-              <div class="impact-section-title">📊 Impact Summary</div>
+              <div class="impact-section-title">📊 {{ $t('graph.impactSummary') }}</div>
               <div class="impact-breakdown">
                 <div class="breakdown-item">
                   <span class="breakdown-dot critical"></span>
-                  <span class="breakdown-label">Critical</span>
+                  <span class="breakdown-label">{{ $t('graph.criticalNode') }}</span>
                   <span class="breakdown-count">{{ alert.breakdown.critical }}</span>
                 </div>
                 <div class="breakdown-item">
                   <span class="breakdown-dot high"></span>
-                  <span class="breakdown-label">High</span>
+                  <span class="breakdown-label">{{ $t('graph.high') }}</span>
                   <span class="breakdown-count">{{ alert.breakdown.high }}</span>
                 </div>
                 <div class="breakdown-item">
                   <span class="breakdown-dot medium"></span>
-                  <span class="breakdown-label">Medium</span>
+                  <span class="breakdown-label">{{ $t('graph.medium') }}</span>
                   <span class="breakdown-count">{{ alert.breakdown.medium }}</span>
                 </div>
                 <div class="breakdown-item">
                   <span class="breakdown-dot low"></span>
-                  <span class="breakdown-label">Low</span>
+                  <span class="breakdown-label">{{ $t('graph.low') }}</span>
                   <span class="breakdown-count">{{ alert.breakdown.low }}</span>
                 </div>
               </div>
@@ -128,7 +127,7 @@
             
             <!-- Impact Description Section (if available) -->
             <div v-if="alert.impactDescription" class="impact-section">
-              <div class="impact-section-title">📝 Impact Description</div>
+              <div class="impact-section-title">📝 {{ $t('graph.impactDescription') }}</div>
               <div class="impact-description-content">
                 {{ alert.impactDescription }}
               </div>
@@ -136,7 +135,7 @@
             
             <!-- Affected Services List (only show if there are affected services) -->
             <div v-if="alert.affectedCount > 0" class="impact-section">
-              <div class="impact-section-title">📋 Affected Services</div>
+              <div class="impact-section-title">📋 {{ $t('graph.affectedServices') }}</div>
               <div class="affected-list">
                 <div 
                   v-for="affected in alert.affectedServices" 
@@ -169,33 +168,33 @@
         <div class="graph-header">
         <div class="graph-title">
           <span>🔗</span>
-          <span>Live Dependency View</span>
+          <span>{{ $t('graph.liveDependencyView') }}</span>
         </div>
         
         <!-- Integrated Stats -->
         <div class="graph-stats">
             <div class="stat-pill">
-                <span class="stat-label">Total:</span>
+                <span class="stat-label">{{ $t('graph.total') }}:</span>
                 <span class="stat-value">{{ stats.total }}</span>
             </div>
             <div class="stat-pill healthy">
                 <span class="stat-dot"></span>
-                <span class="stat-label">Healthy:</span>
+                <span class="stat-label">{{ $t('graph.healthyNode') }}:</span>
                 <span class="stat-value">{{ stats.up }}</span>
             </div>
             <div class="stat-pill warning">
                 <span class="stat-dot"></span>
-                <span class="stat-label">Warning:</span>
+                <span class="stat-label">{{ $t('graph.warningNode') }}:</span>
                 <span class="stat-value">{{ stats.warning }}</span>
             </div>
             <div class="stat-pill down">
                 <span class="stat-dot"></span>
-                <span class="stat-label">Down:</span>
+                <span class="stat-label">{{ $t('graph.down') }}:</span>
                 <span class="stat-value">{{ stats.down }}</span>
             </div>
             <div class="stat-pill unknown" v-if="stats.unknown > 0">
                 <span class="stat-dot"></span>
-                <span class="stat-label">Unknown:</span>
+                <span class="stat-label">{{ $t('graph.unknown') }}:</span>
                 <span class="stat-value">{{ stats.unknown }}</span>
             </div>
         </div>
@@ -209,7 +208,7 @@
             @click="showSecurityPanel = !showSecurityPanel"
           >
             <span>🔐</span>
-            <span class="toggle-label">{{ showSecurityPanel ? 'Hide' : 'Security' }}</span>
+            <span class="toggle-label">{{ showSecurityPanel ? $t('graph.hide') : $t('graph.security') }}</span>
             <span v-if="expiringConfigsCount > 0" class="expiring-badge">{{ expiringConfigsCount }}</span>
             <span v-else class="config-badge">{{ projectSecurityConfigs.length }}</span>
           </button>
@@ -222,7 +221,7 @@
             @click="saveLayout"
           >
             <el-icon><Check /></el-icon>
-            Save Layout
+            {{ $t('graph.saveLayout') }}
           </el-button>
           
           <!-- Customize Layout / Exit Customization Button -->
@@ -232,7 +231,7 @@
             size="small" 
             @click="toggleEditMode"
           >
-            {{ isEditMode ? 'Exit Customization' : 'Customize Layout' }}
+            {{ isEditMode ? $t('graph.exitCustomization') : $t('graph.customizeLayout') }}
           </el-button>
           
 
@@ -242,7 +241,7 @@
             <div v-if="isEditMode && isAdmin" class="shortcuts-hint-inline" :class="{ collapsed: !showShortcutsHint }">
               <div class="hint-title" @click="showShortcutsHint = !showShortcutsHint">
                 <span>⌨️</span>
-                <span v-if="showShortcutsHint">Quick Selection</span>
+                <span v-if="showShortcutsHint">{{ $t('graph.quickSelection') }}</span>
                 <button class="hint-toggle-btn" @click.stop="showShortcutsHint = !showShortcutsHint">
                   {{ showShortcutsHint ? '−' : '?' }}
                 </button>
@@ -250,20 +249,20 @@
               <transition name="expand">
                 <div v-if="showShortcutsHint" class="hint-content">
                   <div class="hint-item">
-                    <kbd>Shift</kbd> + <span class="hint-action">Drag</span>
-                    <span class="hint-desc">Box select</span>
+                    <kbd>Shift</kbd> + <span class="hint-action">{{ $t('graph.drag') }}</span>
+                    <span class="hint-desc">{{ $t('graph.boxSelect') }}</span>
                   </div>
                   <div class="hint-item">
-                    <kbd>Ctrl/Cmd</kbd> + <span class="hint-action">Click</span>
-                    <span class="hint-desc">Multi-select</span>
+                    <kbd>Ctrl/Cmd</kbd> + <span class="hint-action">{{ $t('graph.click') }}</span>
+                    <span class="hint-desc">{{ $t('graph.multiSelect') }}</span>
                   </div>
                   <div class="hint-item">
                     <kbd>Ctrl/Cmd</kbd> + <kbd>A</kbd>
-                    <span class="hint-desc">Select all</span>
+                    <span class="hint-desc">{{ $t('graph.selectAll') }}</span>
                   </div>
                   <div class="hint-item">
                     <kbd>Esc</kbd>
-                    <span class="hint-desc">Clear</span>
+                    <span class="hint-desc">{{ $t('common.clear') }}</span>
                   </div>
                 </div>
               </transition>
@@ -315,25 +314,25 @@
           >
             <div class="context-menu-item" @click="handleContextMenuAction('view')">
               <span class="menu-icon">📋</span>
-              <span>View Details</span>
+              <span>{{ $t('graph.viewDetails') }}</span>
             </div>
             <div class="context-menu-item" @click="handleContextMenuAction('focus')">
               <span class="menu-icon">🎯</span>
-              <span>Focus Node</span>
+              <span>{{ $t('graph.focusNode') }}</span>
             </div>
             <div class="context-menu-item" @click="handleContextMenuAction('dependencies')">
               <span class="menu-icon">🔗</span>
-              <span>View Dependencies</span>
+              <span>{{ $t('graph.viewDependencies') }}</span>
             </div>
             <div class="context-menu-divider"></div>
             <div class="context-menu-item" @click="handleContextMenuAction('check')">
               <span class="menu-icon">🔄</span>
-              <span>Manual Health Check</span>
+              <span>{{ $t('graph.manualHealthCheck') }}</span>
             </div>
             <div v-if="contextMenu.node?.status === 'down'" class="context-menu-divider"></div>
             <div v-if="contextMenu.node?.status === 'down'" class="context-menu-item" @click="handleContextMenuAction('impact')">
               <span class="menu-icon">💡</span>
-              <span>Add Impact Annotation</span>
+              <span>{{ $t('graph.addImpactAnnotation') }}</span>
             </div>
           </div>
         </transition>
@@ -342,11 +341,11 @@
         <div class="quick-bar">
           <button class="quick-btn" @click="showImpactAnalysis = !showImpactAnalysis">
             <span>💡</span>
-            <span>{{ showImpactAnalysis ? 'Hide Analysis' : 'Impact Analysis' }}</span>
+            <span>{{ showImpactAnalysis ? $t('graph.hideAnalysis') : $t('graph.impactAnalysis') }}</span>
           </button>
           <button class="quick-btn" @click="refreshGraph">
             <span>🔄</span>
-            <span>Refresh</span>
+            <span>{{ $t('graph.refresh') }}</span>
           </button>
         </div>
         
@@ -365,27 +364,27 @@
             </div>
             <div class="panel-body">
               <div class="detail-row">
-                <span class="label">Status</span>
+                <span class="label">{{ $t('graph.status') }}</span>
                 <el-tag :type="getStatusType(selectedNode.status)" size="small">
-                  {{ selectedNode.status?.toUpperCase() || 'UNKNOWN' }}
+                  {{ selectedNode.status?.toUpperCase() || $t('graph.statusUnknown') }}
                 </el-tag>
               </div>
               <div class="detail-row">
-                <span class="label">Host</span>
+                <span class="label">{{ $t('graph.host') }}</span>
                 <span class="value">{{ selectedNode.host }}:{{ selectedNode.port }}</span>
               </div>
               <div class="detail-row">
-                <span class="label">Response Time</span>
+                <span class="label">{{ $t('graph.responseTime') }}</span>
                 <span class="value" :class="{ 'warning-text': isSlowResponse(selectedNode.responseTime) }">
                   {{ formatResponseTime(selectedNode.responseTime) }}
                 </span>
               </div>
               <div class="detail-row">
-                <span class="label">Last Check</span>
+                <span class="label">{{ $t('graph.lastCheck') }}</span>
                 <span class="value">{{ formatLastCheck(selectedNode.lastCheck) }}</span>
               </div>
               <div class="detail-row">
-                <span class="label">Risk Level</span>
+                <span class="label">{{ $t('graph.riskLevel') }}</span>
                 <el-tag :type="getRiskType(selectedNode.riskLevel)" size="small">
                   {{ selectedNode.riskLevel?.toUpperCase() }}
                 </el-tag>
@@ -396,19 +395,19 @@
                 <div class="error-label">
                   <el-icon v-if="selectedNode.status === 'down'" color="#f04438"><CircleClose /></el-icon>
                   <el-icon v-else color="#f79009"><Warning /></el-icon>
-                  <span>{{ selectedNode.status === 'down' ? 'Error' : 'Warning' }}</span>
+                  <span>{{ selectedNode.status === 'down' ? $t('graph.error') : $t('graph.warningNode') }}</span>
                 </div>
-                <div class="error-message">{{ selectedNode.errorMessage || 'Connection failed' }}</div>
+                <div class="error-message">{{ selectedNode.errorMessage || $t('graph.connectionFailed') }}</div>
               </div>
               
               <!-- Impact Analysis for Down Services -->
               <div v-if="selectedNode.status === 'down' && impactedServices.length > 0" class="impact-section">
                 <div class="section-title">
-                  <span>⚠️ Impact Analysis</span>
-                  <el-tag type="danger" size="small">{{ impactedServices.length }} affected</el-tag>
+                  <span>⚠️ {{ $t('graph.impactAnalysis') }}</span>
+                  <el-tag type="danger" size="small">{{ $t('graph.affected', { count: impactedServices.length }) }}</el-tag>
                 </div>
                 <div class="impact-description">
-                  Services that depend on this service may be affected
+                  {{ $t('graph.dependencyImpactDesc') }}
                 </div>
                 <div 
                   v-for="service in impactedServices" 
@@ -426,7 +425,7 @@
               
               <!-- Dependencies -->
               <div class="dependency-section" v-if="nodeDependencies.length > 0">
-                <div class="section-title">⬇️ Depends on ({{ nodeDependencies.length }})</div>
+                <div class="section-title">⬇️ {{ $t('graph.dependsOn') }} ({{ nodeDependencies.length }})</div>
                 <div 
                   v-for="dep in nodeDependencies" 
                   :key="dep.id" 
@@ -441,7 +440,7 @@
               
               <!-- Dependents -->
               <div class="dependency-section" v-if="nodeDependents.length > 0">
-                <div class="section-title">⬆️ Depended by ({{ nodeDependents.length }})</div>
+                <div class="section-title">⬆️ {{ $t('graph.dependedBy') }} ({{ nodeDependents.length }})</div>
                 <div 
                   v-for="dep in nodeDependents" 
                   :key="dep.id" 
@@ -463,7 +462,7 @@
           <div class="security-panel-header">
             <div class="security-panel-title">
               <span>🔐</span>
-              <span>Security Configs</span>
+              <span>{{ $t('graph.securityConfigs') }}</span>
               <span class="config-count">({{ projectSecurityConfigs.length }})</span>
             </div>
             <div class="security-header-actions">
@@ -472,13 +471,13 @@
                   class="security-filter-btn" 
                   :class="{ active: securityFilter === 'all' }"
                   @click="securityFilter = 'all'"
-                >All</button>
+                >{{ $t('common.all') }}</button>
                 <button 
                   class="security-filter-btn" 
                   :class="{ active: securityFilter === 'expiring' }"
                   @click="securityFilter = 'expiring'"
                 >
-                  Expiring
+                  {{ $t('graph.expiring') }}
                   <span v-if="expiringConfigsCount > 0" class="filter-badge">{{ expiringConfigsCount }}</span>
                 </button>
               </div>
@@ -502,14 +501,14 @@
               </div>
               <div class="security-card-type">{{ getSecurityTypeLabel(config.type) }}</div>
               <div class="security-card-info">
-                <span class="expiry-label">Expires:</span>
+                <span class="expiry-label">{{ $t('graph.expires') }}:</span>
                 <span class="expiry-date">{{ formatSecurityDate(config.expiry_date) }}</span>
                 <span class="days-remaining" :class="config.status">
-                  ({{ config.days_remaining > 0 ? config.days_remaining + ' days left' : 'Expired' }})
+                  ({{ config.days_remaining > 0 ? $t('graph.daysLeft', { count: config.days_remaining }) : $t('graph.expired') }})
                 </span>
               </div>
               <div v-if="config.affected_services?.length" class="security-card-services">
-                <span class="affects-label">Affects:</span>
+                <span class="affects-label">{{ $t('graph.affects') }}:</span>
                 <div class="service-tags">
                   <span 
                     v-for="serviceId in config.affected_services.slice(0, 3)" 
@@ -528,7 +527,7 @@
             </div>
             
             <div v-if="filteredSecurityConfigs.length === 0" class="no-configs">
-              <span>{{ securityFilter === 'expiring' ? 'No expiring configs in this project' : 'No security configs for this project' }}</span>
+              <span>{{ securityFilter === 'expiring' ? $t('graph.noExpiringConfigs') : $t('graph.noSecurityConfigs') }}</span>
             </div>
           </div>
         </div>
@@ -541,6 +540,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { Graph } from '@antv/g6';
 import { ElMessage } from 'element-plus';
 import { createDependency, updateDependency, deleteDependency, migrateDependencies as migrateDeps } from '../api/dependencies';
@@ -565,6 +565,7 @@ import {
 
 // Permission check
 const isAdmin = computed(() => authUtils.isAdmin());
+const { t } = useI18n();
 
 interface ServiceWithStatus {
   id: string;
@@ -769,19 +770,19 @@ const expiringConfigsCount = computed(() => {
 
 const getSecurityStatusLabel = (status: string) => {
   switch (status) {
-    case 'normal': return 'Normal';
-    case 'warning': return 'Warning';
-    case 'critical': return 'Critical';
-    case 'expired': return 'Expired';
+    case 'normal': return t('graph.securityNormal');
+    case 'warning': return t('graph.securityWarning');
+    case 'critical': return t('graph.securityCritical');
+    case 'expired': return t('graph.securityExpired');
     default: return status;
   }
 };
 
 const getSecurityTypeLabel = (type: string) => {
   switch (type) {
-    case 'accesskey': return 'AccessKey';
-    case 'ftp': return 'FTP Password';
-    case 'ssl': return 'SSL Certificate';
+    case 'accesskey': return t('graph.typeAccesskey');
+    case 'ftp': return t('graph.typeFtp');
+    case 'ssl': return t('graph.typeSsl');
     default: return type;
   }
 };
@@ -898,14 +899,14 @@ const toggleDemoMode = () => {
     const mockAffected: ImpactedService[] = allServices.value.slice(1, 6).map((s, i) => ({
       ...s,
       impactLevel: i === 0 ? 'critical' : i < 2 ? 'high' : i < 4 ? 'medium' : 'low',
-      impactReason: i === 0 ? 'Direct dependency (risk: critical)' : `Via ${demoService.name} (depth: ${i})`,
+      impactReason: i === 0 ? t('graph.directDependency') : t('graph.viaDependency', { name: demoService.name, depth: i }),
       impactPath: [demoService.name, s.name]
     })) as ImpactedService[];
     
     demoAlert.value = {
       serviceId: demoService.id,
       serviceName: demoService.name,
-      message: `[DEMO] ${demoService.name} service is down`,
+      message: t('graph.demoServiceDown', { name: demoService.name }),
       affectedCount: mockAffected.length,
       breakdown: calculateBreakdown(mockAffected),
       affectedServices: mockAffected,
@@ -948,7 +949,7 @@ watch(downServices, () => {
       .filter(link => link.impact_description)
       .map(link => {
         const sourceService = allServices.value.find(s => s.id === link.source);
-        return `${sourceService?.name || 'Unknown'}: ${link.impact_description}`;
+        return `${sourceService?.name || t('graph.unknownService')}: ${link.impact_description}`;
       });
     
     // Combine: service-level first, then dependency-level
@@ -956,7 +957,7 @@ watch(downServices, () => {
     if (serviceImpactDesc) {
       combinedImpactDesc = serviceImpactDesc;
       if (depImpactDescriptions.length > 0) {
-        combinedImpactDesc += ' | Dependency impacts: ' + depImpactDescriptions.join('; ');
+        combinedImpactDesc += ' | ' + t('graph.dependencyImpacts') + ': ' + depImpactDescriptions.join('; ');
       }
     } else if (depImpactDescriptions.length > 0) {
       combinedImpactDesc = depImpactDescriptions.join('; ');
@@ -967,7 +968,7 @@ watch(downServices, () => {
     const depCustomTemplate = relatedLinks.find(link => link.custom_alert_template)?.custom_alert_template;
     const customTemplate = serviceCustomTemplate || depCustomTemplate;
     
-    let message = `${service.name} service is down`;
+    let message = t('graph.serviceIsDown', { name: service.name });
     if (customTemplate) {
       message = customTemplate
         .replace(/\{service_name\}/g, service.name)
@@ -1121,11 +1122,11 @@ const toggleEditMode = async () => {
   if (isEditMode.value) {
     // Exiting edit mode - do NOT auto save, user must click Save button explicitly
     isEditMode.value = false;
-    ElMessage.info('Exited customization mode');
+    ElMessage.info(t('graph.exitedCustomization'));
   } else {
     // Entering edit mode
     isEditMode.value = true;
-    ElMessage.info('Entered customization mode: drag nodes, create/delete connections');
+    ElMessage.info(t('graph.enteredCustomization'));
   }
 };
 
@@ -1147,7 +1148,7 @@ const saveLayout = async () => {
     const response = await api.post('/services/layout', layoutData);
     console.log('Layout save response:', response.data);
     
-    ElMessage.success('Layout saved successfully');
+    ElMessage.success(t('graph.layoutSaved'));
     
     // Refresh graph data to ensure UI is in sync with database
     // This is important after dependency type updates in edit mode
@@ -1155,7 +1156,7 @@ const saveLayout = async () => {
   } catch (error: any) {
     console.error('Failed to save layout:', error);
     console.error('Error response:', error.response?.data);
-    ElMessage.error('Failed to save layout: ' + (error.response?.data?.error || error.message));
+    ElMessage.error(t('graph.layoutSaveFailed') + ': ' + (error.response?.data?.error || error.message));
   }
 };
 
@@ -1186,10 +1187,10 @@ const handleAddLink = async (payload: { source: string, target: string, dependen
       status: allServices.value.find(s => s.id === targetId)?.status
     });
     
-    ElMessage.success('Dependency created');
+    ElMessage.success(t('graph.dependencyCreated'));
   } catch (error) {
     console.error('Failed to create dependency:', error);
-    ElMessage.error('Failed to create dependency');
+    ElMessage.error(t('graph.dependencyCreateFailed'));
   }
 };
 
@@ -1199,7 +1200,7 @@ const handleUpdateLink = async (payload: { id: string, dependencyType?: string, 
   // Check if this is a real dependency (has UUID) or a fallback link (has "link-" prefix)
   if (id.startsWith('link-')) {
     ElMessage({
-      message: 'This is a legacy dependency. To edit it, please delete and recreate in Customize Layout mode.',
+      message: t('graph.legacyDependencyHint'),
       type: 'info',
       duration: 5000,
       showClose: true
@@ -1222,17 +1223,17 @@ const handleUpdateLink = async (payload: { id: string, dependencyType?: string, 
       if (linkDirection) graphLinks.value[linkIndex].linkDirection = linkDirection as any;
     }
     
-    const updateMessage = linkDirection ? 'Link direction updated' : 'Dependency type updated';
+    const updateMessage = linkDirection ? t('graph.linkDirectionUpdated') : t('graph.dependencyTypeUpdated');
     ElMessage.success(updateMessage);
   } catch (error: any) {
     console.error('Failed to update dependency:', error);
-    ElMessage.error(error.response?.data?.error || 'Failed to update dependency');
+    ElMessage.error(error.response?.data?.error || t('graph.dependencyUpdateFailed'));
   }
 };
 
 const migrateDependencies = async () => {
   const loading = ElMessage({
-    message: 'Migrating legacy dependencies...',
+    message: t('graph.migratingDependencies'),
     type: 'info',
     duration: 0,
     iconClass: 'el-icon-loading'
@@ -1242,14 +1243,14 @@ const migrateDependencies = async () => {
     const result = await migrateDeps();
     loading.close();
     
-    ElMessage.success(`Migration completed! Migrated: ${result.migrated}, Skipped: ${result.skipped}`);
+    ElMessage.success(t('graph.migrationCompleted', { migrated: result.migrated, skipped: result.skipped }));
     
     // Refresh the graph to load newly migrated dependencies
     await refreshGraph();
   } catch (error: any) {
     loading.close();
     console.error('Failed to migrate dependencies:', error);
-    ElMessage.error(error.response?.data?.error || 'Failed to migrate dependencies');
+    ElMessage.error(error.response?.data?.error || t('graph.migrationFailed'));
   }
 };
 
@@ -1266,10 +1267,10 @@ const handleDeleteLink = async (link: { id: string, source: string, target: stri
       sourceService.dependencies = sourceService.dependencies.filter(d => d !== link.target);
     }
     
-    ElMessage.success('Dependency deleted');
+    ElMessage.success(t('graph.dependencyDeleted'));
   } catch (error) {
     console.error('Failed to delete dependency:', error);
-    ElMessage.error('Failed to delete dependency');
+    ElMessage.error(t('graph.dependencyDeleteFailed'));
   }
 };
 
@@ -1355,9 +1356,9 @@ const initGraph = async (data: any) => {
           // Display format: icon name \n port info + response time/error
           let rtText = '';
           if (status === 'down') {
-            rtText = '⚠ Connection refused';
+            rtText = t('graph.connRefused');
           } else if (status === 'unknown') {
-            rtText = '? No data';
+            rtText = t('graph.noData');
           } else if (responseTime) {
             if (responseTime > 500) {
               rtText = `⚠ ${responseTime}ms avg`;

@@ -1,7 +1,7 @@
 <template>
   <div class="settings-view">
     <div class="page-header">
-      <h1>Settings</h1>
+      <h1>{{ $t('settings.title') }}</h1>
     </div>
 
     <!-- Dependency Types Management -->
@@ -9,22 +9,22 @@
       <template #header>
         <div class="card-header">
           <el-icon><Share /></el-icon>
-          <span>Dependency Types</span>
+          <span>{{ $t('settings.cardDepTypes') }}</span>
         </div>
       </template>
 
       <div class="dependency-types-section">
-        <p>Manage dependency types used in service relationships. System types cannot be deleted.</p>
+        <p>{{ $t('settings.depTypesDesc') }}</p>
         
         <el-table :data="dependencyTypes" style="width: 100%" v-loading="loadingTypes">
-          <el-table-column prop="name" label="Name" width="100" />
-          <el-table-column prop="label" label="Label" width="120" />
-          <el-table-column label="Icon" width="80">
+          <el-table-column prop="name" :label="$t('settings.colName')" width="100" />
+          <el-table-column prop="label" :label="$t('settings.colLabel')" width="120" />
+          <el-table-column :label="$t('settings.colIcon')" width="80">
             <template #default="{ row }">
               <span class="icon-preview" :style="{ color: row.color || getIconColor(row.icon) }">{{ row.icon }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="Line Style" width="120">
+          <el-table-column :label="$t('settings.colLineStyle')" width="120">
             <template #default="{ row }">
               <svg width="50" height="16" class="line-preview-cell">
                 <line 
@@ -36,20 +36,20 @@
               </svg>
             </template>
           </el-table-column>
-          <el-table-column label="Type" width="80">
+          <el-table-column :label="$t('settings.colType')" width="80">
             <template #default="{ row }">
               <el-tag :type="row.is_system ? 'info' : 'success'" size="small">
-                {{ row.is_system ? 'System' : 'Custom' }}
+                {{ row.is_system ? $t('settings.tagSystem') : $t('settings.tagCustom') }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="Actions" width="150" v-if="isAdmin">
+          <el-table-column :label="$t('common.actions')" width="150" v-if="isAdmin">
             <template #default="{ row }">
               <el-button 
                 size="small" 
                 @click="editDependencyType(row)"
               >
-                Edit
+                {{ $t('common.edit') }}
               </el-button>
               <el-button 
                 size="small" 
@@ -57,7 +57,7 @@
                 @click="deleteDependencyType(row)"
                 :disabled="!!row.is_system"
               >
-                Delete
+                {{ $t('common.delete') }}
               </el-button>
             </template>
           </el-table-column>
@@ -66,7 +66,7 @@
         <div class="add-type-btn" v-if="isAdmin">
           <el-button type="primary" @click="showAddTypeDialog">
             <el-icon><Plus /></el-icon>
-            Add Custom Type
+            {{ $t('settings.btnAddCustom') }}
           </el-button>
         </div>
       </div>
@@ -76,25 +76,25 @@
       <template #header>
         <div class="card-header">
           <el-icon><Setting /></el-icon>
-          <span>General Settings</span>
+          <span>{{ $t('settings.cardGeneral') }}</span>
         </div>
       </template>
 
       <el-form :model="settings" label-width="200px" label-position="left" v-loading="loadingSettings">
         <!-- System Timezone -->
         <el-divider content-position="left">
-          <span style="font-weight: 600; color: #303133;">System Configuration</span>
+          <span style="font-weight: 600; color: #303133;">{{ $t('settings.sectionSystem') }}</span>
         </el-divider>
         
-        <el-form-item label="System Timezone">
+        <el-form-item :label="$t('settings.labelTimezone')">
           <el-select 
             v-model="settings.timezone" 
             filterable
-            placeholder="Select timezone"
+            :placeholder="$t('settings.placeholderTimezone')"
             style="width: 300px"
             :disabled="!isAdmin"
             @change="handleTimezoneChange">
-            <el-option-group label="Common Timezones">
+            <el-option-group :label="$t('settings.tzCommon')">
               <el-option value="UTC" label="UTC (Coordinated Universal Time)" />
               <el-option value="Asia/Shanghai" label="Asia/Shanghai (Beijing Time, UTC+8)" />
               <el-option value="Asia/Tokyo" label="Asia/Tokyo (Japan Time, UTC+9)" />
@@ -102,72 +102,72 @@
               <el-option value="America/Los_Angeles" label="America/Los_Angeles (Pacific Time)" />
               <el-option value="Europe/London" label="Europe/London (GMT/BST)" />
             </el-option-group>
-            <el-option-group label="Asia">
+            <el-option-group :label="$t('settings.tzAsia')">
               <el-option value="Asia/Hong_Kong" label="Asia/Hong_Kong (HKT, UTC+8)" />
               <el-option value="Asia/Singapore" label="Asia/Singapore (SGT, UTC+8)" />
               <el-option value="Asia/Dubai" label="Asia/Dubai (GST, UTC+4)" />
               <el-option value="Asia/Seoul" label="Asia/Seoul (KST, UTC+9)" />
               <el-option value="Asia/Bangkok" label="Asia/Bangkok (ICT, UTC+7)" />
             </el-option-group>
-            <el-option-group label="Americas">
+            <el-option-group :label="$t('settings.tzAmericas')">
               <el-option value="America/Chicago" label="America/Chicago (Central Time)" />
               <el-option value="America/Denver" label="America/Denver (Mountain Time)" />
               <el-option value="America/Toronto" label="America/Toronto (Eastern Time)" />
               <el-option value="America/Sao_Paulo" label="America/Sao_Paulo (BRT)" />
             </el-option-group>
-            <el-option-group label="Europe">
+            <el-option-group :label="$t('settings.tzEurope')">
               <el-option value="Europe/Paris" label="Europe/Paris (CET/CEST)" />
               <el-option value="Europe/Berlin" label="Europe/Berlin (CET/CEST)" />
               <el-option value="Europe/Moscow" label="Europe/Moscow (MSK, UTC+3)" />
             </el-option-group>
-            <el-option-group label="Australia">
+            <el-option-group :label="$t('settings.tzAustralia')">
               <el-option value="Australia/Sydney" label="Australia/Sydney (AEDT/AEST)" />
               <el-option value="Australia/Melbourne" label="Australia/Melbourne (AEDT/AEST)" />
             </el-option-group>
           </el-select>
-          <div class="form-tip">Affects backend log timestamps and system time display. Current time: {{ currentTime }}</div>
+          <div class="form-tip">{{ $t('settings.tipTimezone', { time: currentTime }) }}</div>
         </el-form-item>
 
-        <el-form-item label="Date Format">
+        <el-form-item :label="$t('settings.labelDateFormat')">
           <el-input 
             v-model="settings.dateFormat" 
             placeholder="YYYY-MM-DD HH:mm:ss"
             style="width: 300px"
             :disabled="!isAdmin" />
-          <div class="form-tip">Display format for dates and times in the UI</div>
+          <div class="form-tip">{{ $t('settings.tipDateFormat') }}</div>
         </el-form-item>
 
         <!-- Service Defaults -->
         <el-divider content-position="left">
-          <span style="font-weight: 600; color: #303133;">Service Defaults</span>
+          <span style="font-weight: 600; color: #303133;">{{ $t('settings.sectionDefaults') }}</span>
         </el-divider>
 
-        <el-form-item label="Default Check Interval">
+        <el-form-item :label="$t('settings.labelDefaultInterval')">
           <el-input-number v-model="settings.defaultInterval" :min="10" :max="3600" :disabled="!isAdmin" />
-          <span class="unit-text">seconds (Used for new services in Fixed Interval mode)</span>
+          <span class="unit-text">{{ $t('settings.unitDefaultInterval') }}</span>
         </el-form-item>
-        <el-form-item label="Default Warning Threshold">
+        <el-form-item :label="$t('settings.labelDefaultWarn')">
           <el-input-number v-model="settings.warningThreshold" :min="1" :max="30" :disabled="!isAdmin" />
-          <span class="unit-text">consecutive failures (Range: 1-30)</span>
+          <span class="unit-text">{{ $t('settings.unitWarnThreshold') }}</span>
         </el-form-item>
-        <el-form-item label="Default Error Threshold">
+        <el-form-item :label="$t('settings.labelDefaultError')">
           <el-input-number v-model="settings.errorThreshold" :min="1" :max="50" :disabled="!isAdmin" />
-          <span class="unit-text">consecutive failures (Range: 1-50)</span>
+          <span class="unit-text">{{ $t('settings.unitErrorThreshold') }}</span>
         </el-form-item>
         
         <!-- Data Management -->
         <el-divider content-position="left">
-          <span style="font-weight: 600; color: #303133;">Data Management</span>
+          <span style="font-weight: 600; color: #303133;">{{ $t('settings.sectionData') }}</span>
         </el-divider>
 
-        <el-form-item label="Log Retention">
+        <el-form-item :label="$t('settings.labelLogRetention')">
           <el-input-number v-model="settings.logRetentionDays" :min="1" :max="365" :disabled="!isAdmin" />
-          <span class="unit-text">days (Number of days to keep backend logs)</span>
+          <span class="unit-text">{{ $t('settings.unitLogRetention') }}</span>
         </el-form-item>
 
-        <el-form-item label="Data Retention">
+        <el-form-item :label="$t('settings.labelDataRetention')">
           <el-input-number v-model="settings.dataRetentionDays" :min="1" :max="365" :disabled="!isAdmin" />
-          <span class="unit-text">days (Number of days to keep check records in database)</span>
+          <span class="unit-text">{{ $t('settings.unitDataRetention') }}</span>
         </el-form-item>
       </el-form>
     </el-card>
@@ -176,18 +176,19 @@
       <template #header>
         <div class="card-header">
           <el-icon><FolderOpened /></el-icon>
-          <span>Import / Export</span>
+          <span>{{ $t('settings.cardImportExport') }}</span>
         </div>
       </template>
 
       <div class="import-export-section">
-        <p>Export your service configurations to a JSON file for backup or migration.</p>
+        <p>{{ $t('settings.importExportDesc') }}</p>
         <div class="action-buttons">
           <el-button type="primary" @click="exportConfig">
             <el-icon><Download /></el-icon>
-            Export Configuration
+            {{ $t('settings.btnExportConfig') }}
           </el-button>
           <el-upload
+            v-if="isAdmin"
             ref="uploadRef"
             action="#"
             :auto-upload="false"
@@ -197,52 +198,52 @@
           >
             <el-button>
               <el-icon><Upload /></el-icon>
-              Import Configuration
+              {{ $t('settings.btnImportConfig') }}
             </el-button>
           </el-upload>
         </div>
       </div>
     </el-card>
 
-    <div class="form-actions">
+    <div class="form-actions" v-if="isAdmin">
       <el-button type="primary" size="large" @click="saveSettings" :loading="saving">
-        Save Settings
+        {{ $t('settings.btnSaveSettings') }}
       </el-button>
     </div>
 
     <!-- Dependency Type Edit Dialog -->
     <el-dialog 
       v-model="typeDialogVisible" 
-      :title="editingType ? 'Edit Dependency Type' : 'Add Dependency Type'"
+      :title="editingType ? $t('settings.titleEditDep') : $t('settings.titleAddDep')"
       width="500px"
     >
       <el-form :model="typeForm" label-width="100px">
-        <el-form-item label="Name" required>
+        <el-form-item :label="$t('settings.labelName')" required>
           <el-input 
             v-model="typeForm.name" 
-            placeholder="e.g., monitors"
+            :placeholder="$t('settings.placeholderDepName')"
           />
-          <div class="form-tip" v-if="!editingType">Unique identifier (lowercase, no spaces)</div>
+          <div class="form-tip" v-if="!editingType">{{ $t('settings.tipDepNameUnique') }}</div>
           <div class="form-tip warning" v-else>
-            <span style="color: #f59e0b;">⚠️ Warning:</span> Changing name will update all existing dependencies using this type
+            <span style="color: #f59e0b;">⚠️ {{ $t('settings.warningLabel') }}</span> {{ $t('settings.tipDepNameWarning') }}
           </div>
         </el-form-item>
-        <el-form-item label="Label" required>
-          <el-input v-model="typeForm.label" placeholder="e.g., Monitors" />
-          <div class="form-tip">Display name shown in UI</div>
+        <el-form-item :label="$t('settings.labelLabel')" required>
+          <el-input v-model="typeForm.label" :placeholder="$t('settings.placeholderDepLabel')" />
+          <div class="form-tip">{{ $t('settings.tipDepLabel') }}</div>
         </el-form-item>
-        <el-form-item label="Icon">
+        <el-form-item :label="$t('settings.labelIcon')">
           <div class="icon-input-section">
             <div class="icon-input-wrapper">
               <el-input 
                 v-model="typeForm.icon" 
-                placeholder="Enter emoji (e.g., 🔗)"
+                :placeholder="$t('settings.placeholderIcon')"
                 maxlength="2"
                 style="width: 200px;"
               />
               <span class="icon-live-preview">{{ typeForm.icon || '🔗' }}</span>
             </div>
-            <div class="form-tip">Enter any emoji or select from quick options below</div>
+            <div class="form-tip">{{ $t('settings.tipIcon') }}</div>
             <div class="quick-icon-selector">
               <button 
                 v-for="icon in availableIcons" 
@@ -258,11 +259,11 @@
             </div>
           </div>
         </el-form-item>
-        <el-form-item label="Color">
+        <el-form-item :label="$t('settings.labelColor')">
           <el-color-picker v-model="typeForm.color" />
-          <span style="margin-left: 10px;">{{ typeForm.color || 'Default' }}</span>
+          <span style="margin-left: 10px;">{{ typeForm.color || $t('settings.colorDefault') }}</span>
         </el-form-item>
-        <el-form-item label="Line Style">
+        <el-form-item :label="$t('settings.labelLineStyle')">
           <div class="line-style-selector">
             <div 
               v-for="style in availableLineStyles" 
@@ -285,9 +286,9 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="typeDialogVisible = false">Cancel</el-button>
+        <el-button @click="typeDialogVisible = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="saveType" :loading="savingType">
-          {{ editingType ? 'Update' : 'Create' }}
+          {{ editingType ? $t('common.update') : $t('common.create') }}
         </el-button>
       </template>
     </el-dialog>
@@ -296,6 +297,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Setting, FolderOpened, Download, Upload, Share, Plus } from '@element-plus/icons-vue';
 import api from '../api';
@@ -306,12 +308,15 @@ import authUtils from '../utils/auth';
 // Permission check
 const isAdmin = computed(() => authUtils.isAdmin());
 
+const { t } = useI18n();
+
 interface DependencyType {
   id?: number;
   name: string;
   label: string;
   icon: string;
   color?: string;
+  line_style?: string;
   is_system: boolean;
 }
 
@@ -376,7 +381,7 @@ const loadGeneralSettings = async () => {
     updateCurrentTime();
   } catch (error) {
     console.error('Failed to load settings:', error);
-    ElMessage.warning('Failed to load settings, using defaults');
+    ElMessage.warning(t('settings.msgLoadFailedDefaults'));
   } finally {
     loadingSettings.value = false;
   }
@@ -384,7 +389,7 @@ const loadGeneralSettings = async () => {
 
 const saveSettings = async () => {
   if (!isAdmin.value) {
-    ElMessage.warning('Only administrators can modify settings');
+    ElMessage.warning(t('settings.msgAdminOnly'));
     return;
   }
   
@@ -405,9 +410,9 @@ const saveSettings = async () => {
       api.put('/system-settings/log_retention_days', { value: String(settings.value.logRetentionDays) })
     ]);
     
-    ElMessage.success('Settings saved successfully!');
+    ElMessage.success(t('settings.msgSaved'));
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.error || 'Failed to save settings');
+    ElMessage.error(error.response?.data?.error || t('settings.msgSaveFailed'));
   } finally {
     saving.value = false;
   }
@@ -423,9 +428,9 @@ const exportConfig = async () => {
     a.download = `services-config-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    ElMessage.success('Configuration exported!');
+    ElMessage.success(t('settings.msgExported'));
   } catch (error) {
-    ElMessage.error('Failed to export configuration');
+    ElMessage.error(t('settings.msgExportFailed'));
   }
 };
 
@@ -436,14 +441,14 @@ const handleImportFile = async (file: any) => {
       try {
         const content = JSON.parse(e.target?.result as string);
         await api.post('/services/import', content);
-        ElMessage.success('Configuration imported successfully!');
+        ElMessage.success(t('settings.msgImported'));
       } catch (err: any) {
-        ElMessage.error(err.response?.data?.error || 'Failed to import configuration');
+        ElMessage.error(err.response?.data?.error || t('settings.msgImportFailed'));
       }
     };
     reader.readAsText(file.raw);
   } catch (error) {
-    ElMessage.error('Failed to read file');
+    ElMessage.error(t('settings.msgReadFailed'));
   }
 };
 
@@ -462,12 +467,12 @@ const typeForm = ref({
   line_style: 'solid' as 'solid' | 'dashed' | 'dotted' | 'long-dash'
 });
 
-const availableLineStyles = [
-  { value: 'solid', label: 'Solid', dasharray: 'none' },
-  { value: 'dashed', label: 'Dashed', dasharray: '8,4' },
-  { value: 'dotted', label: 'Dotted', dasharray: '2,4' },
-  { value: 'long-dash', label: 'Long Dash', dasharray: '12,6' }
-];
+const availableLineStyles = computed(() => [
+  { value: 'solid', label: t('settings.styleSolid'), dasharray: 'none' },
+  { value: 'dashed', label: t('settings.styleDashed'), dasharray: '8,4' },
+  { value: 'dotted', label: t('settings.styleDotted'), dasharray: '2,4' },
+  { value: 'long-dash', label: t('settings.styleLongDash'), dasharray: '12,6' }
+]);
 
 const availableIcons = [
   { value: '🔗', label: 'Link', color: '#409EFF' },
@@ -494,7 +499,7 @@ const getIconColor = (icon: string) => {
 };
 
 const getLineDashArray = (lineStyle: string) => {
-  const style = availableLineStyles.find(s => s.value === lineStyle);
+  const style = availableLineStyles.value.find(s => s.value === lineStyle);
   return style?.dasharray || 'none';
 };
 
@@ -503,7 +508,7 @@ const loadDependencyTypes = async () => {
   try {
     dependencyTypes.value = await getDependencyTypes();
   } catch (error) {
-    ElMessage.error('Failed to load dependency types');
+    ElMessage.error(t('settings.msgDepLoadFailed'));
   } finally {
     loadingTypes.value = false;
   }
@@ -535,7 +540,7 @@ const editDependencyType = (type: DependencyType) => {
 
 const saveType = async () => {
   if (!typeForm.value.name.trim() || !typeForm.value.label.trim()) {
-    ElMessage.warning('Name and Label are required');
+    ElMessage.warning(t('settings.msgNameLabelRequired'));
     return;
   }
 
@@ -552,7 +557,7 @@ const saveType = async () => {
         color: typeForm.value.color || undefined,
         line_style: typeForm.value.line_style
       });
-      ElMessage.success('Dependency type updated');
+      ElMessage.success(t('settings.msgDepTypeUpdated'));
     } else {
       await createDependencyType({
         name: typeForm.value.name.toLowerCase().replace(/\s+/g, '_'),
@@ -561,12 +566,12 @@ const saveType = async () => {
         color: typeForm.value.color || undefined,
         line_style: typeForm.value.line_style
       });
-      ElMessage.success('Dependency type created');
+      ElMessage.success(t('settings.msgDepTypeCreated'));
     }
     typeDialogVisible.value = false;
     await loadDependencyTypes();
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.error || 'Failed to save dependency type');
+    ElMessage.error(error.response?.data?.error || t('settings.msgDepTypeSaveFailed'));
   } finally {
     savingType.value = false;
   }
@@ -575,21 +580,21 @@ const saveType = async () => {
 const deleteDependencyType = async (type: DependencyType) => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete the dependency type "${type.label}"?`,
-      'Delete Dependency Type',
+      t('settings.confirmDeleteDepMsg', { name: type.label }),
+      t('settings.confirmDeleteDepTitle'),
       {
-        confirmButtonText: 'Delete',
-        cancelButtonText: 'Cancel',
+        confirmButtonText: t('common.delete'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning'
       }
     );
     
     await apiDeleteType(type.id!);
-    ElMessage.success('Dependency type deleted');
+    ElMessage.success(t('settings.msgDepTypeDeleted'));
     await loadDependencyTypes();
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.error || 'Failed to delete dependency type');
+      ElMessage.error(error.response?.data?.error || t('settings.msgDepTypeDeleteFailed'));
     }
   }
 };

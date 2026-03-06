@@ -132,23 +132,46 @@ router.put('/notifications', (req, res) => {
 
 // Test notification
 router.post('/notifications/test', async (req, res) => {
-  const { type, target } = req.body; // type: 'email' | 'teams', target: email address or webhook url
-  
+  const { type, target, lang } = req.body; // type: 'email' | 'teams', target: email address or webhook url, lang: 'zh-CN' | 'en-US'
+  const isZh = lang === 'zh-CN';
+
   try {
     if (type === 'email') {
-      await NotificationService.sendEmail(target, 'Test Notification', '<h1>This is a test email</h1><p>If you see this, email configuration is working.</p>');
+      const subject = isZh ? '测试通知' : 'Test Notification';
+      const html = isZh
+        ? '<h1>这是一封测试邮件</h1><p>如果您看到此邮件，说明邮件配置正常。</p>'
+        : '<h1>This is a test email</h1><p>If you see this, email configuration is working.</p>';
+      await NotificationService.sendEmail(target, subject, html);
     } else if (type === 'teams') {
-      await NotificationService.sendTeamsNotification(
-        target, 
-        '✅ This is a test notification from OpsMonitor. If you see this message, your Teams webhook is configured correctly!', 
-        '🔔 Test Notification - OpsMonitor',
-        '0076D7'
-      );
+      const title = isZh ? '🔔 测试通知 - OpsMonitor' : '🔔 Test Notification - OpsMonitor';
+      const message = isZh
+        ? '✅ 这是来自 OpsMonitor 的测试通知。如果您看到此消息，说明 Teams Webhook 配置正常！'
+        : '✅ This is a test notification from OpsMonitor. If you see this message, your Teams webhook is configured correctly!';
+      await NotificationService.sendTeamsNotification(target, message, title, '0076D7');
     }
     res.json({ success: true, message: `${type} notification sent successfully` });
   } catch (error: any) {
     logger.notification.error('Notification test failed', { type, target, error });
     res.status(500).json({ success: false, error: error.message || 'Failed to send notification' });
+  }
+});
+
+// Set notification language preference
+router.put('/notification-lang', (req, res) => {
+  try {
+    const { lang } = req.body;
+    if (!lang || !['en-US', 'zh-CN'].includes(lang)) {
+      return res.status(400).json({ error: 'Invalid lang. Must be en-US or zh-CN' });
+    }
+    db.prepare(`
+      INSERT INTO system_configs (key, value, updated_at)
+      VALUES ('notification_lang', ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+    `).run(lang);
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.api.error('Set notification lang error', { error });
+    res.status(500).json({ error: error.message });
   }
 });
 

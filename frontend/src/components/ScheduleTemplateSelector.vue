@@ -33,6 +33,7 @@
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n';
 import type { ScheduleTemplate } from '@/types/schedule';
 
 const emit = defineEmits<{
@@ -42,6 +43,7 @@ const emit = defineEmits<{
 const templates = ref<ScheduleTemplate[]>([]);
 const loading = ref(false);
 const error = ref('');
+const { t } = useI18n();
 
 async function loadTemplates() {
   loading.value = true;
@@ -51,7 +53,7 @@ async function loadTemplates() {
     const response = await axios.get('/api/schedule/templates');
     templates.value = response.data;
   } catch (err: any) {
-    error.value = 'Failed to load templates: ' + (err.message || 'Unknown error');
+    error.value = t('schedule.templateLoadFailed') + ': ' + (err.message || 'Unknown error');
     console.error('Failed to load templates:', err);
   } finally {
     loading.value = false;
@@ -61,7 +63,7 @@ async function loadTemplates() {
 function handleSelect(template: ScheduleTemplate) {
   if (loading.value) return;
   
-  ElMessage.success(`Template applied: ${template.name}`);
+  ElMessage.success(t('schedule.templateApplied', { name: template.name }));
   emit('select', template);
 }
 

@@ -11,29 +11,26 @@
             </div>
             <span class="logo-text">OpsMonitor</span>
           </div>
-          <h1 class="tagline">
-            Unified Operations<br />
-            Monitoring Platform
-          </h1>
+          <h1 class="tagline" v-html="$t('login.brandTagline')"></h1>
           <p class="description">
-            Real-time service monitoring, intelligent alerting, visual dependency mapping - making ops work more efficient
+            {{ $t('login.brandDesc') }}
           </p>
           <ul class="feature-list">
           <li>
             <div class="feature-icon"><el-icon :size="16"><Histogram /></el-icon></div>
-            <span>Multi-project real-time monitoring</span>
+            <span>{{ $t('login.feature1') }}</span>
           </li>
           <li>
             <div class="feature-icon"><el-icon :size="16"><Bell /></el-icon></div>
-            <span>Smart alerts & multi-channel notifications</span>
+            <span>{{ $t('login.feature2') }}</span>
           </li>
           <li>
             <div class="feature-icon"><el-icon :size="16"><Share /></el-icon></div>
-            <span>Service dependency visualization</span>
+            <span>{{ $t('login.feature3') }}</span>
           </li>
           <li>
             <div class="feature-icon"><el-icon :size="16"><DataBoard /></el-icon></div>
-            <span>Grafana dashboard integration</span>
+            <span>{{ $t('login.feature4') }}</span>
           </li>
           </ul>
         </div>
@@ -45,8 +42,8 @@
           <!-- Login Form -->
           <template v-if="!isRegisterMode">
             <div class="form-header">
-              <h2>Welcome Back</h2>
-              <p>Please enter your credentials to sign in</p>
+              <h2>{{ $t('login.welcomeBack') }}</h2>
+              <p>{{ $t('login.signInSubtitle') }}</p>
             </div>
 
             <el-form
@@ -57,20 +54,20 @@
               label-position="top"
               @submit.prevent="handleLogin"
             >
-              <el-form-item label="Username / Email" prop="username">
+              <el-form-item :label="$t('login.labelUsernameEmail')" prop="username">
                 <el-input
                   v-model="loginForm.username"
-                  placeholder="Enter your username or email"
+                  :placeholder="$t('login.placeholderUsernameEmail')"
                   size="large"
                   :prefix-icon="User"
                 />
               </el-form-item>
 
-              <el-form-item label="Password" prop="password">
+              <el-form-item :label="$t('login.labelPassword')" prop="password">
                 <el-input
                   v-model="loginForm.password"
                   type="password"
-                  placeholder="Enter your password"
+                  :placeholder="$t('login.placeholderPassword')"
                   size="large"
                   :prefix-icon="Lock"
                   show-password
@@ -79,8 +76,8 @@
               </el-form-item>
 
               <div class="form-options">
-                <el-checkbox v-model="rememberMe">Remember me</el-checkbox>
-                <a href="#" class="forgot-link">Forgot password?</a>
+                <el-checkbox v-model="rememberMe">{{ $t('login.rememberMe') }}</el-checkbox>
+                <a href="#" class="forgot-link">{{ $t('login.forgotPassword') }}</a>
               </div>
 
               <el-button
@@ -90,38 +87,38 @@
                 :loading="loading"
                 @click="handleLogin"
               >
-                Sign In
+                {{ $t('login.btnSignIn') }}
               </el-button>
             </el-form>
 
             <!-- SSO Section -->
             <div class="sso-section">
-              <div class="sso-divider">Or sign in with</div>
+              <div class="sso-divider">{{ $t('login.ssoOr') }}</div>
               <div class="sso-buttons">
                 <el-button size="large" class="sso-btn" disabled>
                   <el-icon :size="18"><School /></el-icon>
-                  <span class="sso-text">LDAP Login</span>
-                  <span class="coming-soon">Coming Soon</span>
+                  <span class="sso-text">{{ $t('login.ssoLdap') }}</span>
+                  <span class="coming-soon">{{ $t('login.ssoComingSoon') }}</span>
                 </el-button>
                 <el-button size="large" class="sso-btn" disabled>
                   <el-icon :size="18"><Key /></el-icon>
-                  <span class="sso-text">OAuth 2.0</span>
-                  <span class="coming-soon">Coming Soon</span>
+                  <span class="sso-text">{{ $t('login.ssoOauth') }}</span>
+                  <span class="coming-soon">{{ $t('login.ssoComingSoon') }}</span>
                 </el-button>
               </div>
             </div>
 
             <!-- Switch to Register -->
             <div class="auth-switch">
-              Don't have an account? <a @click="isRegisterMode = true">Create Account</a>
+              {{ $t('login.noAccount') }} <a @click="isRegisterMode = true">{{ $t('login.createAccount') }}</a>
             </div>
           </template>
 
           <!-- Register Form -->
           <template v-else>
             <div class="form-header">
-              <h2>Create Account</h2>
-              <p>Join OpsMonitor to start monitoring your services</p>
+              <h2>{{ $t('login.createAccount') }}</h2>
+              <p>{{ $t('login.registerSubtitle') }}</p>
             </div>
 
             <!-- Registration Notice -->
@@ -133,10 +130,7 @@
               <template #default>
                 <div class="register-notice-content">
                   <el-icon><InfoFilled /></el-icon>
-                  <span>
-                    New accounts are automatically assigned <strong>Viewer</strong> role with read-only access.
-                    Contact your administrator to request additional permissions.
-                  </span>
+                  <span v-html="$t('login.registerNotice')"></span>
                 </div>
               </template>
             </el-alert>
@@ -149,40 +143,40 @@
               label-position="top"
               @submit.prevent="handleRegister"
             >
-              <el-form-item label="Username" prop="username">
+              <el-form-item :label="$t('login.labelUsername')" prop="username">
                 <el-input
                   v-model="registerForm.username"
-                  placeholder="Choose a username"
+                  :placeholder="$t('login.placeholderUsername')"
                   size="large"
                   :prefix-icon="User"
                 />
               </el-form-item>
 
-              <el-form-item label="Email" prop="email">
+              <el-form-item :label="$t('login.labelEmail')" prop="email">
                 <el-input
                   v-model="registerForm.email"
-                  placeholder="Enter your email address"
+                  :placeholder="$t('login.placeholderEmail')"
                   size="large"
                   :prefix-icon="Message"
                 />
               </el-form-item>
 
-              <el-form-item label="Password" prop="password">
+              <el-form-item :label="$t('login.labelPassword')" prop="password">
                 <el-input
                   v-model="registerForm.password"
                   type="password"
-                  placeholder="Create a password (min 6 characters)"
+                  :placeholder="$t('login.placeholderRegPwd')"
                   size="large"
                   :prefix-icon="Lock"
                   show-password
                 />
               </el-form-item>
 
-              <el-form-item label="Confirm Password" prop="confirmPassword">
+              <el-form-item :label="$t('login.labelConfirmPwd')" prop="confirmPassword">
                 <el-input
                   v-model="registerForm.confirmPassword"
                   type="password"
-                  placeholder="Confirm your password"
+                  :placeholder="$t('login.placeholderConfirmPwd')"
                   size="large"
                   :prefix-icon="Lock"
                   show-password
@@ -197,13 +191,13 @@
                 :loading="loading"
                 @click="handleRegister"
               >
-                Create Account
+                {{ $t('login.createAccount') }}
               </el-button>
             </el-form>
 
             <!-- Switch to Login -->
             <div class="auth-switch">
-              Already have an account? <a @click="isRegisterMode = false">Sign In</a>
+              {{ $t('login.hasAccount') }} <a @click="isRegisterMode = false">{{ $t('login.btnSignIn') }}</a>
             </div>
           </template>
         </div>
@@ -212,21 +206,23 @@
 
     <!-- Footer -->
     <div class="login-footer">
-      OpsMonitor v1.0.0 © 2025
+      OpsMonitor v1.1.0_beta.1 © 2026
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { User, Lock, Monitor, School, Key, Histogram, Bell, Share, DataBoard, Message, InfoFilled } from '@element-plus/icons-vue';
+import { useI18n } from 'vue-i18n';
 import authApi from '@/api/auth';
 import authUtils from '@/utils/auth';
 
 const router = useRouter();
 const route = useRoute();
+const { t } = useI18n();
 const formRef = ref<FormInstance>();
 const registerFormRef = ref<FormInstance>();
 const loading = ref(false);
@@ -245,42 +241,42 @@ const registerForm = reactive({
   confirmPassword: '',
 });
 
-const rules: FormRules = {
+const rules = computed<FormRules>(() => ({
   username: [
-    { required: true, message: 'Please enter username or email', trigger: 'blur' },
+    { required: true, message: t('login.valRequiredUsername'), trigger: 'blur' },
   ],
   password: [
-    { required: true, message: 'Please enter password', trigger: 'blur' },
+    { required: true, message: t('login.valRequiredPwd'), trigger: 'blur' },
   ],
-};
+}));
 
 const validateConfirmPassword = (rule: any, value: string, callback: any) => {
   if (value !== registerForm.password) {
-    callback(new Error('Passwords do not match'));
+    callback(new Error(t('login.valPwdMismatch')));
   } else {
     callback();
   }
 };
 
-const registerRules: FormRules = {
+const registerRules = computed<FormRules>(() => ({
   username: [
-    { required: true, message: 'Please enter username', trigger: 'blur' },
-    { min: 3, max: 50, message: 'Username must be 3-50 characters', trigger: 'blur' },
-    { pattern: /^[a-zA-Z0-9._]+$/, message: 'Username can only contain letters, numbers, dots, and underscores', trigger: 'blur' },
+    { required: true, message: t('login.valRequiredRegUsername'), trigger: 'blur' },
+    { min: 3, max: 50, message: t('login.valUsernameLength'), trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9._]+$/, message: t('login.valUsernamePattern'), trigger: 'blur' },
   ],
   email: [
-    { required: true, message: 'Please enter email', trigger: 'blur' },
-    { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' },
+    { required: true, message: t('login.valRequiredEmail'), trigger: 'blur' },
+    { type: 'email', message: t('login.valEmailFormat'), trigger: 'blur' },
   ],
   password: [
-    { required: true, message: 'Please enter password', trigger: 'blur' },
-    { min: 6, message: 'Password must be at least 6 characters', trigger: 'blur' },
+    { required: true, message: t('login.valRequiredPwd'), trigger: 'blur' },
+    { min: 6, message: t('login.valPwdMinLength'), trigger: 'blur' },
   ],
   confirmPassword: [
-    { required: true, message: 'Please confirm password', trigger: 'blur' },
+    { required: true, message: t('login.valRequiredConfirm'), trigger: 'blur' },
     { validator: validateConfirmPassword, trigger: 'blur' },
   ],
-};
+}));
 
 const handleLogin = async () => {
   if (!formRef.value) return;
@@ -298,13 +294,13 @@ const handleLogin = async () => {
       // Save auth data
       authUtils.saveAuth(response.token, response.user);
 
-      ElMessage.success('Login successful');
+      ElMessage.success(t('login.msgLoginSuccess'));
 
       // Redirect to original page or dashboard
       const redirect = (route.query.redirect as string) || '/';
       router.push(redirect);
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Login failed';
+      const message = error.response?.data?.error || t('login.msgLoginFailed');
       ElMessage.error(message);
     } finally {
       loading.value = false;
@@ -329,13 +325,13 @@ const handleRegister = async () => {
       // Save auth data for immediate login
       authUtils.saveAuth(response.token, response.user);
 
-      ElMessage.success('Account created successfully! Welcome to OpsMonitor.');
+      ElMessage.success(t('login.msgRegisterSuccess'));
 
       // Redirect to dashboard
       const redirect = (route.query.redirect as string) || '/';
       router.push(redirect);
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Registration failed';
+      const message = error.response?.data?.error || t('login.msgRegisterFailed');
       ElMessage.error(message);
     } finally {
       loading.value = false;

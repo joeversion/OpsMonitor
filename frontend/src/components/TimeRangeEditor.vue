@@ -21,7 +21,7 @@
           />
         </el-checkbox>
         <div class="actions">
-          <el-tooltip content="Move Up" placement="top">
+          <el-tooltip :content="$t('timeRange.tooltipMoveUp')" placement="top">
             <el-button 
               size="small" 
               text 
@@ -30,7 +30,7 @@
               @click="emit('move-up', index)" 
             />
           </el-tooltip>
-          <el-tooltip content="Move Down" placement="top">
+          <el-tooltip :content="$t('timeRange.tooltipMoveDown')" placement="top">
             <el-button 
               size="small" 
               text 
@@ -38,7 +38,7 @@
               @click="emit('move-down', index)" 
             />
           </el-tooltip>
-          <el-tooltip content="Delete" placement="top">
+          <el-tooltip :content="$t('timeRange.tooltipDelete')" placement="top">
             <el-button 
               size="small" 
               text 
@@ -52,34 +52,34 @@
     </template>
     
     <el-form label-width="100px" size="small" :disabled="!localRange.enabled">
-      <el-form-item label="Time Range">
+      <el-form-item :label="$t('timeRange.labelTimeRange')">
         <div class="time-range-input">
           <el-time-select
             v-model="localRange.start"
             start="00:00"
             step="00:15"
             end="23:45"
-            placeholder="Start Time"
+            :placeholder="$t('timeRange.placeholderStart')"
             @change="handleUpdate"
           />
-          <span class="separator">to</span>
+          <span class="separator">{{ $t('common.to') }}</span>
           <el-time-select
             v-model="localRange.end"
             start="00:00"
             step="00:15"
             end="23:45"
-            placeholder="End Time"
+            :placeholder="$t('timeRange.placeholderEnd')"
             @change="handleUpdate"
           />
         </div>
         <div class="time-hint">
           <el-text size="small" type="info">
-            Supports overnight ranges, e.g., 23:00 to 01:00
+            {{ $t('timeRange.hintOvernight') }}
           </el-text>
         </div>
       </el-form-item>
       
-      <el-form-item label="Check Interval">
+      <el-form-item :label="$t('timeRange.labelInterval')">
         <div class="interval-input">
           <el-input-number 
             v-model="intervalValue" 
@@ -92,9 +92,9 @@
             style="width: 100px; margin-left: 8px;"
             @change="updateInterval"
           >
-            <el-option label="Seconds" value="seconds" />
-            <el-option label="Minutes" value="minutes" />
-            <el-option label="Hours" value="hours" />
+            <el-option :label="$t('schedule.unitSeconds')" value="seconds" />
+            <el-option :label="$t('schedule.unitMinutes')" value="minutes" />
+            <el-option :label="$t('schedule.unitHours')" value="hours" />
           </el-select>
         </div>
         <div class="interval-hint">
@@ -104,7 +104,7 @@
         </div>
       </el-form-item>
       
-      <el-form-item label="Active Days">
+      <el-form-item :label="$t('timeRange.labelActiveDays')">
         <WeekdaySelector 
           v-model="localRange.weekdays" 
           :disabled="!localRange.enabled"
@@ -119,6 +119,7 @@
 import { ref, watch, computed } from 'vue';
 import { ArrowUp, ArrowDown, Delete } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
+import { useI18n } from 'vue-i18n';
 import type { TimeRange } from '@/types/schedule';
 import WeekdaySelector from './WeekdaySelector.vue';
 
@@ -135,6 +136,7 @@ const emit = defineEmits<{
 }>();
 
 const localRange = ref<TimeRange>({ ...props.range });
+const { t } = useI18n();
 
 // Interval display fields
 const intervalValue = ref(1);
@@ -214,11 +216,11 @@ function handleUpdate() {
 async function handleDelete() {
   try {
     await ElMessageBox.confirm(
-      'Are you sure to delete this time rule?',
-      'Confirm Delete',
+      t('timeRange.confirmDelete'),
+      t('timeRange.confirmDeleteTitle'),
       {
-        confirmButtonText: 'Delete',
-        cancelButtonText: 'Cancel',
+        confirmButtonText: t('common.delete'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning',
       }
     );

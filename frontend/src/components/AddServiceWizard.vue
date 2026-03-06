@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="isEdit ? 'Edit Service' : (isCopy ? 'Copy Service' : 'Add Service')"
+    :title="isEdit ? $t('wizard.dialogTitleEdit') : (isCopy ? $t('wizard.dialogTitleCopy') : $t('wizard.dialogTitleAdd'))"
     width="800px"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
@@ -17,17 +17,17 @@
       </div>
       <div class="banner-content">
         <div class="banner-title">
-          {{ isEdit ? '✏️ Editing Service' : (isCopy ? '📋 Copying Service' : '➕ Adding New Service') }}
+          {{ isEdit ? $t('wizard.titleEditing') : (isCopy ? $t('wizard.titleCopying') : $t('wizard.titleAdding')) }}
         </div>
         <div class="banner-description">
           <template v-if="isEdit">
-            <span>💡 Modify the service settings below. Changes will take effect immediately after saving.</span>
+            <span>{{ $t('wizard.descEditing') }}</span>
           </template>
           <template v-else-if="isCopy">
-            <span>📋 Creating a copy. Modify the settings and save as a new service.</span>
+            <span>{{ $t('wizard.descCopying') }}</span>
           </template>
           <template v-else>
-            <span>📋 Configure service monitoring in {{ totalSteps }} easy steps.</span>
+            <span>{{ $t('wizard.descAdding', { n: totalSteps }) }}</span>
           </template>
         </div>
       </div>
@@ -62,7 +62,7 @@
       <div v-show="currentStep === 0" class="step-panel">
         <div class="section-title">
           <el-icon><Setting /></el-icon>
-          <span>Service Status & Control</span>
+          <span>{{ $t('services.sectionStatusControl') }}</span>
         </div>
 
         <div class="status-controls-grid">
@@ -71,13 +71,13 @@
             <div class="control-card-header">
               <div class="control-label">
                 <el-icon><Monitor /></el-icon>
-                <span>Monitoring</span>
+                <span>{{ $t('services.labelMonitoring') }}</span>
               </div>
               <el-switch v-model="form.enabled" :active-value="1" :inactive-value="0" size="large" />
             </div>
-            <div class="control-description">Enable health check monitoring</div>
+            <div class="control-description">{{ $t('wizard.descEnableMonitoring') }}</div>
             <el-tag :type="form.enabled ? 'success' : 'info'" size="small">
-              {{ form.enabled ? 'Active' : 'Disabled' }}
+              {{ form.enabled ? $t('statusLabels.active') : $t('common.disabled') }}
             </el-tag>
           </div>
 
@@ -86,13 +86,13 @@
             <div class="control-card-header">
               <div class="control-label">
                 <el-icon><Bell /></el-icon>
-                <span>Alerts</span>
+                <span>{{ $t('services.labelAlerts') }}</span>
               </div>
               <el-switch v-model="form.alert_enabled" :active-value="1" :inactive-value="0" size="large" />
             </div>
-            <div class="control-description">Send notifications on failure</div>
+            <div class="control-description">{{ $t('wizard.descSendNotifications') }}</div>
             <el-tag :type="form.alert_enabled ? 'success' : 'info'" size="small">
-              {{ form.alert_enabled ? 'Enabled' : 'Disabled' }}
+              {{ form.alert_enabled ? $t('common.enabled') : $t('common.disabled') }}
             </el-tag>
           </div>
 
@@ -101,31 +101,31 @@
             <div class="control-card-header">
               <div class="control-label">
                 <el-icon><Warning /></el-icon>
-                <span>Risk Level</span>
+                <span>{{ $t('services.labelRiskLevel') }}</span>
               </div>
             </div>
             <el-select v-model="form.risk_level" style="width: 100%; margin-top: 8px;">
-              <el-option label="🟢 Low" value="low" />
-              <el-option label="🟡 Medium" value="medium" />
-              <el-option label="🟠 High" value="high" />
-              <el-option label="🔴 Critical" value="critical" />
+              <el-option :label="$t('services.riskLow')" value="low" />
+              <el-option :label="$t('services.riskMedium')" value="medium" />
+              <el-option :label="$t('services.riskHigh')" value="high" />
+              <el-option :label="$t('services.riskCritical')" value="critical" />
             </el-select>
           </div>
         </div>
 
         <div class="section-title" style="margin-top: 20px;">
           <el-icon><Document /></el-icon>
-          <span>Basic Information</span>
+          <span>{{ $t('services.sectionBasicInfo') }}</span>
         </div>
 
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Service Name" required>
-              <el-input v-model="form.name" placeholder="e.g. API Gateway" />
+            <el-form-item :label="$t('services.labelServiceName')" required>
+              <el-input v-model="form.name" :placeholder="$t('services.placeholderServiceName')" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="Icon">
+            <el-form-item :label="$t('services.labelIcon')">
               <IconSelector v-model="form.icon" />
             </el-form-item>
           </el-col>
@@ -133,8 +133,8 @@
 
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Project">
-              <el-select v-model="form.project_id" placeholder="Select project" clearable style="width: 100%;">
+            <el-form-item :label="$t('services.labelProject')">
+              <el-select v-model="form.project_id" :placeholder="$t('services.placeholderSelectProject')" clearable style="width: 100%;">
                 <el-option
                   v-for="project in projects"
                   :key="project.id"
@@ -151,15 +151,15 @@
 
         <div class="section-title">
           <el-icon><Monitor /></el-icon>
-          <span>Host Configuration</span>
+          <span>{{ $t('services.sectionHostConfig') }}</span>
         </div>
 
         <el-row :gutter="12">
           <el-col :span="18">
-            <el-form-item label="Select Host" :required="!isEdit">
+            <el-form-item :label="$t('services.labelSelectHost')" :required="!isEdit">
               <el-select
                 v-model="selectedHostId"
-                placeholder="-- Select an existing host --"
+                :placeholder="$t('services.placeholderSelectHost')"
                 style="width: 100%;"
                 @change="handleHostSelect"
                 clearable
@@ -177,7 +177,7 @@
             <el-form-item label=" ">
               <el-button type="primary" plain @click="showAddHostDialog = true" style="width: 100%;">
                 <el-icon><Plus /></el-icon>
-                <span>New Host</span>
+                <span>{{ $t('services.btnNewHost') }}</span>
               </el-button>
             </el-form-item>
           </el-col>
@@ -189,7 +189,7 @@
             <el-icon><Monitor /></el-icon>
             <span>{{ selectedHostData.name }}</span>
             <el-tag :type="selectedHostData.status === 'healthy' ? 'success' : 'danger'" size="small">
-              {{ selectedHostData.status || 'unknown' }}
+              {{ selectedHostData.status ? $t('statusLabels.' + selectedHostData.status) : $t('statusLabels.unknown') }}
             </el-tag>
           </div>
           <div class="host-preview-meta">
@@ -203,30 +203,30 @@
       <div v-show="currentStep === 1" class="step-panel">
         <div class="section-title">
           <el-icon><Pointer /></el-icon>
-          <span>Health Check Configuration</span>
+          <span>{{ $t('services.sectionHealthCheck') }}</span>
         </div>
 
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Check Type" required>
+            <el-form-item :label="$t('services.labelCheckType')" required>
               <el-select v-model="form.check_type" @change="handleCheckTypeChange" style="width: 100%;">
-                <el-option-group label="Network Checks">
-                  <el-option label="🔌 TCP Port Check" value="tcp" />
-                  <el-option label="🌐 HTTP Check" value="http" />
-                  <el-option label="🔒 HTTPS Check" value="https" />
+                <el-option-group :label="$t('services.groupNetwork')">
+                  <el-option :label="$t('services.typeTcp')" value="tcp" />
+                  <el-option :label="$t('services.typeHttp')" value="http" />
+                  <el-option :label="$t('services.typeHttps')" value="https" />
                 </el-option-group>
-                <el-option-group label="System Checks">
-                  <el-option label="📜 Script Check" value="script" />
+                <el-option-group :label="$t('services.groupSystem')">
+                  <el-option :label="$t('services.typeScript')" value="script" />
                 </el-option-group>
-                <el-option-group label="File Checks">
-                  <el-option label="📄 File Exists Check" value="file" />
-                  <el-option label="📋 Log Monitor" value="log" />
+                <el-option-group :label="$t('services.groupFile')">
+                  <el-option :label="$t('services.typeFile')" value="file" />
+                  <el-option :label="$t('services.typeLog')" value="log" />
                 </el-option-group>
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12" v-if="!['script', 'file', 'log'].includes(form.check_type as string)">
-            <el-form-item label="Port" required>
+            <el-form-item :label="$t('services.labelPort')" required>
               <el-input-number v-model="form.port" :min="1" :max="65535" style="width: 100%;" />
             </el-form-item>
           </el-col>
@@ -235,12 +235,12 @@
         <!-- Check Type Info -->
         <el-alert type="info" :closable="false" show-icon style="margin-bottom: 16px;">
           <template #title>
-            <span v-if="form.check_type === 'tcp'">TCP Port Check: Verifies if the specified port is open and accepting connections.</span>
-            <span v-else-if="form.check_type === 'http'">HTTP Check: Sends HTTP request and validates response status code.</span>
-            <span v-else-if="form.check_type === 'https'">HTTPS Check: Sends secure HTTPS request with SSL validation.</span>
-            <span v-else-if="form.check_type === 'script'">Script Check: Executes a custom script and checks exit code.</span>
-            <span v-else-if="form.check_type === 'file'">File Check: Monitors file existence and properties.</span>
-            <span v-else-if="form.check_type === 'log'">Log Monitor: Monitors log files for patterns.</span>
+            <span v-if="form.check_type === 'tcp'">{{ $t('services.descTcp') }}</span>
+            <span v-else-if="form.check_type === 'http'">{{ $t('services.descHttp') }}</span>
+            <span v-else-if="form.check_type === 'https'">{{ $t('services.descHttps') }}</span>
+            <span v-else-if="form.check_type === 'script'">{{ $t('services.descScript') }}</span>
+            <span v-else-if="form.check_type === 'file'">{{ $t('services.descFile') }}</span>
+            <span v-else-if="form.check_type === 'log'">{{ $t('services.descLog') }}</span>
           </template>
         </el-alert>
 
@@ -248,19 +248,19 @@
         <template v-if="form.check_type === 'http' || form.check_type === 'https'">
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="Health Check Path">
-                <el-input v-model="httpConfig.path" placeholder="/health or /api/health" />
+              <el-form-item :label="$t('services.labelHealthPath')">
+                <el-input v-model="httpConfig.path" :placeholder="$t('services.placeholderHealthPath')" />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="Expected Status">
+              <el-form-item :label="$t('services.labelExpectedStatus')">
                 <el-input-number v-model="httpConfig.expected_status" :min="100" :max="599" style="width: 100%;" controls-position="right" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="Timeout (ms)">
+              <el-form-item :label="$t('services.labelTimeout')">
                 <el-input-number v-model="httpConfig.timeout" :min="1000" :max="30000" :step="1000" style="width: 100%;" controls-position="right" />
               </el-form-item>
             </el-col>
@@ -271,27 +271,27 @@
         <template v-if="form.check_type === 'script'">
           <el-row :gutter="20">
             <el-col :span="8">
-              <el-form-item label="Script Type" required>
+              <el-form-item :label="$t('services.labelScriptType')" required>
                 <el-select v-model="scriptCheckConfig.script_type" style="width: 100%;">
-                  <el-option label="🐚 Bash Script" value="bash" />
-                  <el-option label="🐍 Python Script" value="python" />
-                  <el-option label="💻 PowerShell Script" value="powershell" />
-                  <el-option label="📗 Node.js Script" value="nodejs" />
+                  <el-option :label="$t('services.scriptBash')" value="bash" />
+                  <el-option :label="$t('services.scriptPython')" value="python" />
+                  <el-option :label="$t('services.scriptPowershell')" value="powershell" />
+                  <el-option :label="$t('services.scriptNode')" value="nodejs" />
                 </el-select>
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="Expected Exit Code">
+              <el-form-item :label="$t('services.labelExpectedExitCode')">
                 <el-input-number v-model="scriptCheckConfig.expected_exit_code" :min="0" :max="255" style="width: 100%;" />
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="Timeout (sec)">
+              <el-form-item :label="$t('services.labelScriptTimeout')">
                 <el-input-number v-model="scriptCheckConfig.timeout" :min="1" :max="300" style="width: 100%;" />
               </el-form-item>
             </el-col>
           </el-row>
-          <el-form-item label="Script Content" required>
+          <el-form-item :label="$t('services.labelScriptContent')" required>
             <el-input
               v-model="scriptCheckConfig.script_content"
               type="textarea"
@@ -306,30 +306,30 @@
         <template v-if="form.check_type === 'file' || form.check_type === 'log'">
           <el-row :gutter="20">
             <el-col :span="24">
-              <el-form-item label="Monitoring Mode">
+              <el-form-item :label="$t('services.labelMonitorMode')">
                 <el-radio-group v-model="fileCheckConfig.mode">
-                  <el-radio-button label="single">Single File</el-radio-button>
-                  <el-radio-button label="folder">Folder + Pattern</el-radio-button>
+                  <el-radio-button label="single">{{ $t('services.modeSingleFile') }}</el-radio-button>
+                  <el-radio-button label="folder">{{ $t('services.modeFolderPattern') }}</el-radio-button>
                 </el-radio-group>
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20" v-if="fileCheckConfig.mode === 'single'">
             <el-col :span="24">
-              <el-form-item label="File Path" required>
-                <el-input v-model="fileCheckConfig.file_path" placeholder="e.g. /var/log/app.log" />
+              <el-form-item :label="$t('services.labelFilePath')" required>
+                <el-input v-model="fileCheckConfig.file_path" :placeholder="$t('services.placeholderFilePath')" />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20" v-else>
             <el-col :span="12">
-              <el-form-item label="Directory Path" required>
-                <el-input v-model="fileCheckConfig.directory_path" placeholder="e.g. /var/log/myapp/$(date +%F) or /var/log/myapp/*" />
+              <el-form-item :label="$t('services.labelDirPath')" required>
+                <el-input v-model="fileCheckConfig.directory_path" :placeholder="$t('wizard.placeholderDirPath')" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="Filename Pattern">
-                <el-input v-model="fileCheckConfig.filename_pattern" placeholder="e.g. app-.*\.log or *.log" />
+              <el-form-item :label="$t('services.labelFilePattern')">
+                <el-input v-model="fileCheckConfig.filename_pattern" :placeholder="$t('wizard.placeholderFilePattern')" />
               </el-form-item>
             </el-col>
           </el-row>
@@ -341,7 +341,7 @@
       <div v-show="currentStep === 2" class="step-panel">
         <div class="section-title">
           <el-icon><Clock /></el-icon>
-          <span>Schedule Configuration</span>
+          <span>{{ $t('services.sectionSchedule') }}</span>
         </div>
 
         <ScheduleConfigPanel v-model="scheduleConfig" />
@@ -351,75 +351,75 @@
       <div v-show="currentStep === 3" class="step-panel">
         <div class="section-title">
           <el-icon><Bell /></el-icon>
-          <span>Alert Thresholds</span>
+          <span>{{ $t('services.sectionAlertThresholds') }}</span>
         </div>
 
         <div class="threshold-cards">
           <div class="threshold-card">
             <div class="threshold-card-header">
               <el-icon style="color: #fa8c16;"><Warning /></el-icon>
-              <span>Warning Threshold</span>
+              <span>{{ $t('services.labelWarnThreshold') }}</span>
             </div>
             <div class="threshold-value">
               <el-input-number v-model="form.warning_threshold" :min="1" :max="30" size="large" />
-              <span class="threshold-unit">consecutive failures</span>
+              <span class="threshold-unit">{{ $t('services.unitConsecutiveFailures') }}</span>
             </div>
-            <div class="threshold-hint">Range: 1-30</div>
+            <div class="threshold-hint">{{ $t('services.hintRange1_30') }}</div>
           </div>
 
           <div class="threshold-card">
             <div class="threshold-card-header">
               <el-icon style="color: #f5222d;"><CircleClose /></el-icon>
-              <span>Error Threshold</span>
+              <span>{{ $t('services.labelErrorThreshold') }}</span>
             </div>
             <div class="threshold-value">
               <el-input-number v-model="form.error_threshold" :min="1" :max="50" size="large" />
-              <span class="threshold-unit">consecutive failures</span>
+              <span class="threshold-unit">{{ $t('services.unitConsecutiveFailures') }}</span>
             </div>
-            <div class="threshold-hint">Range: 1-50</div>
+            <div class="threshold-hint">{{ $t('services.hintRange1_50') }}</div>
           </div>
 
           <div class="threshold-card">
             <div class="threshold-card-header">
               <el-icon style="color: #722ed1;"><Bell /></el-icon>
-              <span>Alert Trigger</span>
+              <span>{{ $t('services.labelAlertTrigger') }}</span>
             </div>
             <div class="threshold-value">
               <el-input-number v-model="form.failure_threshold" :min="1" :max="10" size="large" />
-              <span class="threshold-unit">consecutive failures</span>
+              <span class="threshold-unit">{{ $t('services.unitConsecutiveFailures') }}</span>
             </div>
-            <div class="threshold-hint">Send alert after this many failures (Range: 1-10)</div>
+            <div class="threshold-hint">{{ $t('services.hintAlertTrigger') }}</div>
           </div>
         </div>
 
         <div class="section-title" style="margin-top: 24px;">
           <el-icon><Edit /></el-icon>
-          <span>Alert Customization (Optional)</span>
+          <span>{{ $t('services.sectionAlertCustomize') }}</span>
         </div>
 
-        <el-form-item label="Service Impact Description">
+        <el-form-item :label="$t('services.labelImpactDesc')">
           <el-input
             v-model="form.impact_description"
             type="textarea"
             :rows="2"
-            placeholder="Describe the impact when this service is down..."
+            :placeholder="$t('services.placeholderImpactDesc')"
           />
         </el-form-item>
 
-        <el-form-item label="Custom Alert Template">
+        <el-form-item :label="$t('services.labelAlertTemplate')">
           <el-input
             v-model="form.custom_alert_template"
-            placeholder="{service_name} is down! {impact_description}"
+            :placeholder="$t('services.placeholderAlertTemplate')"
           />
-          <div class="form-hint">Variables: {service_name}, {host}, {port}, {risk_level}, {down_time}</div>
+          <div class="form-hint">{{ $t('services.hintAlertVars') }}</div>
         </el-form-item>
 
-        <el-divider content-position="left">Dependencies (Optional)</el-divider>
+        <el-divider content-position="left">{{ $t('services.dividerDeps') }}</el-divider>
 
         <!-- Dependencies Table -->
         <div v-if="serviceDependencies.length > 0" class="dependencies-table">
           <el-table :data="serviceDependencies" size="small" style="margin-bottom: 15px;">
-            <el-table-column label="Target Service" min-width="180">
+            <el-table-column :label="$t('services.colTargetService')" min-width="180">
               <template #default="scope">
                 <div style="display: flex; align-items: center; gap: 6px;">
                   <el-tag 
@@ -428,12 +428,12 @@
                     type="warning"
                     effect="plain"
                     style="font-size: 10px;"
-                  >X-Project</el-tag>
+                  >{{ $t('services.tagXProject') }}</el-tag>
                   <span>{{ getServiceNameById(scope.row.target_service_id) }}</span>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="Type" width="120">
+            <el-table-column :label="$t('common.type')" width="120">
               <template #default="scope">
                 <el-select v-model="scope.row.dependency_type" size="small">
                   <el-option
@@ -445,12 +445,12 @@
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="Risk" width="100">
+            <el-table-column :label="$t('services.colRisk')" width="100">
               <template #default="scope">
                 <el-select v-model="scope.row.risk_level" size="small">
-                  <el-option label="Low" value="low" />
-                  <el-option label="Medium" value="medium" />
-                  <el-option label="High" value="high" />
+                  <el-option :label="$t('services.riskLowSimple')" value="low" />
+                  <el-option :label="$t('services.riskMediumSimple')" value="medium" />
+                  <el-option :label="$t('services.riskHighSimple')" value="high" />
                 </el-select>
               </template>
             </el-table-column>
@@ -469,7 +469,7 @@
           <el-col :span="10">
             <el-select
               v-model="newDependency.target_service_id"
-              placeholder="Select service"
+              :placeholder="$t('services.placeholderSelectService')"
               style="width: 100%;"
               filterable
             >
@@ -499,9 +499,9 @@
           </el-col>
           <el-col :span="5">
             <el-select v-model="newDependency.risk_level" style="width: 100%;">
-              <el-option label="Low" value="low" />
-              <el-option label="Medium" value="medium" />
-              <el-option label="High" value="high" />
+              <el-option :label="$t('services.riskLowSimple')" value="low" />
+              <el-option :label="$t('services.riskMediumSimple')" value="medium" />
+              <el-option :label="$t('services.riskHighSimple')" value="high" />
             </el-select>
           </el-col>
           <el-col :span="3">
@@ -516,47 +516,47 @@
       <div v-show="currentStep === 4" class="step-panel">
         <el-alert type="success" :closable="false" show-icon style="margin-bottom: 20px;">
           <template #title>
-            Review your configuration below. Click "{{ isEdit ? 'Update' : 'Create' }}" to save.
+            {{ $t('services.reviewAlert') }}
           </template>
         </el-alert>
 
         <div class="review-section">
           <div class="review-section-title">
             <el-icon><Document /></el-icon>
-            <span>Basic Information</span>
-            <el-button link type="primary" size="small" @click="goToStep(0)">Edit</el-button>
+            <span>{{ $t('services.reviewBasicInfo') }}</span>
+            <el-button link type="primary" size="small" @click="goToStep(0)">{{ $t('common.edit') }}</el-button>
           </div>
           <div class="review-grid">
             <div class="review-item">
-              <span class="review-label">Service Name</span>
+              <span class="review-label">{{ $t('services.labelServiceName') }}</span>
               <span class="review-value">{{ form.name || '-' }}</span>
             </div>
             <div class="review-item">
-              <span class="review-label">Icon</span>
+              <span class="review-label">{{ $t('services.labelIcon') }}</span>
               <span class="review-value" style="font-size: 20px;">{{ form.icon || '🔧' }}</span>
             </div>
             <div class="review-item">
-              <span class="review-label">Project</span>
+              <span class="review-label">{{ $t('services.labelProject') }}</span>
               <span class="review-value">{{ getProjectName(form.project_id) || '-' }}</span>
             </div>
             <div class="review-item">
-              <span class="review-label">Host</span>
+              <span class="review-label">{{ $t('services.reviewHost') }}</span>
               <span class="review-value">{{ selectedHostData?.name || form.host || '-' }}</span>
             </div>
             <div class="review-item">
-              <span class="review-label">Risk Level</span>
-              <span class="review-value">{{ form.risk_level }}</span>
+              <span class="review-label">{{ $t('services.labelRiskLevel') }}</span>
+              <span class="review-value">{{ riskLevelLabel }}</span>
             </div>
             <div class="review-item">
-              <span class="review-label">Monitoring</span>
+              <span class="review-label">{{ $t('services.labelMonitoring') }}</span>
               <el-tag :type="form.enabled ? 'success' : 'info'" size="small">
-                {{ form.enabled ? 'Active' : 'Disabled' }}
+                {{ form.enabled ? $t('statusLabels.active') : $t('common.disabled') }}
               </el-tag>
             </div>
             <div class="review-item">
-              <span class="review-label">Alerts</span>
+              <span class="review-label">{{ $t('services.labelAlerts') }}</span>
               <el-tag :type="form.alert_enabled ? 'success' : 'info'" size="small">
-                {{ form.alert_enabled ? 'Enabled' : 'Disabled' }}
+                {{ form.alert_enabled ? $t('common.enabled') : $t('common.disabled') }}
               </el-tag>
             </div>
           </div>
@@ -565,16 +565,16 @@
         <div class="review-section">
           <div class="review-section-title">
             <el-icon><Pointer /></el-icon>
-            <span>Health Check</span>
-            <el-button link type="primary" size="small" @click="goToStep(1)">Edit</el-button>
+            <span>{{ $t('services.reviewHealthCheck') }}</span>
+            <el-button link type="primary" size="small" @click="goToStep(1)">{{ $t('common.edit') }}</el-button>
           </div>
           <div class="review-grid">
             <div class="review-item">
-              <span class="review-label">Check Type</span>
-              <span class="review-value">{{ form.check_type?.toUpperCase() }}</span>
+              <span class="review-label">{{ $t('services.labelCheckType') }}</span>
+              <span class="review-value">{{ checkTypeLabel }}</span>
             </div>
             <div class="review-item" v-if="!['script', 'file', 'log'].includes(form.check_type as string)">
-              <span class="review-label">Port</span>
+              <span class="review-label">{{ $t('services.labelPort') }}</span>
               <span class="review-value">{{ form.port }}</span>
             </div>
           </div>
@@ -583,17 +583,17 @@
         <div class="review-section">
           <div class="review-section-title">
             <el-icon><Clock /></el-icon>
-            <span>Schedule</span>
-            <el-button link type="primary" size="small" @click="goToStep(2)">Edit</el-button>
+            <span>{{ $t('services.reviewSchedule') }}</span>
+            <el-button link type="primary" size="small" @click="goToStep(2)">{{ $t('common.edit') }}</el-button>
           </div>
           <div class="review-grid">
             <div class="review-item">
-              <span class="review-label">Mode</span>
-              <span class="review-value">{{ scheduleConfig.type === 'fixed' ? 'Fixed Interval' : 'Time Rules' }}</span>
+              <span class="review-label">{{ $t('services.reviewMode') }}</span>
+              <span class="review-value">{{ scheduleConfig.type === 'fixed' ? $t('services.modeFixed') : $t('services.modeTimeRules') }}</span>
             </div>
             <div class="review-item">
-              <span class="review-label">Default Interval</span>
-              <span class="review-value">{{ scheduleConfig.defaultInterval }} seconds</span>
+              <span class="review-label">{{ $t('services.reviewDefaultInterval') }}</span>
+              <span class="review-value">{{ scheduleConfig.defaultInterval }} {{ $t('common.seconds') }}</span>
             </div>
           </div>
         </div>
@@ -601,21 +601,21 @@
         <div class="review-section">
           <div class="review-section-title">
             <el-icon><Bell /></el-icon>
-            <span>Alert Settings</span>
-            <el-button link type="primary" size="small" @click="goToStep(3)">Edit</el-button>
+            <span>{{ $t('services.reviewAlertSettings') }}</span>
+            <el-button link type="primary" size="small" @click="goToStep(3)">{{ $t('common.edit') }}</el-button>
           </div>
           <div class="review-grid">
             <div class="review-item">
-              <span class="review-label">Warning / Error</span>
-              <span class="review-value">{{ form.warning_threshold }} / {{ form.error_threshold }} failures</span>
+              <span class="review-label">{{ $t('services.reviewWarnError') }}</span>
+              <span class="review-value">{{ form.warning_threshold }} / {{ form.error_threshold }} {{ $t('services.unitFailures') }}</span>
             </div>
             <div class="review-item">
-              <span class="review-label">Alert Trigger</span>
-              <span class="review-value">After {{ form.failure_threshold }} failures</span>
+              <span class="review-label">{{ $t('services.labelAlertTrigger') }}</span>
+              <span class="review-value">{{ $t('wizard.afterNFailures', { n: form.failure_threshold }) }}</span>
             </div>
             <div class="review-item" v-if="serviceDependencies.length > 0">
-              <span class="review-label">Dependencies</span>
-              <span class="review-value">{{ serviceDependencies.length }} service(s)</span>
+              <span class="review-label">{{ $t('services.reviewDeps') }}</span>
+              <span class="review-value">{{ serviceDependencies.length }} {{ $t('services.unitServices') }}</span>
             </div>
           </div>
         </div>
@@ -626,16 +626,16 @@
     <template #footer>
       <div class="wizard-footer">
         <el-button @click="handlePrevious" :disabled="currentStep === 0">
-          ← Previous
+          {{ $t('services.btnPrevious') }}
         </el-button>
         <div class="footer-right">
-          <el-button @click="handleCancel">Cancel</el-button>
+          <el-button @click="handleCancel">{{ $t('common.cancel') }}</el-button>
           <el-button
             type="primary"
             @click="handleNext"
             :loading="submitting"
           >
-            {{ currentStep === totalSteps - 1 ? (isEdit ? 'Update' : 'Create') : 'Next →' }}
+            {{ currentStep === totalSteps - 1 ? (isEdit ? $t('common.update') : $t('common.create')) : $t('services.btnNext') }}
           </el-button>
         </div>
       </div>
@@ -645,21 +645,21 @@
   <!-- Add Host Dialog (Full Version) -->
   <el-dialog
     v-model="showAddHostDialog"
-    title="Add New Host"
+    :title="$t('wizard.addHostTitle')"
     width="650px"
     :close-on-click-modal="false"
   >
     <el-form :model="newHostForm" label-width="140px">
-      <el-form-item label="Host Name" required>
-        <el-input v-model="newHostForm.name" placeholder="prod-web-01" />
+      <el-form-item :label="$t('hosts.labelHostName')" required>
+        <el-input v-model="newHostForm.name" :placeholder="$t('hosts.placeholderHostName')" />
       </el-form-item>
       
-      <el-form-item label="IP / Hostname" required>
-        <el-input v-model="newHostForm.ip" placeholder="192.168.1.100 or example.com" />
+      <el-form-item :label="$t('hosts.labelIP')" required>
+        <el-input v-model="newHostForm.ip" :placeholder="$t('hosts.placeholderIP')" />
       </el-form-item>
       
-      <el-form-item label="Project">
-        <el-select v-model="newHostForm.project_id" placeholder="Select project" clearable style="width: 100%;">
+      <el-form-item :label="$t('hosts.labelProject')">
+        <el-select v-model="newHostForm.project_id" :placeholder="$t('hosts.placeholderProject')" clearable style="width: 100%;">
           <el-option
             v-for="proj in projects"
             :key="proj.id"
@@ -669,77 +669,77 @@
         </el-select>
       </el-form-item>
       
-      <el-form-item label="Connection Type">
+      <el-form-item :label="$t('hosts.labelConnType')">
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
           <div 
             class="connection-card"
             :class="{ active: newHostForm.connection_type === 'ssh' }"
             @click="newHostForm.connection_type = 'ssh'">
             <div class="connection-icon">🔐</div>
-            <div class="connection-name">SSH</div>
-            <div class="connection-desc">Remote access</div>
+            <div class="connection-name">{{ $t('hosts.cardSSH') }}</div>
+            <div class="connection-desc">{{ $t('hosts.cardSSHDesc') }}</div>
           </div>
           <div 
             class="connection-card"
             :class="{ active: newHostForm.connection_type === 'local' }"
             @click="newHostForm.connection_type = 'local'">
             <div class="connection-icon">💻</div>
-            <div class="connection-name">Local</div>
-            <div class="connection-desc">Ping check</div>
+            <div class="connection-name">{{ $t('hosts.cardLocal') }}</div>
+            <div class="connection-desc">{{ $t('hosts.cardLocalDesc') }}</div>
           </div>
         </div>
       </el-form-item>
       
       <!-- SSH Configuration Section -->
       <template v-if="newHostForm.connection_type === 'ssh'">
-        <el-divider content-position="left">SSH Configuration</el-divider>
+        <el-divider content-position="left">{{ $t('hosts.dividerSSH') }}</el-divider>
         
-        <el-form-item label="SSH Port">
+        <el-form-item :label="$t('hosts.labelSSHPort')">
           <el-input-number v-model="newHostForm.ssh_port" :min="1" :max="65535" style="width: 150px" />
-          <span style="margin-left: 12px; color: #909399;">Default: 22</span>
+          <span style="margin-left: 12px; color: #909399;">{{ $t('hosts.noteDefault22') }}</span>
         </el-form-item>
         
-        <el-form-item label="Username">
-          <el-input v-model="newHostForm.ssh_username" placeholder="root or admin" />
+        <el-form-item :label="$t('hosts.labelUsername')">
+          <el-input v-model="newHostForm.ssh_username" :placeholder="$t('hosts.placeholderUsername')" />
         </el-form-item>
         
-        <el-form-item label="Auth Type">
+        <el-form-item :label="$t('hosts.labelAuthType')">
           <el-radio-group v-model="newHostForm.ssh_auth_type">
-            <el-radio value="password">Password</el-radio>
-            <el-radio value="private_key">Private Key</el-radio>
+            <el-radio value="password">{{ $t('hosts.optPassword') }}</el-radio>
+            <el-radio value="private_key">{{ $t('hosts.optPrivateKey') }}</el-radio>
           </el-radio-group>
         </el-form-item>
         
-        <el-form-item v-if="newHostForm.ssh_auth_type === 'password'" label="Password">
+        <el-form-item v-if="newHostForm.ssh_auth_type === 'password'" :label="$t('hosts.labelPassword')">
           <el-input 
             v-model="newHostForm.ssh_password" 
             type="password" 
             show-password 
-            placeholder="SSH password" />
+            :placeholder="$t('hosts.placeholderPassword')" />
         </el-form-item>
         
-        <el-form-item v-if="newHostForm.ssh_auth_type === 'private_key'" label="Private Key">
+        <el-form-item v-if="newHostForm.ssh_auth_type === 'private_key'" :label="$t('hosts.labelPrivateKey')">
           <el-input 
             v-model="newHostForm.ssh_private_key" 
             type="textarea" 
             :rows="4"
-            placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----" />
+            :placeholder="$t('hosts.placeholderPrivateKey')" />
         </el-form-item>
         
-        <el-form-item v-if="newHostForm.ssh_auth_type === 'private_key'" label="Passphrase">
+        <el-form-item v-if="newHostForm.ssh_auth_type === 'private_key'" :label="$t('hosts.labelPassphrase')">
           <el-input 
             v-model="newHostForm.ssh_passphrase" 
             type="password" 
             show-password 
-            placeholder="Leave empty if no passphrase" />
+            :placeholder="$t('hosts.placeholderPassphrase')" />
         </el-form-item>
         
-        <el-divider content-position="left">Proxy (Optional)</el-divider>
+        <el-divider content-position="left">{{ $t('hosts.dividerProxy') }}</el-divider>
         
-        <el-form-item label="Proxy Host">
+        <el-form-item :label="$t('hosts.labelProxyHost')">
           <el-select 
             v-model="newHostForm.ssh_proxy_host" 
-            placeholder="Select proxy or enter manually"
+            :placeholder="$t('hosts.placeholderProxyHost')"
             filterable
             allow-create
             clearable
@@ -753,20 +753,20 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item v-if="newHostForm.ssh_proxy_host" label="Proxy Port">
+        <el-form-item v-if="newHostForm.ssh_proxy_host" :label="$t('hosts.labelProxyPort')">
           <el-input-number v-model="newHostForm.ssh_proxy_port" :min="1" :max="65535" style="width: 150px" />
         </el-form-item>
         
-        <el-divider content-position="left">Advanced Settings</el-divider>
+        <el-divider content-position="left">{{ $t('hosts.dividerAdvanced') }}</el-divider>
         
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Max Retries">
+            <el-form-item :label="$t('hosts.labelMaxRetries')">
               <el-input-number v-model="newHostForm.ssh_max_retries" :min="1" :max="10" style="width: 100%;" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="Retry Delay (s)">
+            <el-form-item :label="$t('hosts.labelRetryDelay')">
               <el-input-number v-model="newHostForm.ssh_retry_delay" :min="1" :max="10" :step="1" style="width: 100%;" />
             </el-form-item>
           </el-col>
@@ -774,46 +774,46 @@
         
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Conn Timeout (s)">
+            <el-form-item :label="$t('hosts.labelConnTimeout')">
               <el-input-number v-model="newHostForm.ssh_connection_timeout" :min="5" :max="60" :step="1" style="width: 100%;" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="Cmd Timeout (s)">
+            <el-form-item :label="$t('hosts.labelCmdTimeout')">
               <el-input-number v-model="newHostForm.ssh_command_timeout" :min="10" :max="300" :step="5" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
         
-        <el-form-item label="Check Interval">
+        <el-form-item :label="$t('services.labelCheckInterval')">
           <el-input-number v-model="newHostForm.check_interval" :min="60" :max="3600" :step="60" style="width: 150px" />
-          <span style="margin-left: 12px; color: #909399;">seconds (60-3600s)</span>
+          <span style="margin-left: 12px; color: #909399;">{{ $t('hosts.unitInterval') }}</span>
         </el-form-item>
       </template>
       
-      <el-form-item label="Description">
+      <el-form-item :label="$t('hosts.labelDesc')">
         <el-input 
           v-model="newHostForm.description" 
           type="textarea" 
           :rows="2"
-          placeholder="Optional description" />
+          :placeholder="$t('hosts.placeholderDesc')" />
       </el-form-item>
       
-      <el-form-item label="Tags">
+      <el-form-item :label="$t('hosts.labelTags')">
         <el-select 
           v-model="newHostForm.tags" 
           multiple 
           filterable 
           allow-create 
-          placeholder="Add tags"
+          :placeholder="$t('hosts.placeholderTags')"
           style="width: 100%">
         </el-select>
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="showAddHostDialog = false">Cancel</el-button>
+      <el-button @click="showAddHostDialog = false">{{ $t('common.cancel') }}</el-button>
       <el-button type="primary" @click="handleCreateHost" :loading="creatingHost">
-        Create Host
+        {{ $t('wizard.btnCreateHost') }}
       </el-button>
     </template>
   </el-dialog>
@@ -821,6 +821,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import {
   Plus, Edit, Monitor, Right, Check, Setting, Bell, Warning,
@@ -863,6 +864,33 @@ const emit = defineEmits<{
   (e: 'host-created', host: Host): void;
 }>();
 
+// i18n
+const { t } = useI18n();
+
+// Risk level label for review step
+const riskLevelLabel = computed(() => {
+  const map: Record<string, string> = {
+    low: t('services.riskLow'),
+    medium: t('services.riskMedium'),
+    high: t('services.riskHigh'),
+    critical: t('services.riskCritical'),
+  };
+  return map[form.risk_level] || form.risk_level;
+});
+
+// Check type label for review step
+const checkTypeLabel = computed(() => {
+  const map: Record<string, string> = {
+    tcp: t('services.typeTcp'),
+    http: t('services.typeHttp'),
+    https: t('services.typeHttps'),
+    script: t('services.typeScript'),
+    file: t('services.typeFile'),
+    log: t('services.typeLog'),
+  };
+  return map[form.check_type as string] || form.check_type?.toUpperCase();
+});
+
 // Dialog visibility
 const visible = computed({
   get: () => props.modelValue,
@@ -870,14 +898,14 @@ const visible = computed({
 });
 
 // Wizard state
-const steps = [
-  { key: 'basic', title: 'Basic' },
-  { key: 'check', title: 'Health Check' },
-  { key: 'schedule', title: 'Schedule' },
-  { key: 'alerts', title: 'Alerts' },
-  { key: 'confirm', title: 'Confirm' }
-];
-const totalSteps = steps.length;
+const steps = computed(() => [
+  { key: 'basic', title: t('services.stepBasic') },
+  { key: 'check', title: t('services.stepHealthCheck') },
+  { key: 'schedule', title: t('services.stepSchedule') },
+  { key: 'alerts', title: t('services.stepAlerts') },
+  { key: 'confirm', title: t('services.stepConfirm') }
+]);
+const totalSteps = computed(() => steps.value.length);
 const currentStep = ref(0);
 const submitting = ref(false);
 const showBanner = ref(true);
@@ -1020,7 +1048,7 @@ const groupedServicesForDep = computed(() => {
   projectMap.forEach((serviceList, projectId) => {
     const project = props.projects.find(p => p.id === projectId);
     groups.push({
-      projectName: project ? project.name : 'No Project',
+      projectName: project ? project.name : t('wizard.noProject'),
       projectId,
       services: serviceList.sort((a, b) => a.name.localeCompare(b.name))
     });
@@ -1058,7 +1086,7 @@ const handleHostSelect = (hostId: string) => {
 
 const handleCreateHost = async () => {
   if (!newHostForm.name || !newHostForm.ip) {
-    ElMessage.warning('Please enter host name and IP address');
+    ElMessage.warning(t('wizard.msgEnterHostInfo'));
     return;
   }
   
@@ -1072,7 +1100,7 @@ const handleCreateHost = async () => {
       ssh_command_timeout: newHostForm.ssh_command_timeout * 1000,
     };
     const createdHost = await hostsApi.create(submitHostData);
-    ElMessage.success(`Host "${createdHost.name}" created successfully`);
+    ElMessage.success(t('wizard.msgHostCreated', { name: createdHost.name }));
     
     // Emit event so parent can refresh hosts list
     emit('host-created', createdHost);
@@ -1087,7 +1115,7 @@ const handleCreateHost = async () => {
     showAddHostDialog.value = false;
   } catch (err: any) {
     console.error('Failed to create host:', err);
-    ElMessage.error(err.response?.data?.error || 'Failed to create host');
+    ElMessage.error(err.response?.data?.error || t('wizard.msgHostCreateFailed'));
   } finally {
     creatingHost.value = false;
   }
@@ -1179,7 +1207,7 @@ const goToStep = (step: number) => {
     addDependency();
   }
   
-  if (step >= 0 && step < totalSteps) {
+  if (step >= 0 && step < totalSteps.value) {
     currentStep.value = step;
   }
 };
@@ -1188,21 +1216,21 @@ const validateCurrentStep = (): boolean => {
   switch (currentStep.value) {
     case 0: // Basic
       if (!form.name) {
-        ElMessage.warning('Please enter a service name');
+        ElMessage.warning(t('services.msgEnterName'));
         return false;
       }
       if (!props.isEdit && !selectedHostId.value && !form.host) {
-        ElMessage.warning('Please select a host');
+        ElMessage.warning(t('services.msgSelectHost'));
         return false;
       }
       return true;
     case 1: // Health Check
       if (!form.check_type) {
-        ElMessage.warning('Please select a check type');
+        ElMessage.warning(t('services.msgSelectCheckType'));
         return false;
       }
       if (!['script', 'file', 'log'].includes(form.check_type as string) && !form.port) {
-        ElMessage.warning('Please enter a port number');
+        ElMessage.warning(t('services.msgEnterPort'));
         return false;
       }
       return true;
@@ -1225,7 +1253,7 @@ const handleNext = async () => {
     addDependency();
   }
 
-  if (currentStep.value < totalSteps - 1) {
+  if (currentStep.value < totalSteps.value - 1) {
     currentStep.value++;
   } else {
     // Submit

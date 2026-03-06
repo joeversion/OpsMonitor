@@ -10,7 +10,7 @@
     <!-- Layout Selector (shown in edit mode) -->
     <div v-if="isEditMode" class="layout-toolbar">
       <div class="layout-section">
-        <span class="toolbar-label">Layout:</span>
+        <span class="toolbar-label">{{ $t('graphCanvas.layoutLabel') }}</span>
         <div class="layout-options">
           <button 
             v-for="layout in layoutOptions" 
@@ -27,7 +27,7 @@
       </div>
       <div class="toolbar-divider"></div>
       <div class="layout-section">
-        <span class="toolbar-label">Direction:</span>
+        <span class="toolbar-label">{{ $t('graphCanvas.directionLabel') }}</span>
         <div class="direction-options">
           <button 
             v-for="dir in directionOptions" 
@@ -43,25 +43,25 @@
       </div>
       <div class="toolbar-divider"></div>
       <div class="layout-section">
-        <span class="toolbar-label">Snap:</span>
+        <span class="toolbar-label">{{ $t('graphCanvas.snapLabel') }}</span>
         <div class="snap-options">
           <button 
             class="snap-btn"
             :class="{ active: snapToGrid }"
             @click="snapToGrid = !snapToGrid"
-            title="Snap to grid (20px)"
+            :title="$t('graphCanvas.snapGridDesc')"
           >
             <span class="snap-icon">⊞</span>
-            <span>Grid</span>
+            <span>{{ $t('graphCanvas.snapGrid') }}</span>
           </button>
           <button 
             class="snap-btn"
             :class="{ active: snapToGuides }"
             @click="snapToGuides = !snapToGuides"
-            title="Smart alignment guidelines"
+            :title="$t('graphCanvas.snapAlignDesc')"
           >
             <span class="snap-icon">⫼</span>
-            <span>Align</span>
+            <span>{{ $t('graphCanvas.snapAlign') }}</span>
           </button>
         </div>
       </div>
@@ -270,7 +270,7 @@
               :x="getLinkLabelPosition(link).x"
               :y="getLinkLabelPosition(link).y + 23"
               class="cross-project-badge-text"
-            >X-Project</text>
+            >{{ $t('graphCanvas.badgeXProject') }}</text>
           </g>
         </g>
       </g>
@@ -316,7 +316,7 @@
       @click.stop="selectNode(node, $event)"
     >
       <!-- Cross-project badge with project name -->
-      <div v-if="node.isCrossProjectService" class="cross-project-node-badge">{{ node.project_name || 'External' }}</div>
+      <div v-if="node.isCrossProjectService" class="cross-project-node-badge">{{ node.project_name || $t('graphCanvas.badgeExternal') }}</div>
       <!-- Connection Handles -->
       <div class="node-handle handle-top" @mousedown.stop="startDragLink($event, node, 'top')"></div>
       <div class="node-handle handle-bottom" @mousedown.stop="startDragLink($event, node, 'bottom')"></div>
@@ -361,9 +361,9 @@
       :style="{ left: linkContextMenu.x + 'px', top: linkContextMenu.y + 'px' }"
       @click.stop
     >
-      <div class="context-menu-header">Dependency Settings</div>
+      <div class="context-menu-header">{{ $t('graphCanvas.edgeSettingsTitle') }}</div>
       <div class="context-menu-section">
-        <div class="context-menu-label">Type</div>
+        <div class="context-menu-label">{{ $t('graphCanvas.edgeLabelType') }}</div>
         <div class="context-menu-options">
           <button 
             v-for="type in dependencyTypes" 
@@ -379,7 +379,7 @@
       </div>
       <div class="context-menu-divider"></div>
       <div class="context-menu-section">
-        <div class="context-menu-label">Line Direction</div>
+        <div class="context-menu-label">{{ $t('graphCanvas.edgeLabelDirection') }}</div>
         <div class="direction-options-menu">
           <button 
             v-for="dir in linkDirectionOptions" 
@@ -397,7 +397,7 @@
       <div class="context-menu-divider"></div>
       <div class="context-menu-item danger" @click="deleteLink">
         <span class="menu-icon">🗑️</span>
-        <span>Delete Connection</span>
+        <span>{{ $t('graphCanvas.btnDeleteConn') }}</span>
       </div>
     </div>
     
@@ -408,7 +408,7 @@
       :style="{ left: linkTypeSelectorPos.x + 'px', top: linkTypeSelectorPos.y + 'px' }"
       @click.stop
     >
-      <div class="selector-header">Select Dependency Type</div>
+      <div class="selector-header">{{ $t('graphCanvas.selectDepType') }}</div>
       <div class="selector-options">
         <button 
           v-for="type in dependencyTypes" 
@@ -423,13 +423,14 @@
           </div>
         </button>
       </div>
-      <button class="selector-cancel" @click="cancelNewLink">Cancel</button>
+      <button class="selector-cancel" @click="cancelNewLink">{{ $t('common.cancel') }}</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { getDependencyTypes } from '../api/dependency-types';
 import ServiceIcon from './ServiceIcon.vue';
 
@@ -493,6 +494,8 @@ const emit = defineEmits([
   'save-layout'
 ]);
 
+const { t } = useI18n();
+
 const canvasRef = ref<HTMLElement | null>(null);
 
 // Zoom and pan state
@@ -521,34 +524,34 @@ interface Guideline {
 }
 const activeGuidelines = ref<Guideline[]>([]);
 
-const layoutOptions = [
-  { value: 'layered', label: 'Layered', icon: '📊', description: 'Auto-arrange by service layer (recommended)' },
-  { value: 'dagre', label: 'Directed', icon: '🔀', description: 'Auto-calculate optimal dependency path layout' },
-  { value: 'force', label: 'Force', icon: '🧲', description: 'Physics simulation, auto-cluster related nodes' },
-  { value: 'grid', label: 'Grid', icon: '⊞', description: 'Neat grid arrangement' }
-];
+const layoutOptions = computed(() => [
+  { value: 'layered', label: t('graphCanvas.layoutLayered'), icon: '📊', description: t('graphCanvas.layoutLayeredDesc') },
+  { value: 'dagre', label: t('graphCanvas.layoutDirected'), icon: '🔀', description: t('graphCanvas.layoutDirectedDesc') },
+  { value: 'force', label: t('graphCanvas.layoutForce'), icon: '🧲', description: t('graphCanvas.layoutForceDesc') },
+  { value: 'grid', label: t('graphCanvas.layoutGrid'), icon: '⊞', description: t('graphCanvas.layoutGridDesc') }
+]);
 
-const directionOptions = [
-  { value: 'TB', label: 'Top to Bottom', icon: '↓' },
-  { value: 'LR', label: 'Left to Right', icon: '→' },
-  { value: 'BT', label: 'Bottom to Top', icon: '↑' },
-  { value: 'RL', label: 'Right to Left', icon: '←' }
-];
+const directionOptions = computed(() => [
+  { value: 'TB', label: t('graphCanvas.dirTopBottom'), icon: '↓' },
+  { value: 'LR', label: t('graphCanvas.dirLeftRight'), icon: '→' },
+  { value: 'BT', label: t('graphCanvas.dirBottomTop'), icon: '↑' },
+  { value: 'RL', label: t('graphCanvas.dirRightLeft'), icon: '←' }
+]);
 
 // Link direction options for individual link customization
 // Controls arrow direction: normal (A→B) or reverse (A←B)
-const linkDirectionOptions = [
-  { value: 'normal', label: 'Normal (A → B)', shortLabel: 'A→B', icon: '→' },
-  { value: 'reverse', label: 'Reverse (A ← B)', shortLabel: 'A←B', icon: '←' }
-];
+const linkDirectionOptions = computed(() => [
+  { value: 'normal', label: t('graphCanvas.edgeDirNormal'), shortLabel: 'A→B', icon: '→' },
+  { value: 'reverse', label: t('graphCanvas.edgeDirReverse'), shortLabel: 'A←B', icon: '←' }
+]);
 
 // Dependency types - dynamically loaded from API
 const dependencyTypes = ref<{ value: string; label: string; icon: string; description: string; color: string; line_style: string }[]>([
   // Default fallback types
-  { value: 'depends', label: 'Depends', icon: '🔗', description: 'Strong dependency, must be available', color: '#ef4444', line_style: 'solid' },
-  { value: 'uses', label: 'Uses', icon: '📡', description: 'Weak dependency, can degrade', color: '#6366f1', line_style: 'dashed' },
-  { value: 'sync', label: 'Sync', icon: '🔄', description: 'Data synchronization relationship', color: '#06b6d4', line_style: 'dotted' },
-  { value: 'backup', label: 'Backup', icon: '💾', description: 'Backup/redundancy relationship', color: '#10b981', line_style: 'long-dash' }
+  { value: 'depends', label: t('graphCanvas.depDepends'), icon: '🔗', description: t('graphCanvas.depDependsDesc'), color: '#ef4444', line_style: 'solid' },
+  { value: 'uses', label: t('graphCanvas.depUses'), icon: '📡', description: t('graphCanvas.depUsesDesc'), color: '#6366f1', line_style: 'dashed' },
+  { value: 'sync', label: t('graphCanvas.depSync'), icon: '🔄', description: t('graphCanvas.depSyncDesc'), color: '#06b6d4', line_style: 'dotted' },
+  { value: 'backup', label: t('graphCanvas.depBackup'), icon: '💾', description: t('graphCanvas.depBackupDesc'), color: '#10b981', line_style: 'long-dash' }
 ]);
 
 // Load dependency types from API

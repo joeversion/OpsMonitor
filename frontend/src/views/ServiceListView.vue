@@ -8,7 +8,7 @@
             <el-icon :size="24"><Monitor /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Total Services</div>
+            <div class="stat-label">{{ $t('services.totalServices') }}</div>
             <div class="stat-value">{{ services.length }}</div>
           </div>
         </div>
@@ -19,7 +19,7 @@
             <el-icon :size="24"><CircleCheckFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Healthy</div>
+            <div class="stat-label">{{ $t('services.healthy') }}</div>
             <div class="stat-value" style="color: #67C23A">{{ services.filter(s => s.latestStatus === 'up').length }}</div>
           </div>
         </div>
@@ -30,7 +30,7 @@
             <el-icon :size="24"><WarningFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Warning</div>
+            <div class="stat-label">{{ $t('services.warning') }}</div>
             <div class="stat-value" style="color: #E6A23C">{{ services.filter(s => s.latestStatus === 'warning').length }}</div>
           </div>
         </div>
@@ -41,7 +41,7 @@
             <el-icon :size="24"><CircleCloseFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Down / Unknown</div>
+            <div class="stat-label">{{ $t('services.downUnknown') }}</div>
             <div class="stat-value" style="color: #F56C6C">{{ services.filter(s => s.latestStatus === 'down' || s.latestStatus === 'unknown' || !s.latestStatus).length }}</div>
           </div>
         </div>
@@ -51,10 +51,10 @@
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="card-title">Service Management</span>
+          <span class="card-title">{{ $t('services.title') }}</span>
           <div class="actions">
             <el-button v-if="!hideActions" @click="handleExport">
-              <el-icon><Download /></el-icon> Export
+              <el-icon><Download /></el-icon> {{ $t('services.btnExport') }}
             </el-button>
             <template v-if="isAdmin && !hideActions">
               <el-upload
@@ -65,12 +65,12 @@
                 style="display: inline-block; margin: 0 10px;"
               >
                 <el-button>
-                  <el-icon><Upload /></el-icon> Import
+                  <el-icon><Upload /></el-icon> {{ $t('services.btnImport') }}
                 </el-button>
               </el-upload>
             </template>
             <el-button v-if="isAdmin" type="primary" @click="handleAdd">
-              <el-icon><Plus /></el-icon> Add Service
+              <el-icon><Plus /></el-icon> {{ $t('services.btnAdd') }}
             </el-button>
           </div>
         </div>
@@ -81,29 +81,29 @@
         <div class="batch-info">
           <el-icon class="batch-icon"><Select /></el-icon>
           <span class="batch-count">{{ selectedServices.length }}</span>
-          <span class="batch-text">service(s) selected</span>
+          <span class="batch-text">{{ $t('services.selectedCount', { n: selectedServices.length }) }}</span>
         </div>
         <div class="batch-buttons">
           <el-button size="small" type="primary" plain @click="handleBatchEdit">
             <el-icon><Edit /></el-icon>
-            <span class="button-text">Batch Edit</span>
+            <span class="button-text">{{ $t('services.batchEdit') }}</span>
           </el-button>
           <el-button size="small" type="danger" plain @click="handleBatchDelete">
             <el-icon><Delete /></el-icon>
-            <span class="button-text">Delete</span>
+            <span class="button-text">{{ $t('services.batchDelete') }}</span>
           </el-button>
           <el-button size="small" @click="clearSelection">
             <el-icon><Close /></el-icon>
-            <span class="button-text">Clear</span>
+            <span class="button-text">{{ $t('services.clearSelect') }}</span>
           </el-button>
         </div>
       </div>
 
       <!-- Filters -->
       <div class="filter-bar">
-        <el-input v-model="searchQuery" placeholder="Search services..." :prefix-icon="Search" style="width: 300px;" clearable />
-        <el-select v-if="!currentProjectId && !hideProjectFilter" v-model="filterProject" placeholder="Project" clearable style="width: 180px;">
-          <el-option label="All Projects" value="" />
+        <el-input v-model="searchQuery" :placeholder="$t('services.searchPlaceholder')" :prefix-icon="Search" style="width: 300px;" clearable />
+        <el-select v-if="!currentProjectId && !hideProjectFilter" v-model="filterProject" :placeholder="$t('services.colProject')" clearable style="width: 180px;">
+          <el-option :label="$t('services.allProjects')" value="" />
           <el-option 
             v-for="project in projects" 
             :key="project.id" 
@@ -111,12 +111,12 @@
             :value="project.id" 
           />
         </el-select>
-        <el-select v-model="filterStatus" placeholder="Status" clearable style="width: 150px;">
-          <el-option label="All Status" value="" />
-          <el-option label="Normal" value="up" />
-          <el-option label="Warning" value="warning" />
-          <el-option label="Down" value="down" />
-          <el-option label="Unknown" value="unknown" />
+        <el-select v-model="filterStatus" :placeholder="$t('common.status')" clearable style="width: 150px;">
+          <el-option :label="$t('services.allStatus')" value="" />
+          <el-option :label="$t('services.statusNormal')" value="up" />
+          <el-option :label="$t('services.statusWarning')" value="warning" />
+          <el-option :label="$t('services.statusDown')" value="down" />
+          <el-option :label="$t('services.statusUnknown')" value="unknown" />
         </el-select>
       </div>
 
@@ -126,15 +126,15 @@
         v-loading="loading"
         @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" v-if="isAdmin" />
-        <el-table-column label="No." width="70" align="center">
+        <el-table-column :label="$t('services.colNo')" width="70" align="center">
           <template #default="{ $index }">
             <span class="no-column">{{ (currentPage - 1) * pageSize + $index + 1 }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="Status" min-width="90">
+        <el-table-column :label="$t('services.colStatus')" min-width="90">
           <template #header>
             <div class="sortable-header" @click="handleSort('status')">
-              <span>Status</span>
+              <span>{{ $t('services.colStatus') }}</span>
               <span class="sort-icon">
                 <el-icon v-if="sortBy === 'status' && sortOrder === 'asc'"><CaretTop /></el-icon>
                 <el-icon v-else-if="sortBy === 'status' && sortOrder === 'desc'"><CaretBottom /></el-icon>
@@ -146,10 +146,10 @@
             <StatusBadge :status="scope.row.latestStatus || 'unknown'" />
           </template>
         </el-table-column>
-        <el-table-column label="Service Name" min-width="200">
+        <el-table-column :label="$t('services.colName')" min-width="200">
           <template #header>
             <div class="sortable-header" @click="handleSort('name')">
-              <span>Service Name</span>
+              <span>{{ $t('services.colName') }}</span>
               <span class="sort-icon">
                 <el-icon v-if="sortBy === 'name' && sortOrder === 'asc'"><CaretTop /></el-icon>
                 <el-icon v-else-if="sortBy === 'name' && sortOrder === 'desc'"><CaretBottom /></el-icon>
@@ -164,10 +164,10 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="Project" min-width="110" v-if="!currentProjectId">
+        <el-table-column :label="$t('services.colProject')" min-width="110" v-if="!currentProjectId">
           <template #header>
             <div class="sortable-header" @click="handleSort('project')">
-              <span>Project</span>
+              <span>{{ $t('services.colProject') }}</span>
               <span class="sort-icon">
                 <el-icon v-if="sortBy === 'project' && sortOrder === 'asc'"><CaretTop /></el-icon>
                 <el-icon v-else-if="sortBy === 'project' && sortOrder === 'desc'"><CaretBottom /></el-icon>
@@ -182,7 +182,7 @@
             <span v-else style="color: #909399;">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="Response" min-width="160">
+        <el-table-column :label="$t('services.colResponse')" min-width="160">
           <template #default="scope">
             <template v-if="scope.row.latestCheck">
               <el-progress 
@@ -205,10 +205,10 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="Last Checked" min-width="110">
+        <el-table-column :label="$t('services.colLastCheck')" min-width="110">
           <template #header>
             <div class="sortable-header" @click="handleSort('lastChecked')">
-              <span>Last Checked</span>
+              <span>{{ $t('services.colLastCheck') }}</span>
               <span class="sort-icon">
                 <el-icon v-if="sortBy === 'lastChecked' && sortOrder === 'asc'"><CaretTop /></el-icon>
                 <el-icon v-else-if="sortBy === 'lastChecked' && sortOrder === 'desc'"><CaretBottom /></el-icon>
@@ -223,10 +223,10 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="Monitoring" min-width="120" align="center">
+        <el-table-column :label="$t('services.colMonitoring')" min-width="120" align="center">
           <template #header>
             <div class="sortable-header" @click="handleSort('monitoring')">
-              <span>Monitoring</span>
+              <span>{{ $t('services.colMonitoring') }}</span>
               <span class="sort-icon">
                 <el-icon v-if="sortBy === 'monitoring' && sortOrder === 'asc'"><CaretTop /></el-icon>
                 <el-icon v-else-if="sortBy === 'monitoring' && sortOrder === 'desc'"><CaretBottom /></el-icon>
@@ -244,10 +244,10 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="Alerts" min-width="120" align="center">
+        <el-table-column :label="$t('services.colAlerts')" min-width="120" align="center">
           <template #header>
             <div class="sortable-header" @click="handleSort('alerts')">
-              <span>Alerts</span>
+              <span>{{ $t('services.colAlerts') }}</span>
               <span class="sort-icon">
                 <el-icon v-if="sortBy === 'alerts' && sortOrder === 'asc'"><CaretTop /></el-icon>
                 <el-icon v-else-if="sortBy === 'alerts' && sortOrder === 'desc'"><CaretBottom /></el-icon>
@@ -265,14 +265,14 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="check_type" label="Type" min-width="50">
+        <el-table-column prop="check_type" :label="$t('services.colType')" min-width="50">
           <template #default="scope">
             <el-tag size="small" type="info">{{ scope.row.check_type.toUpperCase() }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Actions" min-width="230" align="right" v-if="isAdmin">
+        <el-table-column :label="$t('services.colActions')" min-width="230" align="right" v-if="isAdmin">
           <template #default="scope">
-            <el-tooltip content="Run check now" placement="top" :show-after="300">
+            <el-tooltip :content="$t('services.tooltipRunCheck')" placement="top" :show-after="300">
               <el-button
                 size="small"
                 type="primary"
@@ -282,12 +282,12 @@
                 style="padding: 2px 7px; margin-right: 4px;"
               >
                 <el-icon v-if="!runningChecks.has(scope.row.id)" style="margin-right:3px;"><VideoPlay /></el-icon>
-                <span>Run</span>
+                <span>{{ $t('services.btnRun') }}</span>
               </el-button>
             </el-tooltip>
-            <el-button link type="success" size="small" @click="handleCopy(scope.row)">Copy</el-button>
-            <el-button link type="primary" size="small" @click="handleEdit(scope.row)">Edit</el-button>
-            <el-button link type="danger" size="small" @click="handleDelete(scope.row)">Delete</el-button>
+            <el-button link type="success" size="small" @click="handleCopy(scope.row)">{{ $t('services.btnCopy') }}</el-button>
+            <el-button link type="primary" size="small" @click="handleEdit(scope.row)">{{ $t('services.btnEdit') }}</el-button>
+            <el-button link type="danger" size="small" @click="handleDelete(scope.row)">{{ $t('services.btnDelete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -306,7 +306,7 @@
 
     <el-dialog 
       v-model="dialogVisible" 
-      :title="isEdit ? 'Edit Service' : (isCopy ? 'Copy Service' : 'Add Service')" 
+      :title="isEdit ? $t('wizard.titleEditing') : (isCopy ? $t('wizard.titleCopying') : $t('wizard.titleAdding'))" 
       width="750px"
       :close-on-click-modal="false"
       :close-on-press-escape="false"
@@ -322,18 +322,18 @@
           </div>
           <div class="banner-content">
             <div class="banner-title">
-              {{ isEdit ? '✏️ Editing Service' : (isCopy ? '📋 Copying Service' : '➕ Adding New Service') }}
+              {{ isEdit ? $t('wizard.titleEditing') : (isCopy ? $t('wizard.titleCopying') : $t('wizard.titleAdding')) }}
             </div>
             <div class="banner-description">
               <template v-if="isEdit">
-                <span>💡 Modify the service settings below. Changes will take effect immediately after saving.</span>
+                <span>{{ $t('wizard.descEditing') }}</span>
               </template>
               <template v-else>
                 <span>📋 Configure service monitoring settings. </span>
-                <span>Need to add a new host? </span>
+                <span>{{ $t('services.sectionHostConfig') }} </span>
                 <router-link to="/hosts" class="banner-link" target="_blank">
                   <el-icon><Monitor /></el-icon>
-                  <span>Go to Hosts Management</span>
+                  <span>{{ $t('hosts.title') }}</span>
                   <el-icon><Right /></el-icon>
                 </router-link>
               </template>
@@ -345,7 +345,7 @@
         <div class="status-controls-section">
           <div class="status-header">
             <el-icon><Setting /></el-icon>
-            <span>Service Status & Control</span>
+            <span>{{ $t('services.sectionStatusControl') }}</span>
           </div>
           <div class="status-controls-grid">
             <!-- Service Monitoring -->
@@ -353,20 +353,20 @@
               <div class="control-card-header">
                 <div class="control-label">
                   <el-icon style="font-size: 16px;"><Monitor /></el-icon>
-                  <span>Monitoring</span>
+                  <span>{{ $t('services.labelMonitoring') }}</span>
                 </div>
                 <el-switch v-model="form.enabled" :active-value="1" :inactive-value="0" size="large" />
               </div>
               <div class="control-description">
-                Enable or disable health check monitoring for this service
+                {{ $t('services.descMonitoring') }}
               </div>
               <el-tag v-if="form.enabled" type="success" size="small" style="margin-top: 8px;">
                 <el-icon><CircleCheck /></el-icon>
-                <span style="margin-left: 4px;">Active Monitoring</span>
+                <span style="margin-left: 4px;">{{ $t('services.tagActiveMonitoring') }}</span>
               </el-tag>
               <el-tag v-else type="info" size="small" style="margin-top: 8px;">
                 <el-icon><CircleClose /></el-icon>
-                <span style="margin-left: 4px;">Monitoring Disabled</span>
+                <span style="margin-left: 4px;">{{ $t('services.tagMonitoringDisabled') }}</span>
               </el-tag>
             </div>
 
@@ -375,20 +375,20 @@
               <div class="control-card-header">
                 <div class="control-label">
                   <el-icon style="font-size: 16px;"><Bell /></el-icon>
-                  <span>Alerts</span>
+                  <span>{{ $t('services.labelAlerts') }}</span>
                 </div>
                 <el-switch v-model="form.alert_enabled" :active-value="1" :inactive-value="0" size="large" />
               </div>
               <div class="control-description">
-                Send notifications when service health check fails
+                {{ $t('services.descAlerts') }}
               </div>
               <el-tag v-if="form.alert_enabled" type="success" size="small" style="margin-top: 8px;">
                 <el-icon><CircleCheck /></el-icon>
-                <span style="margin-left: 4px;">Alerts Enabled</span>
+                <span style="margin-left: 4px;">{{ $t('services.tagAlertsEnabled') }}</span>
               </el-tag>
               <el-tag v-else type="info" size="small" style="margin-top: 8px;">
                 <el-icon><BellSlash /></el-icon>
-                <span style="margin-left: 4px;">Alerts Disabled</span>
+                <span style="margin-left: 4px;">{{ $t('services.tagAlertsDisabled') }}</span>
               </el-tag>
             </div>
 
@@ -397,21 +397,21 @@
               <div class="control-card-header">
                 <div class="control-label">
                   <el-icon style="font-size: 16px;"><Warning /></el-icon>
-                  <span>Risk Level</span>
+                  <span>{{ $t('services.labelRiskLevel') }}</span>
                 </div>
               </div>
               <el-select v-model="form.risk_level" style="width: 100%; margin-top: 8px;" size="large">
-                <el-option label="🟢 Low" value="low" />
-                <el-option label="🟡 Medium" value="medium" />
-                <el-option label="🟠 High" value="high" />
-                <el-option label="🔴 Critical" value="critical" />
+                <el-option :label="$t('services.riskLow')" value="low" />
+                <el-option :label="$t('services.riskMedium')" value="medium" />
+                <el-option :label="$t('services.riskHigh')" value="high" />
+                <el-option :label="$t('services.riskCritical')" value="critical" />
               </el-select>
               <el-tag
                 :type="form.risk_level === 'critical' ? 'danger' : form.risk_level === 'high' ? 'warning' : form.risk_level === 'medium' ? 'primary' : 'success'"
                 size="small"
                 style="margin-top: 8px;">
                 <el-icon><Warning /></el-icon>
-                <span style="margin-left: 4px;">{{ form.risk_level === 'critical' ? 'Critical Impact' : form.risk_level === 'high' ? 'High Impact' : form.risk_level === 'medium' ? 'Medium Impact' : 'Low Impact' }} Service</span>
+                <span style="margin-left: 4px;">{{ form.risk_level === 'critical' ? $t('services.tagCriticalImpact') : form.risk_level === 'high' ? $t('services.tagHighImpact') : form.risk_level === 'medium' ? $t('services.tagMediumImpact') : $t('services.tagLowImpact') }}</span>
               </el-tag>
             </div>
           </div>
@@ -420,17 +420,17 @@
         <!-- Basic Information Section -->
         <el-divider content-position="left">
           <el-icon><Document /></el-icon>
-          <span style="margin-left: 8px;">Basic Information</span>
+          <span style="margin-left: 8px;">{{ $t('services.sectionBasicInfo') }}</span>
         </el-divider>
 
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Service Name" required>
-              <el-input v-model="form.name" placeholder="e.g. API Gateway" />
+            <el-form-item :label="$t('services.labelServiceName')" required>
+              <el-input v-model="form.name" :placeholder="$t('services.placeholderServiceName')" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="Icon">
+            <el-form-item :label="$t('services.labelIcon')">
               <IconSelector v-model="form.icon" />
             </el-form-item>
           </el-col>
@@ -438,8 +438,8 @@
 
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Project">
-              <el-select v-model="form.project_id" placeholder="Select project" clearable style="width: 100%;" @change="handleProjectChange">
+            <el-form-item :label="$t('services.labelProject')">
+              <el-select v-model="form.project_id" :placeholder="$t('services.placeholderSelectProject')" clearable style="width: 100%;" @change="handleProjectChange">
                 <el-option 
                   v-for="project in projects" 
                   :key="project.id" 
@@ -457,15 +457,15 @@
         <!-- Host Configuration Section -->
         <el-divider content-position="left">
           <el-icon><Monitor /></el-icon>
-          <span style="margin-left: 8px;">Host Configuration</span>
+          <span style="margin-left: 8px;">{{ $t('services.sectionHostConfig') }}</span>
         </el-divider>
 
         <el-row :gutter="20">
           <el-col :span="24">
-            <el-form-item label="Select Host" :required="!isEdit">
+            <el-form-item :label="$t('services.labelSelectHost')" :required="!isEdit">
               <el-select 
                 v-model="selectedHostId" 
-                placeholder="-- Select an existing host --" 
+                :placeholder="$t('services.placeholderSelectHost')" 
                 style="width: 100%;"
                 @change="handleHostSelect"
                 clearable>
@@ -481,8 +481,8 @@
               <div v-if="!isEdit && filteredHosts.length === 0" style="margin-top: 8px;">
                 <el-alert type="info" :closable="false" show-icon>
                   <template #title>
-                    <span>No hosts available. </span>
-                    <router-link to="/hosts" style="color: #409eff; font-weight: 500;">Go to Hosts Management →</router-link>
+                    <span>{{ $t('services.noHostsAvailable') }} </span>
+                    <router-link to="/hosts" style="color: #409eff; font-weight: 500;">{{ $t('hosts.title') }} →</router-link>
                   </template>
                 </el-alert>
               </div>
@@ -603,35 +603,35 @@
         <!-- Health Check Configuration -->
         <el-divider content-position="left">
           <el-icon><Pointer /></el-icon>
-          <span style="margin-left: 8px;">Health Check Configuration</span>
+          <span style="margin-left: 8px;">{{ $t('services.sectionHealthCheck') }}</span>
         </el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Check Type" required>
+            <el-form-item :label="$t('services.labelCheckType')" required>
               <el-select v-model="form.check_type" @change="handleCheckTypeChange" style="width: 100%;">
-                <el-option-group label="Network Checks">
-                  <el-option label="🔌 TCP Port Check" value="tcp" />
-                  <el-option label="🌐 HTTP Check" value="http" />
-                  <el-option label="🔒 HTTPS Check" value="https" />
+                <el-option-group :label="$t('services.groupNetwork')">
+                  <el-option :label="$t('services.typeTcp')" value="tcp" />
+                  <el-option :label="$t('services.typeHttp')" value="http" />
+                  <el-option :label="$t('services.typeHttps')" value="https" />
                 </el-option-group>
-                <el-option-group label="System Checks">
-                  <el-option label="📜 Script Check" value="script" />
+                <el-option-group :label="$t('services.groupSystem')">
+                  <el-option :label="$t('services.typeScript')" value="script" />
                 </el-option-group>
-                <el-option-group label="Data Checks (Coming soon)" class="coming-soon-group" :disabled="true">
-                  <el-option label="🐬 MySQL Check (Coming soon)" value="mysql" class="coming-soon-option" disabled />
-                  <el-option label="🐘 PostgreSQL Check (Coming soon)" value="postgresql" class="coming-soon-option" disabled />
-                  <el-option label="📮 Redis Check (Coming soon)" value="redis" class="coming-soon-option" disabled />
-                  <el-option label="🍃 MongoDB Check (Coming soon)" value="mongodb" class="coming-soon-option" disabled />
+                <el-option-group :label="$t('services.groupDataChecks')" class="coming-soon-group" :disabled="true">
+                  <el-option :label="$t('services.typeMysql')" value="mysql" class="coming-soon-option" disabled />
+                  <el-option :label="$t('services.typePostgresql')" value="postgresql" class="coming-soon-option" disabled />
+                  <el-option :label="$t('services.typeRedis')" value="redis" class="coming-soon-option" disabled />
+                  <el-option :label="$t('services.typeMongodb')" value="mongodb" class="coming-soon-option" disabled />
                 </el-option-group>
-                <el-option-group label="File Checks">
-                  <el-option label="📄 File Exists Check" value="file" />
-                  <el-option label="📋 Log Monitor" value="log" />
+                <el-option-group :label="$t('services.groupFile')">
+                  <el-option :label="$t('services.typeFile')" value="file" />
+                  <el-option :label="$t('services.typeLog')" value="log" />
                 </el-option-group>
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12" v-if="!['script', 'file', 'log'].includes(form.check_type as string)">
-            <el-form-item label="Port" required>
+            <el-form-item :label="$t('services.labelPort')" required>
               <el-input-number v-model="form.port" :min="1" :max="65535" style="width: 100%;" />
             </el-form-item>
           </el-col>
@@ -639,10 +639,10 @@
         <!-- Check Interval moved to Schedule Configuration section below -->
 
         <!-- HTTP Configuration (show only when check_type is http or https) -->
-        <el-divider v-if="(form.check_type as string) === 'http' || (form.check_type as string) === 'https'" content-position="left">HTTP/HTTPS Configuration</el-divider>
+        <el-divider v-if="(form.check_type as string) === 'http' || (form.check_type as string) === 'https'" content-position="left">{{ $t('services.sectionHttpConfig') }}</el-divider>
         <el-row v-if="(form.check_type as string) === 'http' || (form.check_type as string) === 'https'" :gutter="20">
           <el-col :span="6">
-            <el-form-item label="Protocol">
+            <el-form-item :label="$t('services.labelProtocol')">
               <el-select v-model="httpConfig.protocol" style="width: 100%;">
                 <el-option label="HTTP" value="http" />
                 <el-option label="HTTPS" value="https" />
@@ -650,19 +650,19 @@
             </el-form-item>
           </el-col>
           <el-col :span="18">
-            <el-form-item label="Health Check Path">
-              <el-input v-model="httpConfig.path" placeholder="/health or /api/health" />
+            <el-form-item :label="$t('services.labelHealthPath')">
+              <el-input v-model="httpConfig.path" :placeholder="$t('services.placeholderHealthPath')" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="Expected Status">
+            <el-form-item :label="$t('services.labelExpectedStatus')">
               <el-input-number v-model="httpConfig.expected_status" :min="100" :max="599" style="width: 100%;" controls-position="right" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="Timeout (ms)">
+            <el-form-item :label="$t('services.labelTimeout')">
               <el-input-number v-model="httpConfig.timeout" :min="1000" :max="30000" :step="1000" style="width: 100%;" controls-position="right" />
             </el-form-item>
           </el-col>
@@ -670,22 +670,22 @@
 
         <!-- Script Check Configuration -->
         <template v-if="(form.check_type as string) === 'script'">
-          <el-divider content-position="left">Script Check Configuration</el-divider>
+          <el-divider content-position="left">{{ $t('services.sectionScriptConfig') }}</el-divider>
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="Script Type" required>
+              <el-form-item :label="$t('services.labelScriptType')" required>
                 <el-select v-model="scriptCheckConfig.script_type" style="width: 100%;">
-                  <el-option label="🐚 Bash Script" value="bash" />
-                  <el-option label="🐍 Python Script" value="python" />
-                  <el-option label="💻 PowerShell Script" value="powershell" />
-                  <el-option label="📗 Node.js Script" value="nodejs" />
+                  <el-option :label="$t('services.scriptBash')" value="bash" />
+                  <el-option :label="$t('services.scriptPython')" value="python" />
+                  <el-option :label="$t('services.scriptPowershell')" value="powershell" />
+                  <el-option :label="$t('services.scriptNode')" value="nodejs" />
                 </el-select>
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="24">
-              <el-form-item label="Script Content" required>
+              <el-form-item :label="$t('services.labelScriptContent')" required>
                 <el-input 
                   v-model="scriptCheckConfig.script_content" 
                   type="textarea" 
@@ -694,19 +694,19 @@
                   style="font-family: 'Courier New', monospace;"
                 />
                 <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                  Script should exit with code 0 for success, non-zero for failure
+                  {{ $t('services.hintScriptExitCode') }}
                 </div>
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="8">
-              <el-form-item label="Expected Exit Code">
+              <el-form-item :label="$t('services.labelExpectedExitCode')">
                 <el-input-number v-model="scriptCheckConfig.expected_exit_code" :min="0" :max="255" style="width: 100%;" />
               </el-form-item>
             </el-col>
             <el-col :span="8">
-              <el-form-item label="Timeout (seconds)">
+              <el-form-item :label="$t('services.labelScriptTimeout')">
                 <el-input-number v-model="scriptCheckConfig.timeout" :min="1" :max="300" style="width: 100%;" />
               </el-form-item>
             </el-col>
@@ -715,23 +715,23 @@
 
         <!-- Database Check Configuration -->
         <template v-if="['mysql', 'postgresql', 'redis', 'mongodb'].includes(form.check_type as string)">
-          <el-divider content-position="left">Database Check Configuration</el-divider>
+          <el-divider content-position="left">{{ $t('services.sectionDatabaseConfig') }}</el-divider>
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="Database Name">
+              <el-form-item :label="$t('services.labelDatabaseName')">
                 <el-input v-model="databaseCheckConfig.database_name" placeholder="e.g. myapp_db" />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="Username">
-                <el-input v-model="databaseCheckConfig.username" placeholder="Database username" />
+              <el-form-item :label="$t('services.labelDbUsername')">
+                <el-input v-model="databaseCheckConfig.username" :placeholder="$t('services.placeholderDbUsername')" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="Password">
-                <el-input v-model="databaseCheckConfig.password" type="password" placeholder="Database password" />
+              <el-form-item :label="$t('services.labelDbPassword')">
+                <el-input v-model="databaseCheckConfig.password" type="password" :placeholder="$t('services.placeholderDbPassword')" />
               </el-form-item>
             </el-col>
           </el-row>
@@ -740,7 +740,7 @@
               <el-form-item label="Test Query (Optional)">
                 <el-input v-model="databaseCheckConfig.test_query" placeholder="e.g. SELECT 1" />
                 <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                  Query to verify database connectivity
+                  {{ $t('services.hintTestQuery') }}
                 </div>
               </el-form-item>
             </el-col>
@@ -749,32 +749,32 @@
 
         <!-- File / Log Check Configuration -->
         <template v-if="['file', 'log'].includes(form.check_type as string)">
-          <el-divider content-position="left">File / Log Check Configuration</el-divider>
+          <el-divider content-position="left">{{ $t('services.sectionFileConfig') }}</el-divider>
           <el-row :gutter="20">
             <el-col :span="24">
-              <el-form-item label="Monitoring Mode" required>
+              <el-form-item :label="$t('services.labelMonitorMode')" required>
                 <el-radio-group v-model="fileCheckConfig.mode">
-                  <el-radio-button label="single">Single File</el-radio-button>
-                  <el-radio-button label="folder">Folder + Pattern</el-radio-button>
+                  <el-radio-button label="single">{{ $t('services.modeSingleFile') }}</el-radio-button>
+                  <el-radio-button label="folder">{{ $t('services.modeFolderPattern') }}</el-radio-button>
                 </el-radio-group>
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20" v-if="fileCheckConfig.mode === 'single'">
             <el-col :span="24">
-              <el-form-item label="File Path" required>
-                <el-input v-model="fileCheckConfig.file_path" placeholder="e.g. /var/log/app.log" />
+              <el-form-item :label="$t('services.labelFilePath')" required>
+                <el-input v-model="fileCheckConfig.file_path" :placeholder="$t('services.placeholderFilePath')" />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20" v-else>
             <el-col :span="12">
-              <el-form-item label="Directory Path" required>
+              <el-form-item :label="$t('services.labelDirPath')" required>
                 <el-input v-model="fileCheckConfig.directory_path" placeholder="e.g. /var/log/myapp/$(date +%F) or /var/log/myapp/*" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="Filename Pattern (glob/regex)" required>
+              <el-form-item :label="$t('services.labelFilePattern')" required>
                 <el-input 
                   v-model="fileCheckConfig.filename_pattern" 
                   placeholder="e.g. app-.*\\.log or *.log">
@@ -784,9 +784,9 @@
                       raw-content>
                       <template #content>
                         <div style="max-width: 300px;">
-                          <strong>Pattern Matching:</strong><br/>
-                          Glob first, then Regex<br/><br/>
-                          <strong>Examples:</strong><br/>
+                          <strong>{{ $t('services.tooltipPatternTitle') }}</strong><br/>
+                          {{ $t('services.tooltipPatternDesc') }}<br/><br/>
+                          <strong>{{ $t('services.tooltipPatternExamples') }}</strong><br/>
                           • *.log - All .log files<br/>
                           • backup-[0-9]{4}-[0-9]{2}-[0-9]{2}.* - Date files<br/>
                           • db-.*\\.sql\\.gz - DB backups<br/>
@@ -802,29 +802,29 @@
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="Check Type">
+              <el-form-item :label="$t('services.labelFileCheckType')">
                 <el-select v-model="fileCheckConfig.check_type" style="width: 100%;">
-                  <el-option label="File Exists" value="exists" />
-                  <el-option label="File Size" value="size" />
-                  <el-option label="File Modified" value="modified" />
-                  <el-option label="Content Pattern" value="content" />
+                  <el-option :label="$t('services.fileExists')" value="exists" />
+                  <el-option :label="$t('services.fileSize')" value="size" />
+                  <el-option :label="$t('services.fileModified')" value="modified" />
+                  <el-option :label="$t('services.contentPattern')" value="content" />
                 </el-select>
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="Use Latest Matched File">
+              <el-form-item :label="$t('services.labelUseLatest')">
                 <el-switch v-model="fileCheckConfig.use_latest" :active-value="true" :inactive-value="false" />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="Freshness Window (days)">
+              <el-form-item :label="$t('services.labelFreshnessDays')">
                 <el-input-number v-model="fileCheckConfig.freshness_days" :min="0" :max="30" style="width: 100%;" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="Max Age">
+              <el-form-item :label="$t('services.labelMaxAge')">
                 <div style="display: flex; width: 100%;">
                   <el-input-number 
                     v-model="fileCheckConfig.max_age_value" 
@@ -833,9 +833,9 @@
                     style="width: 150px;" 
                   />
                   <el-select v-model="fileCheckConfig.max_age_unit" style="width: calc(100% - 150px);">
-                    <el-option label="Minutes" value="minutes" />
-                    <el-option label="Hours" value="hours" />
-                    <el-option label="Days" value="days" />
+                    <el-option :label="$t('services.unitMinutes')" value="minutes" />
+                    <el-option :label="$t('services.unitHours')" value="hours" />
+                    <el-option :label="$t('services.unitDays')" value="days" />
                   </el-select>
                 </div>
               </el-form-item>
@@ -843,19 +843,19 @@
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="Content Pattern (regex)">
+              <el-form-item :label="$t('services.labelContentPattern')">
                 <el-input v-model="fileCheckConfig.content_pattern" placeholder="ERROR|FATAL" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="Min Size (KB)">
+              <el-form-item :label="$t('services.labelMinSize')">
                 <el-input-number v-model="fileCheckConfig.expected_size_delta" :min="0" :max="102400" style="width: 100%;" />
               </el-form-item>
             </el-col>
           </el-row>
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="Timeout (seconds)">
+              <el-form-item :label="$t('services.labelFileTimeout')">
                 <el-input-number v-model="fileCheckConfig.timeout_seconds" :min="5" :max="300" style="width: 100%;" />
               </el-form-item>
             </el-col>
@@ -865,7 +865,7 @@
         <!-- Schedule Configuration -->
         <el-divider content-position="left">
           <el-icon><Clock /></el-icon>
-          <span style="margin-left: 8px;">Schedule Configuration</span>
+          <span style="margin-left: 8px;">{{ $t('services.sectionSchedule') }}</span>
         </el-divider>
         <div style="margin: 16px 0;">
           <ScheduleConfigPanel v-model="scheduleConfig" />
@@ -874,21 +874,21 @@
         <!-- Alert Thresholds -->
         <el-divider content-position="left">
           <el-icon><DataLine /></el-icon>
-          <span style="margin-left: 8px;">Alert Thresholds</span>
+          <span style="margin-left: 8px;">{{ $t('services.sectionAlertThresholds') }}</span>
         </el-divider>
         <div class="threshold-cards">
           <!-- Warning Threshold Card -->
           <div class="threshold-card">
             <div class="threshold-card-header">
               <el-icon style="font-size: 20px; color: #fa8c16;"><Warning /></el-icon>
-              <span style="font-weight: 600; margin-left: 8px;">Warning Threshold</span>
+              <span style="font-weight: 600; margin-left: 8px;">{{ $t('services.labelWarnThreshold') }}</span>
             </div>
             <div class="threshold-value">
               <el-input-number v-model="form.warning_threshold" :min="1" :max="30" size="large" style="width: 120px;" />
-              <span class="threshold-unit">consecutive failures</span>
+              <span class="threshold-unit">{{ $t('services.unitConsecutiveFailures') }}</span>
             </div>
             <div class="threshold-hint">
-              Trigger a warning after this many failed checks (Range: 1-30)
+              {{ $t('services.hintWarnThreshold') }}
             </div>
           </div>
 
@@ -896,14 +896,14 @@
           <div class="threshold-card">
             <div class="threshold-card-header">
               <el-icon style="font-size: 20px; color: #f5222d;"><CircleClose /></el-icon>
-              <span style="font-weight: 600; margin-left: 8px;">Error Threshold</span>
+              <span style="font-weight: 600; margin-left: 8px;">{{ $t('services.labelErrorThreshold') }}</span>
             </div>
             <div class="threshold-value">
               <el-input-number v-model="form.error_threshold" :min="1" :max="50" size="large" style="width: 120px;" />
-              <span class="threshold-unit">consecutive failures</span>
+              <span class="threshold-unit">{{ $t('services.unitConsecutiveFailures') }}</span>
             </div>
             <div class="threshold-hint">
-              Trigger an error alert after this many failed checks (Range: 1-50)
+              {{ $t('services.hintErrorThreshold') }}
             </div>
           </div>
 
@@ -911,51 +911,51 @@
           <div class="threshold-card">
             <div class="threshold-card-header">
               <el-icon style="font-size: 20px; color: #722ed1;"><Bell /></el-icon>
-              <span style="font-weight: 600; margin-left: 8px;">Alert Trigger Threshold</span>
+              <span style="font-weight: 600; margin-left: 8px;">{{ $t('services.labelAlertTrigger') }}</span>
             </div>
             <div class="threshold-value">
               <el-input-number v-model="form.failure_threshold" :min="1" :max="10" size="large" style="width: 120px;" />
-              <span class="threshold-unit">consecutive failures</span>
+              <span class="threshold-unit">{{ $t('services.unitConsecutiveFailures') }}</span>
             </div>
             <div class="threshold-hint">
-              Send alert notification after this many consecutive failures. Prevents false alarms from network jitter. (Range: 1-10)
+              {{ $t('services.hintAlertTrigger') }}
             </div>
           </div>
         </div>
 
         <!-- Service Alert Customization -->
-        <el-divider content-position="left">Alert Customization (Optional)</el-divider>
+        <el-divider content-position="left">{{ $t('services.sectionAlertCustomize') }}</el-divider>
         <el-row :gutter="20">
           <el-col :span="24">
-            <el-form-item label="Service Impact Description">
+            <el-form-item :label="$t('services.labelImpactDesc')">
               <el-input
                 v-model="form.impact_description"
                 type="textarea"
                 :rows="2"
-                placeholder="Describe the impact when this service is down, e.g., Users cannot access the system, All API calls will fail..."
+                :placeholder="$t('services.placeholderImpactDesc')"
               />
               <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                This description will be shown in alerts when the service itself goes down (not related to dependencies)
+                {{ $t('services.hintImpactDesc') }}
               </div>
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="24">
-            <el-form-item label="Custom Alert Template">
+            <el-form-item :label="$t('services.labelAlertTemplate')">
               <el-input
                 v-model="form.custom_alert_template"
-                placeholder="{service_name} is down! {impact_description}"
+                :placeholder="$t('services.placeholderAlertTemplate')"
               />
               <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                Variables: {service_name}, {host}, {port}, {risk_level}, {down_time}, {impact_description}
+                {{ $t('services.hintAlertVars') }}
               </div>
             </el-form-item>
           </el-col>
         </el-row>
 
         <!-- Dependencies Configuration -->
-        <el-divider content-position="left">Dependencies (Optional)</el-divider>
+        <el-divider content-position="left">{{ $t('services.dividerDeps') }}</el-divider>
         
         <!-- Existing Dependencies Table -->
         <div v-if="serviceDependencies.length > 0" class="dependencies-table">
@@ -964,32 +964,32 @@
               <template #default="scope">
                 <div style="padding: 12px 20px; background: #fafafa;">
                   <el-form label-position="top" size="small">
-                    <el-form-item label="Impact Description" style="margin-bottom: 12px;">
+                    <el-form-item :label="$t('services.labelImpactDesc')" style="margin-bottom: 12px;">
                       <el-input
                         :model-value="scope.row.impact_description"
                         type="textarea"
                         :rows="2"
-                        placeholder="Describe the impact when this dependency is down, e.g., Database outage will cause all data read/write to fail..."
+                        :placeholder="$t('services.placeholderDepImpact')"
                         @input="(val) => { scope.row.impact_description = val; }"
                         @blur="updateDependencyInList(scope.$index, 'impact_description', scope.row.impact_description)"
                       />
                     </el-form-item>
-                    <el-form-item label="Custom Alert Template" style="margin-bottom: 0;">
+                    <el-form-item :label="$t('services.labelAlertTemplate')" style="margin-bottom: 0;">
                       <el-input
                         :model-value="scope.row.custom_alert_template"
-                        placeholder="{service_name} is down, affecting {affected_count} services"
+                        :placeholder="$t('services.placeholderDepAlertTemplate')"
                         @input="(val) => { scope.row.custom_alert_template = val; }"
                         @blur="updateDependencyInList(scope.$index, 'custom_alert_template', scope.row.custom_alert_template)"
                       />
                       <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-                        支持变量: {service_name}, {affected_count}, {risk_level}, {down_time}
+                        {{ $t('services.hintDepAlertVars') }}
                       </div>
                     </el-form-item>
                   </el-form>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="Target Service" min-width="180">
+            <el-table-column :label="$t('services.colTargetService')" min-width="180">
               <template #default="scope">
                 <div style="display: flex; align-items: center; gap: 6px;">
                   <el-tag 
@@ -1003,7 +1003,7 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="Type" width="120">
+            <el-table-column :label="$t('common.type')" width="120">
               <template #default="scope">
                 <el-select 
                   v-model="scope.row.dependency_type" 
@@ -1019,23 +1019,23 @@
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="Risk" width="100">
+            <el-table-column :label="$t('services.colRisk')" width="100">
               <template #default="scope">
                 <el-select 
                   v-model="scope.row.risk_level" 
                   size="small"
                   @change="updateDependencyInList(scope.$index, 'risk_level', scope.row.risk_level)"
                 >
-                  <el-option label="Low" value="low" />
-                  <el-option label="Medium" value="medium" />
-                  <el-option label="High" value="high" />
-                  <el-option label="Critical" value="critical" />
+                  <el-option :label="$t('services.riskLowSimple')" value="low" />
+                  <el-option :label="$t('services.riskMediumSimple')" value="medium" />
+                  <el-option :label="$t('services.riskHighSimple')" value="high" />
+                  <el-option :label="$t('services.riskCriticalSimple')" value="critical" />
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="Alert" width="60">
+            <el-table-column :label="$t('services.colAlerts')" width="60">
               <template #default="scope">
-                <el-tooltip :content="scope.row.impact_description || scope.row.custom_alert_template ? 'Has custom alert config' : 'No custom alert config'" placement="top">
+                <el-tooltip :content="scope.row.impact_description || scope.row.custom_alert_template ? $t('services.hasCustomAlertConfig') : $t('services.noCustomAlertConfig')" placement="top">
                   <el-icon :style="{ color: (scope.row.impact_description || scope.row.custom_alert_template) ? '#67c23a' : '#c0c4cc' }">
                     <Bell v-if="scope.row.impact_description || scope.row.custom_alert_template" />
                     <Notification v-else />
@@ -1058,7 +1058,7 @@
           <el-col :span="10">
             <el-select 
               v-model="newDependency.target_service_id" 
-              placeholder="Select service to depend on" 
+              :placeholder="$t('services.placeholderSelectService')" 
               style="width: 100%;"
               filterable
             >
@@ -1077,7 +1077,7 @@
             </el-select>
           </el-col>
           <el-col :span="6">
-            <el-select v-model="newDependency.dependency_type" placeholder="Type" style="width: 100%;">
+            <el-select v-model="newDependency.dependency_type" :placeholder="$t('services.placeholderDepType')" style="width: 100%;">
               <el-option 
                 v-for="type in dependencyTypes" 
                 :key="type.name" 
@@ -1087,11 +1087,11 @@
             </el-select>
           </el-col>
           <el-col :span="5">
-            <el-select v-model="newDependency.risk_level" placeholder="Risk" style="width: 100%;">
-              <el-option label="Low" value="low" />
-              <el-option label="Medium" value="medium" />
-              <el-option label="High" value="high" />
-              <el-option label="Critical" value="critical" />
+            <el-select v-model="newDependency.risk_level" :placeholder="$t('services.colRisk')" style="width: 100%;">
+              <el-option :label="$t('services.riskLowSimple')" value="low" />
+              <el-option :label="$t('services.riskMediumSimple')" value="medium" />
+              <el-option :label="$t('services.riskHighSimple')" value="high" />
+              <el-option :label="$t('services.riskCriticalSimple')" value="critical" />
             </el-select>
           </el-col>
           <el-col :span="3">
@@ -1104,8 +1104,8 @@
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">Cancel</el-button>
-          <el-button type="primary" @click="handleSubmit">{{ isEdit ? 'Update' : 'Create' }}</el-button>
+          <el-button @click="dialogVisible = false">{{ $t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="handleSubmit">{{ isEdit ? $t('common.update') : $t('common.create') }}</el-button>
         </span>
       </template>
     </el-dialog>
@@ -1113,7 +1113,7 @@
     <!-- Batch Edit Dialog -->
     <el-dialog 
       v-model="batchEditDialogVisible" 
-      title="Batch Edit Services" 
+      :title="$t('services.batchEditTitle')" 
       width="600px">
       <el-alert
         type="info"
@@ -1121,127 +1121,127 @@
         show-icon
         style="margin-bottom: 20px">
         <template #title>
-          <span style="font-size: 13px;">Editing {{ selectedServices.length }} service(s). Only fields you modify will be updated.</span>
+          <span style="font-size: 13px;">{{ $t('services.batchEditInfo', { n: selectedServices.length }) }}</span>
         </template>
       </el-alert>
 
       <el-form :model="batchEditForm" label-width="160px">
-        <el-form-item label="Check Interval">
+        <el-form-item :label="$t('services.labelCheckInterval')">
           <el-alert
             type="warning"
             :closable="false"
             style="margin-bottom: 8px; font-size: 12px;">
-            <span>Note: This will update services to Fixed Interval schedule mode.</span>
+            <span>{{ $t('services.batchIntervalNote') }}</span>
           </el-alert>
           <el-input-number 
             v-model="batchEditForm.check_interval" 
             :min="10" 
             :max="3600" 
-            placeholder="Leave empty to keep current"
+            :placeholder="$t('services.placeholderKeepCurrent')"
             clearable
             style="width: 100%;" />
-          <div class="form-tip">seconds (10-3600)</div>
+          <div class="form-tip">{{ $t('services.tipCheckInterval') }}</div>
         </el-form-item>
 
-        <el-form-item label="Warning Threshold">
+        <el-form-item :label="$t('services.labelWarnThreshold')">
           <el-input-number 
             v-model="batchEditForm.warning_threshold" 
             :min="1" 
             :max="30"
-            placeholder="Leave empty to keep current"
+            :placeholder="$t('services.placeholderKeepCurrent')"
             clearable
             style="width: 100%;" />
-          <div class="form-tip">consecutive failures (1-30)</div>
+          <div class="form-tip">{{ $t('services.tipWarnThreshold') }}</div>
         </el-form-item>
 
-        <el-form-item label="Error Threshold">
+        <el-form-item :label="$t('services.labelErrorThreshold')">
           <el-input-number 
             v-model="batchEditForm.error_threshold" 
             :min="1" 
             :max="50"
-            placeholder="Leave empty to keep current"
+            :placeholder="$t('services.placeholderKeepCurrent')"
             clearable
             style="width: 100%;" />
-          <div class="form-tip">consecutive failures (1-50)</div>
+          <div class="form-tip">{{ $t('services.tipErrorThreshold') }}</div>
         </el-form-item>
 
-        <el-form-item label="Risk Level">
+        <el-form-item :label="$t('services.labelRiskLevel')">
           <el-select 
             v-model="batchEditForm.risk_level" 
-            placeholder="Leave empty to keep current"
+            :placeholder="$t('services.placeholderKeepCurrent')"
             clearable
             style="width: 100%;">
-            <el-option label="Low" value="low" />
-            <el-option label="Medium" value="medium" />
-            <el-option label="High" value="high" />
-            <el-option label="Critical" value="critical" />
+            <el-option :label="$t('services.riskLowSimple')" value="low" />
+            <el-option :label="$t('services.riskMediumSimple')" value="medium" />
+            <el-option :label="$t('services.riskHighSimple')" value="high" />
+            <el-option :label="$t('services.riskCriticalSimple')" value="critical" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="Service Enabled">
+        <el-form-item :label="$t('services.labelServiceEnabled')">
           <el-select 
             v-model="batchEditForm.enabled" 
-            placeholder="Leave empty to keep current"
+            :placeholder="$t('services.placeholderKeepCurrent')"
             clearable
             style="width: 100%;">
-            <el-option label="Enabled" :value="true" />
-            <el-option label="Disabled" :value="false" />
+            <el-option :label="$t('common.enabled')" :value="true" />
+            <el-option :label="$t('common.disabled')" :value="false" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="Alert Enabled">
+        <el-form-item :label="$t('services.labelAlertEnabled')">
           <el-select 
             v-model="batchEditForm.alert_enabled" 
-            placeholder="Leave empty to keep current"
+            :placeholder="$t('services.placeholderKeepCurrent')"
             clearable
             style="width: 100%;">
-            <el-option label="Enabled" :value="true" />
-            <el-option label="Disabled" :value="false" />
+            <el-option :label="$t('common.enabled')" :value="true" />
+            <el-option :label="$t('common.disabled')" :value="false" />
           </el-select>
         </el-form-item>
       </el-form>
 
       <template #footer>
-        <el-button @click="batchEditDialogVisible = false">Cancel</el-button>
-        <el-button type="primary" @click="submitBatchEdit">Update {{ selectedServices.length }} Service(s)</el-button>
+        <el-button @click="batchEditDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="submitBatchEdit">{{ $t('services.btnUpdateN', { n: selectedServices.length }) }}</el-button>
       </template>
     </el-dialog>
 
     <!-- Check Details Dialog -->
     <el-dialog
       v-model="checkDetailsVisible"
-      title="Check Result Details"
+      :title="$t('services.checkDetailsTitle')"
       width="600px"
     >
       <div v-if="currentCheckDetails">
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="Status">
+          <el-descriptions-item :label="$t('common.status')">
             <StatusBadge :status="currentCheckDetails.status" />
           </el-descriptions-item>
-          <el-descriptions-item label="Response Time">{{ currentCheckDetails.response_time }}ms</el-descriptions-item>
-          <el-descriptions-item label="Checked At">{{ formatTime(currentCheckDetails.checked_at) }}</el-descriptions-item>
-          <el-descriptions-item label="Message" v-if="currentCheckDetails.error_message">
+          <el-descriptions-item :label="$t('services.colResponse')">{{ currentCheckDetails.response_time }}ms</el-descriptions-item>
+          <el-descriptions-item :label="$t('services.colLastCheck')">{{ formatTime(currentCheckDetails.checked_at) }}</el-descriptions-item>
+          <el-descriptions-item :label="$t('services.checkMessage')" v-if="currentCheckDetails.error_message">
             <span class="text-error">{{ currentCheckDetails.error_message }}</span>
           </el-descriptions-item>
         </el-descriptions>
 
         <div v-if="currentCheckDetails.output" style="margin-top: 20px;">
-          <h4>Output</h4>
+          <h4>{{ $t('services.checkOutput') }}</h4>
           <pre style="background: #f5f7fa; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap;">{{ currentCheckDetails.output }}</pre>
         </div>
 
         <div v-if="currentCheckDetails.stdout" style="margin-top: 20px;">
-          <h4>Standard Output</h4>
+          <h4>{{ $t('services.checkStdout') }}</h4>
           <pre style="background: #f5f7fa; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap;">{{ currentCheckDetails.stdout }}</pre>
         </div>
 
         <div v-if="currentCheckDetails.stderr" style="margin-top: 20px;">
-          <h4>Standard Error</h4>
+          <h4>{{ $t('services.checkStderr') }}</h4>
           <pre style="background: #fff0f0; padding: 10px; border-radius: 4px; overflow-x: auto; color: #f56c6c; white-space: pre-wrap;">{{ currentCheckDetails.stderr }}</pre>
         </div>
         
         <div v-if="currentCheckDetails.details" style="margin-top: 20px;">
-           <h4>Details</h4>
+           <h4>{{ $t('services.checkDetails') }}</h4>
            <pre style="background: #f5f7fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px;">{{ JSON.stringify(currentCheckDetails.details, null, 2) }}</pre>
         </div>
       </div>
@@ -1287,6 +1287,7 @@ import type { ScheduleConfig } from '../types/schedule';
 import { getHosts } from '../api/hosts';
 import * as hostsApi from '../api/hosts';
 import type { Host, CreateHostDto } from '../types/host';
+import { useI18n } from 'vue-i18n';
 
 // Props
 const props = withDefaults(defineProps<{
@@ -1304,6 +1305,7 @@ const props = withDefaults(defineProps<{
 // Router
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 
 // Manual check loading state
 const runningChecks = ref<Set<string>>(new Set());
@@ -1331,11 +1333,12 @@ async function handleRunCheck(service: any) {
     const result = await runCheck(service.id);
     const statusMap: Record<string, string> = { up: 'success', down: 'error', warning: 'warning' };
     const msgType = (statusMap[result.status] || 'info') as 'success' | 'error' | 'warning' | 'info';
-    ElMessage[msgType](`${service.name}: ${result.status.toUpperCase()}${ result.response_time ? ` (${result.response_time}ms)` : '' }`);
+    const statusLabel = t(`statusLabels.${result.status}`) || result.status.toUpperCase();
+    ElMessage[msgType](`${service.name}: ${statusLabel}${ result.response_time ? ` (${result.response_time}ms)` : '' }`);
     // Refresh service list to show updated status
     await fetchServices();
   } catch (e: any) {
-    ElMessage.error(`Check failed: ${e.response?.data?.error || e.message}`);
+    ElMessage.error(t('services.msgCheckFailed', { error: e.response?.data?.error || e.message }));
   } finally {
     const next = new Set(runningChecks.value);
     next.delete(service.id);
@@ -1468,7 +1471,7 @@ const viewCheckDetails = async (service: any) => {
     if (!service) return;
     const serviceId = service.id || service.service_id;
     if (!serviceId) {
-        ElMessage.warning('No check records available');
+        ElMessage.warning(t('services.noCheckRecords'));
         return;
     }
     currentDetailsServiceId.value = serviceId;
@@ -1479,7 +1482,7 @@ const viewCheckDetails = async (service: any) => {
         const fresh = await getLatestCheck(serviceId);
         currentCheckDetails.value = fresh;
     } catch (_) {
-        if (!currentCheckDetails.value) ElMessage.warning('No check records available');
+        if (!currentCheckDetails.value) ElMessage.warning(t('services.noCheckRecords'));
     }
 };
 
@@ -1897,7 +1900,7 @@ const fetchServices = async () => {
     }));
     services.value = servicesWithStatus;
   } catch (error) {
-    ElMessage.error('Failed to fetch services');
+    ElMessage.error(t('services.msgOperationFailed'));
   } finally {
     loading.value = false;
   }
@@ -2213,7 +2216,7 @@ const handleAdd = () => {
       if (projectId) {
         form.project_id = projectId;
       }
-      ElMessage.success(`Pre-filled with host: ${host.name}`);
+      ElMessage.success(t('services.msgHostPrefilled', { name: host.name }));
       
       // Clear query parameters after using them
       if (route.path === '/services') {
@@ -2368,7 +2371,7 @@ const handleCopy = async (row: Service) => {
   currentId.value = row.id; // Set to source service ID for data loading
   wizardDialogVisible.value = true;
   
-  ElMessage.info('Service copied. Modify and save as new service.');
+  ElMessage.info(t('services.msgCopied'));
 };
 
 const handleEdit = async (row: Service) => {
@@ -2431,7 +2434,7 @@ const handleEdit = async (row: Service) => {
     const supportedCheckTypes = ['tcp', 'http', 'https', 'script', 'file', 'log'];
     if (!supportedCheckTypes.includes(form.check_type as string)) {
       form.check_type = 'tcp';
-      ElMessage.warning('Check Type 当前版本不支持,已切换为 TCP。');
+      ElMessage.warning(t('services.msgCheckTypeUnsupported'));
     }
     
     console.log('✅ Step 4: Check type validated');
@@ -2580,7 +2583,7 @@ const handleEdit = async (row: Service) => {
     console.log('🎉 handleEdit completed successfully!');
   } catch (error) {
     console.error('❌ Error in handleEdit:', error);
-    ElMessage.error('Failed to open edit dialog: ' + (error as Error).message);
+    ElMessage.error(t('services.msgOperationFailed'));
   }
 };
 
@@ -2614,7 +2617,7 @@ const handleToggleMonitoring = async (service: Service) => {
       updates: { enabled: newStatus }
     });
   } catch (error: any) {
-    ElMessage.error('Failed to update monitoring status: ' + error.message);
+    ElMessage.error(t('services.msgMonitorFailed'));
     // Revert the switch on error
     service.enabled = service.enabled === 1 ? 0 : 1;
   }
@@ -2628,7 +2631,7 @@ const handleToggleAlerts = async (service: Service) => {
       updates: { alert_enabled: newStatus }
     });
   } catch (error: any) {
-    ElMessage.error('Failed to update alert status: ' + error.message);
+    ElMessage.error(t('services.msgAlertStatusFailed'));
     // Revert the switch on error
     service.alert_enabled = service.alert_enabled === 1 ? 0 : 1;
   }
@@ -2641,11 +2644,11 @@ const handleBatchEnable = async () => {
       serviceIds,
       updates: { enabled: 1 }
     });
-    ElMessage.success(`Enabled ${serviceIds.length} service(s)`);
+    ElMessage.success(t('services.msgEnabledN', { n: serviceIds.length }));
     await fetchServices();
     clearSelection();
   } catch (error: any) {
-    ElMessage.error('Failed to enable services: ' + error.message);
+    ElMessage.error(t('services.msgEnableFailed'));
   }
 };
 
@@ -2656,31 +2659,31 @@ const handleBatchDisable = async () => {
       serviceIds,
       updates: { enabled: 0 }
     });
-    ElMessage.success(`Disabled ${serviceIds.length} service(s)`);
+    ElMessage.success(t('services.msgDisabledN', { n: serviceIds.length }));
     await fetchServices();
     clearSelection();
   } catch (error: any) {
-    ElMessage.error('Failed to disable services: ' + error.message);
+    ElMessage.error(t('services.msgDisableFailed'));
   }
 };
 
 const handleDelete = (row: Service) => {
   ElMessageBox.confirm(
-    `Are you sure you want to delete service "${row.name}"? This action cannot be undone.`,
-    'Confirm Delete',
+    t('services.confirmDeleteMsg', { name: row.name }),
+    t('services.confirmDeleteTitle'),
     {
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: t('common.delete'),
+      cancelButtonText: t('common.cancel'),
       type: 'warning',
       confirmButtonClass: 'el-button--danger'
     }
   ).then(async () => {
     try {
       await deleteService(row.id);
-      ElMessage.success('Delete completed');
+      ElMessage.success(t('services.msgDeleteDone'));
       fetchServices();
     } catch (error) {
-      ElMessage.error('Delete failed');
+      ElMessage.error(t('services.msgDeleteFailed'));
     }
   }).catch(() => {
     // User cancelled
@@ -2689,11 +2692,11 @@ const handleDelete = (row: Service) => {
 
 const handleBatchDelete = () => {
   ElMessageBox.confirm(
-    `Are you sure you want to delete ${selectedServices.value.length} selected service(s)? This action cannot be undone.`,
-    'Confirm Batch Delete',
+    t('services.confirmBatchDeleteMsg', { n: selectedServices.value.length }),
+    t('services.confirmBatchDeleteTitle'),
     {
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: t('common.delete'),
+      cancelButtonText: t('common.cancel'),
       type: 'warning',
       confirmButtonClass: 'el-button--danger'
     }
@@ -2703,11 +2706,11 @@ const handleBatchDelete = () => {
         deleteService(service.id)
       );
       await Promise.all(promises);
-      ElMessage.success(`Deleted ${selectedServices.value.length} service(s)`);
+      ElMessage.success(t('services.msgDeleteDone'));
       await fetchServices();
       clearSelection();
     } catch (error: any) {
-      ElMessage.error('Failed to delete services: ' + error.message);
+      ElMessage.error(t('services.msgDeleteFailed'));
     }
   }).catch(() => {
     // User cancelled
@@ -2726,19 +2729,19 @@ const submitBatchEdit = async () => {
     if (batchEditForm.value.alert_enabled !== null) updates.alert_enabled = batchEditForm.value.alert_enabled ? 1 : 0;
     
     if (Object.keys(updates).length === 0) {
-      ElMessage.warning('Please select at least one field to update');
+      ElMessage.warning(t('services.msgBatchSelectField'));
       return;
     }
     
     const serviceIds = selectedServices.value.map(s => s.id);
     const response = await api.patch('/services/batch', { serviceIds, updates });
     
-    ElMessage.success(response.data.message || `Updated ${serviceIds.length} service(s)`);
+    ElMessage.success(t('services.msgUpdated'));
     batchEditDialogVisible.value = false;
     await fetchServices();
     clearSelection();
   } catch (error: any) {
-    ElMessage.error('Failed to update services: ' + (error.response?.data?.error || error.message));
+    ElMessage.error(t('services.msgOperationFailed'));
   }
 };
 
@@ -2852,10 +2855,10 @@ const handleSubmit = async () => {
         await axios.put(`/api/services/${serviceId}/schedule`, scheduleConfig.value);
       } catch (scheduleError: any) {
         console.error('Failed to update schedule configuration:', scheduleError);
-        ElMessage.warning('Service updated but schedule configuration failed to save');
+        ElMessage.warning(t('services.msgScheduleFailed'));
       }
       
-      ElMessage.success('Service updated successfully');
+      ElMessage.success(t('services.msgUpdated'));
     } else {
       const created = await createService(data);
       serviceId = created.id;
@@ -2878,10 +2881,10 @@ const handleSubmit = async () => {
         await axios.put(`/api/services/${serviceId}/schedule`, scheduleConfig.value);
       } catch (scheduleError: any) {
         console.error('Failed to set schedule configuration:', scheduleError);
-        ElMessage.warning('Service created but schedule configuration failed to save');
+        ElMessage.warning(t('services.msgScheduleFailed'));
       }
       
-      ElMessage.success('Service created successfully');
+      ElMessage.success(t('services.msgCreated'));
     }
     
     dialogVisible.value = false;
@@ -2891,9 +2894,9 @@ const handleSubmit = async () => {
   } catch (error: any) {
     // Handle duplicate name error
     if (error?.response?.data?.code === 'DUPLICATE_NAME') {
-      ElMessage.error('Service name already exists in this project. Please use a different name.');
+      ElMessage.error(t('services.msgNameExists'));
     } else {
-      ElMessage.error(error?.response?.data?.error || 'Operation failed');
+      ElMessage.error(error?.response?.data?.error || t('services.msgOperationFailed'));
     }
   }
 };
@@ -2928,7 +2931,7 @@ const handleWizardSubmit = async (submitData: any, dependencies: any[]) => {
     if (isEdit.value && currentId.value) {
       await updateService(currentId.value, data);
       serviceId = currentId.value;
-      ElMessage.success('Service updated successfully');
+      ElMessage.success(t('services.msgUpdated'));
       
       // Handle dependencies for edit mode: delete removed, create new
       const existingDeps = dependencies.filter(d => d.isExisting && d.id);
@@ -2962,7 +2965,7 @@ const handleWizardSubmit = async (submitData: any, dependencies: any[]) => {
     } else {
       const created = await createService(data);
       serviceId = created.id;
-      ElMessage.success('Service created successfully');
+      ElMessage.success(t('services.msgCreated'));
       
       // Create all dependencies for new service
       for (const dep of dependencies) {
@@ -2980,7 +2983,7 @@ const handleWizardSubmit = async (submitData: any, dependencies: any[]) => {
       await axios.put(`/api/services/${serviceId}/schedule`, scheduleData);
     } catch (scheduleError: any) {
       console.error('Failed to set schedule configuration:', scheduleError);
-      ElMessage.warning('Service saved but schedule configuration failed');
+      ElMessage.warning(t('services.msgScheduleFailed'));
     }
     
     wizardDialogVisible.value = false;
@@ -2989,9 +2992,9 @@ const handleWizardSubmit = async (submitData: any, dependencies: any[]) => {
     fetchAllServices();
   } catch (error: any) {
     if (error?.response?.data?.code === 'DUPLICATE_NAME') {
-      ElMessage.error('Service name already exists in this project. Please use a different name.');
+      ElMessage.error(t('services.msgNameExists'));
     } else {
-      ElMessage.error(error?.response?.data?.error || 'Operation failed');
+      ElMessage.error(error?.response?.data?.error || t('services.msgOperationFailed'));
     }
   }
 };
@@ -3015,7 +3018,7 @@ const handleExport = async () => {
     link.click();
     document.body.removeChild(link);
   } catch (error) {
-    ElMessage.error('Export failed');
+    ElMessage.error(t('services.msgExportFailed'));
   }
 };
 
@@ -3025,10 +3028,10 @@ const handleImport = async (file: File) => {
     try {
       const json = JSON.parse(e.target?.result as string);
       await axios.post('/api/services/import', json);
-      ElMessage.success('Import successful');
+      ElMessage.success(t('services.msgImportSuccess'));
       fetchServices();
     } catch (error) {
-      ElMessage.error('Import failed: Invalid JSON or server error');
+      ElMessage.error(t('services.msgImportFailed'));
     }
   };
   reader.readAsText(file);

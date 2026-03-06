@@ -11,13 +11,14 @@
       </el-checkbox-button>
     </el-checkbox-group>
     <div v-if="!selectedDays || selectedDays.length === 0" class="hint">
-      <el-text size="small" type="info">Empty means all days are active</el-text>
+      <el-text size="small" type="info">{{ $t('weekday.hintEmpty') }}</el-text>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const props = defineProps<{
   modelValue?: number[];
@@ -28,15 +29,17 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: number[] | undefined): void;
 }>();
 
-const weekdays = [
-  { label: 'Mon', value: 1 },
-  { label: 'Tue', value: 2 },
-  { label: 'Wed', value: 3 },
-  { label: 'Thu', value: 4 },
-  { label: 'Fri', value: 5 },
-  { label: 'Sat', value: 6 },
-  { label: 'Sun', value: 7 }
-];
+const { t } = useI18n();
+
+const weekdays = computed(() => [
+  { label: t('weekday.mon'), value: 1 },
+  { label: t('weekday.tue'), value: 2 },
+  { label: t('weekday.wed'), value: 3 },
+  { label: t('weekday.thu'), value: 4 },
+  { label: t('weekday.fri'), value: 5 },
+  { label: t('weekday.sat'), value: 6 },
+  { label: t('weekday.sun'), value: 7 }
+]);
 
 const selectedDays = ref<number[]>(props.modelValue || []);
 

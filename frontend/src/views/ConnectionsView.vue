@@ -2,67 +2,67 @@
   <div class="connections-view">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Connections</h1>
-        <p class="page-desc">SSH / connection profiles (view scoped to project if selected)</p>
+        <h1 class="page-title">{{ $t('connections.title') }}</h1>
+        <p class="page-desc">{{ $t('connections.subtitle') }}</p>
       </div>
       <div>
-        <el-button type="primary" :icon="Plus" @click="showAddConnection = true">Add Connection</el-button>
+        <el-button type="primary" :icon="Plus" @click="showAddConnection = true">{{ $t('connections.btnAdd') }}</el-button>
       </div>
     </div>
 
     <!-- Filter/Stats Bar if needed -->
     <div class="filter-bar">
       <div class="filter-item">
-        <span class="filter-label">Scope:</span>
-        <el-tag>{{ currentProjectId ? 'Project' : 'Global' }}</el-tag>
+        <span class="filter-label">{{ $t('connections.filterScope') }}</span>
+        <el-tag>{{ currentProjectId ? $t('connections.tagProject') : $t('connections.tagGlobal') }}</el-tag>
       </div>
     </div>
 
     <div class="table-container">
       <el-table :data="filteredConnections" style="width: 100%">
-        <el-table-column prop="name" label="Name" sortable />
-        <el-table-column prop="type" label="Type" width="150" />
-        <el-table-column prop="project" label="Project" width="200">
+        <el-table-column prop="name" :label="$t('connections.colName')" sortable />
+        <el-table-column prop="type" :label="$t('connections.colType')" width="150" />
+        <el-table-column prop="project" :label="$t('connections.colProject')" width="200">
           <template #default="scope">
-            {{ scope.row.project || 'Global' }}
+            {{ scope.row.project || $t('common.global') }}
           </template>
         </el-table-column>
-        <el-table-column prop="hostId" label="Associated Host" width="200">
+        <el-table-column prop="hostId" :label="$t('connections.colHost')" width="200">
            <template #default="scope">
              {{ getHostNameById(scope.row.hostId) || '-' }}
            </template>
         </el-table-column>
-        <el-table-column label="Actions" width="200" align="right">
+        <el-table-column :label="$t('common.actions')" width="200" align="right">
           <template #default="scope">
-            <el-button size="small" @click="openEditConnection(scope.row)">Edit</el-button>
-            <el-button size="small" type="danger" @click="confirmDeleteConnection(scope.row)">Delete</el-button>
+            <el-button size="small" @click="openEditConnection(scope.row)">{{ $t('common.edit') }}</el-button>
+            <el-button size="small" type="danger" @click="confirmDeleteConnection(scope.row)">{{ $t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
 
       <div v-if="filteredConnections.length === 0" class="empty-state">
-        <p>No connections found for current scope.</p>
+        <p>{{ $t('connections.emptyText') }}</p>
       </div>
     </div>
 
     <!-- Add/Edit Dialog -->
     <el-dialog 
       v-model="showAddConnection" 
-      :title="connectionForm.id ? 'Edit Connection' : 'Add Connection'"
+      :title="connectionForm.id ? $t('connections.titleEdit') : $t('connections.titleAdd')"
       width="600px"
       @close="resetForm">
       <el-form :model="connectionForm" label-width="120px">
-        <el-form-item label="Name">
-          <el-input v-model="connectionForm.name" placeholder="e.g. deploy-key-prod" />
+        <el-form-item :label="$t('connections.labelName')">
+          <el-input v-model="connectionForm.name" :placeholder="$t('connections.placeholderName')" />
         </el-form-item>
-        <el-form-item label="Type">
+        <el-form-item :label="$t('connections.labelType')">
           <el-select v-model="connectionForm.type" style="width: 100%">
-            <el-option label="SSH Key" value="ssh-key" />
-            <el-option label="Jump Host" value="jump-host" />
+            <el-option :label="$t('connections.typeSSHKey')" value="ssh-key" />
+            <el-option :label="$t('connections.typeJumpHost')" value="jump-host" />
           </el-select>
         </el-form-item>
-        <el-form-item label="Project (Optional)">
-           <el-select v-model="connectionForm.projectId" placeholder="Global (or select project)" clearable style="width: 100%">
+        <el-form-item :label="$t('connections.labelProject')">
+           <el-select v-model="connectionForm.projectId" :placeholder="$t('connections.placeholderProject')" clearable style="width: 100%">
              <el-option 
                v-for="p in projects" 
                :key="p.id" 
@@ -71,8 +71,8 @@
              />
            </el-select>
         </el-form-item>
-        <el-form-item label="Host (Optional)">
-           <el-select v-model="connectionForm.hostId" placeholder="Select host" clearable style="width: 100%">
+        <el-form-item :label="$t('connections.labelHost')">
+           <el-select v-model="connectionForm.hostId" :placeholder="$t('connections.placeholderHost')" clearable style="width: 100%">
              <el-option 
                v-for="h in hosts" 
                :key="h.id" 
@@ -81,18 +81,18 @@
              />
            </el-select>
         </el-form-item>
-        <el-form-item label="Details">
+        <el-form-item :label="$t('connections.labelDetails')">
           <el-input 
             v-model="connectionForm.details" 
             type="textarea" 
             :rows="4" 
-            placeholder="Key content or host details..." 
+            :placeholder="$t('connections.placeholderDetails')" 
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showAddConnection = false">Cancel</el-button>
-        <el-button type="primary" @click="saveConnection">Save</el-button>
+        <el-button @click="showAddConnection = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="saveConnection">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -100,6 +100,7 @@
 
 <script setup lang="ts">
 import { ref, computed, inject, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { Plus } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { getProjects, type ProjectWithStats } from '../api/projects'; // Reuse existing API types if possible
@@ -107,6 +108,7 @@ import hostsApi from '../api/hosts';
 import type { Host } from '../types/host';
 
 // Inject context
+const { t } = useI18n();
 const currentProjectId = inject('currentProjectId');
 
 // Mock Data State (Since no backend API exists for this specific entity yet)
@@ -172,7 +174,7 @@ const resetForm = () => {
 
 const saveConnection = () => {
     if (!connectionForm.value.name) {
-        ElMessage.warning('Name is required');
+        ElMessage.warning(t('connections.msgNameRequired'));
         return;
     }
     
@@ -189,23 +191,23 @@ const saveConnection = () => {
         const idx = connections.value.findIndex(c => c.id === connectionForm.value.id);
         if (idx !== -1) {
             connections.value[idx] = { ...connectionForm.value } as any;
-             ElMessage.success('Connection updated (Mock)');
+             ElMessage.success(t('connections.msgUpdated'));
         }
     } else {
         // Add
         const newId = Math.max(...connections.value.map(c => c.id), 0) + 1;
         connections.value.push({ ...connectionForm.value, id: newId } as any);
-        ElMessage.success('Connection added (Mock)');
+        ElMessage.success(t('connections.msgCreated'));
     }
     showAddConnection.value = false;
 };
 
 const confirmDeleteConnection = (row: any) => {
-    ElMessageBox.confirm(`Delete connection ${row.name}?`, 'Confirm', {
+    ElMessageBox.confirm(t('connections.confirmDeleteMsg', { name: row.name }), t('connections.confirmDeleteTitle'), {
         type: 'warning'
     }).then(() => {
         connections.value = connections.value.filter(c => c.id !== row.id);
-        ElMessage.success('Connection deleted (Mock)');
+        ElMessage.success(t('connections.msgDeleted'));
     }).catch(() => {});
 };
 </script>

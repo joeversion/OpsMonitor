@@ -12,21 +12,21 @@
             <Icon v-if="isIconifyIcon(modelValue)" :icon="modelValue" :width="20" />
             <span v-else>{{ modelValue || '🔧' }}</span>
           </span>
-          <span class="icon-label">{{ modelValue ? 'Change Icon' : 'Select Icon' }}</span>
+          <span class="icon-label">{{ modelValue ? $t('iconSelector.changeIcon') : $t('iconSelector.selectIcon') }}</span>
           <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
         </div>
       </template>
       
       <div class="icon-picker">
         <div class="icon-picker-header">
-          <span>Select an Icon</span>
+          <span>{{ $t('iconSelector.dialogTitle') }}</span>
           <el-button 
             v-if="modelValue" 
             size="small" 
             text 
             @click="handleClear"
           >
-            Clear
+            {{ $t('iconSelector.btnClear') }}
           </el-button>
         </div>
         
@@ -59,9 +59,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 import { ArrowDown } from '@element-plus/icons-vue';
 import { Icon } from '@iconify/vue';
+import { useI18n } from 'vue-i18n';
 
 const props = defineProps<{
   modelValue?: string;
@@ -72,15 +73,16 @@ const emit = defineEmits<{
 }>();
 
 const activeCategory = ref('database');
+const { t } = useI18n();
 
 const isIconifyIcon = (value?: string) => {
   return value && value.includes(':');
 };
 
-const categories = [
+const categories = computed(() => [
   {
     name: 'database',
-    label: 'Databases',
+    label: t('iconSelector.tabDatabases'),
     type: 'iconify',
     icons: [
       { value: 'logos:mysql', label: 'MySQL' },
@@ -99,7 +101,7 @@ const categories = [
   },
   {
     name: 'web',
-    label: 'Web & API',
+    label: t('iconSelector.tabWebApi'),
     type: 'iconify',
     icons: [
       { value: 'logos:nginx', label: 'Nginx' },
@@ -119,7 +121,7 @@ const categories = [
   },
   {
     name: 'messaging',
-    label: 'Messaging',
+    label: t('iconSelector.tabMessaging'),
     type: 'iconify',
     icons: [
       { value: 'logos:kafka-icon', label: 'Kafka' },
@@ -134,7 +136,7 @@ const categories = [
   },
   {
     name: 'infra',
-    label: 'Infrastructure',
+    label: t('iconSelector.tabInfra'),
     type: 'iconify',
     icons: [
       { value: 'logos:docker-icon', label: 'Docker' },
@@ -153,7 +155,7 @@ const categories = [
   },
   {
     name: 'cloud',
-    label: 'Cloud',
+    label: t('iconSelector.tabCloud'),
     type: 'iconify',
     icons: [
       { value: 'logos:aws', label: 'AWS' },
@@ -168,7 +170,7 @@ const categories = [
   },
   {
     name: 'monitoring',
-    label: 'Monitoring',
+    label: t('iconSelector.tabMonitoring'),
     type: 'iconify',
     icons: [
       { value: 'logos:prometheus', label: 'Prometheus' },
@@ -183,7 +185,7 @@ const categories = [
   },
   {
     name: 'cache',
-    label: 'Cache & Search',
+    label: t('iconSelector.tabCacheSearch'),
     type: 'iconify',
     icons: [
       { value: 'logos:redis', label: 'Redis' },
@@ -195,31 +197,31 @@ const categories = [
   },
   {
     name: 'emoji',
-    label: 'Emoji',
+    label: t('iconSelector.tabEmoji'),
     type: 'emoji',
     icons: [
-      { value: '🌐', label: 'Web' },
-      { value: '⚙️', label: 'Service' },
-      { value: '🗄️', label: 'Database' },
-      { value: '📨', label: 'Message' },
-      { value: '☁️', label: 'Cloud' },
-      { value: '🔧', label: 'Tool' },
-      { value: '📊', label: 'Monitor' },
-      { value: '🔐', label: 'Security' },
-      { value: '⚡', label: 'Fast' },
-      { value: '🚀', label: 'Launch' },
-      { value: '💾', label: 'Storage' },
-      { value: '🔗', label: 'Link' },
-      { value: '📦', label: 'Package' },
-      { value: '🛡️', label: 'Shield' },
-      { value: '🔔', label: 'Alert' },
-      { value: '👁️', label: 'Watch' }
+      { value: '🌐', label: t('iconSelector.emojiWeb') },
+      { value: '⚙️', label: t('iconSelector.emojiService') },
+      { value: '🗄️', label: t('iconSelector.emojiDatabase') },
+      { value: '📨', label: t('iconSelector.emojiMessage') },
+      { value: '☁️', label: t('iconSelector.emojiCloud') },
+      { value: '🔧', label: t('iconSelector.emojiTool') },
+      { value: '📊', label: t('iconSelector.emojiMonitor') },
+      { value: '🔐', label: t('iconSelector.emojiSecurity') },
+      { value: '⚡', label: t('iconSelector.emojiFast') },
+      { value: '🚀', label: t('iconSelector.emojiLaunch') },
+      { value: '💾', label: t('iconSelector.emojiStorage') },
+      { value: '🔗', label: t('iconSelector.emojiLink') },
+      { value: '📦', label: t('iconSelector.emojiPackage') },
+      { value: '🛡️', label: t('iconSelector.emojiShield') },
+      { value: '🔔', label: t('iconSelector.emojiAlert') },
+      { value: '👁️', label: t('iconSelector.emojiWatch') }
     ]
   }
-];
+]);
 
 const findCategoryForIcon = (icon: string): string | null => {
-  for (const category of categories) {
+  for (const category of categories.value) {
     if (category.icons.some(item => item.value === icon)) {
       return category.name;
     }

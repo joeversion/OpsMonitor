@@ -8,7 +8,7 @@
       <el-aside :width="isCollapsed ? '64px' : '220px'" class="sidebar-aside">
         <div class="logo-container">
           <el-icon :size="24"><Monitor /></el-icon>
-          <span v-show="!isCollapsed">OpsMonitor</span>
+          <span v-show="!isCollapsed">{{ $t('app.brand') }}</span>
         </div>
         
         <!-- Project Selector -->
@@ -22,58 +22,58 @@
         
         <el-menu router :default-active="$route.path" class="sidebar-menu" :collapse="isCollapsed">
           <!-- ANALYZE Group -->
-          <div class="menu-group-title" v-show="!isCollapsed">ANALYZE</div>
+          <div class="menu-group-title" v-show="!isCollapsed">{{ $t('app.menuAnalyze') }}</div>
           <el-menu-item index="/" class="enhanced-menu-item">
             <el-icon><Odometer /></el-icon>
             <template #title>
-              <span>Overview</span>
+              <span>{{ $t('app.menuOverview') }}</span>
             </template>
           </el-menu-item>
           <el-menu-item index="/graph" class="enhanced-menu-item">
             <el-icon><Share /></el-icon>
             <template #title>
-              <span>Topology</span>
+              <span>{{ $t('app.menuTopology') }}</span>
             </template>
           </el-menu-item>
           <el-menu-item index="/grafana" class="enhanced-menu-item">
             <el-icon><DataBoard /></el-icon>
             <template #title>
-              <span>Metrics</span>
+              <span>{{ $t('app.menuMetrics') }}</span>
             </template>
           </el-menu-item>
           <el-menu-item index="/alerts" class="enhanced-menu-item">
             <el-icon><Bell /></el-icon>
             <template #title>
-              <span>Alerts</span>
+              <span>{{ $t('app.menuAlerts') }}</span>
             </template>
           </el-menu-item>
 
           <div class="menu-divider" v-show="!isCollapsed"></div>
 
           <!-- INFRASTRUCTURE Group -->
-          <div class="menu-group-title" v-show="!isCollapsed">INFRASTRUCTURE</div>
+          <div class="menu-group-title" v-show="!isCollapsed">{{ $t('app.menuInfra') }}</div>
           <el-menu-item index="/projects" class="enhanced-menu-item">
             <el-icon><FolderOpened /></el-icon>
             <template #title>
-              <span>Projects</span>
+              <span>{{ $t('app.menuProjects') }}</span>
             </template>
           </el-menu-item>
           <el-menu-item index="/hosts" class="enhanced-menu-item">
             <el-icon><Monitor /></el-icon>
             <template #title>
-              <span>Hosts</span>
+              <span>{{ $t('app.menuHosts') }}</span>
             </template>
           </el-menu-item>
           <el-menu-item index="/services" class="enhanced-menu-item">
             <el-icon><Box /></el-icon>
             <template #title>
-              <span>Services</span>
+              <span>{{ $t('app.menuServices') }}</span>
             </template>
           </el-menu-item>
           <el-menu-item index="/security" class="enhanced-menu-item">
             <el-icon><Key /></el-icon>
             <template #title>
-              <span>Security</span>
+              <span>{{ $t('app.menuSecurity') }}</span>
             </template>
           </el-menu-item>
           
@@ -83,13 +83,13 @@
           <el-menu-item index="/users" v-if="isAdmin" class="enhanced-menu-item">
             <el-icon><UserFilled /></el-icon>
             <template #title>
-              <span>Users</span>
+              <span>{{ $t('app.menuUsers') }}</span>
             </template>
           </el-menu-item>
           <el-menu-item index="/settings" class="enhanced-menu-item">
             <el-icon><Tools /></el-icon>
             <template #title>
-              <span>Settings</span>
+              <span>{{ $t('app.menuSettings') }}</span>
             </template>
           </el-menu-item>
         </el-menu>
@@ -108,13 +108,57 @@
             </el-breadcrumb>
           </div>
           <div class="header-right">
-            <el-badge :value="alertCount" :hidden="alertCount === 0" class="item">
-              <el-icon :size="20" style="cursor: pointer"><Bell /></el-icon>
-            </el-badge>
+            <el-popover
+              ref="alertPopoverRef"
+              placement="bottom-end"
+              :width="420"
+              trigger="click"
+              popper-class="alert-popover"
+              @show="onAlertPopoverShow"
+            >
+              <template #reference>
+                <el-badge :value="alertCount" :hidden="alertCount === 0" class="item alert-badge-item">
+                  <el-icon :size="20" style="cursor: pointer"><Bell /></el-icon>
+                </el-badge>
+              </template>
+              <div class="alert-popover-content">
+                <div class="alert-popover-header">
+                  <span class="alert-popover-title">{{ $t('app.alertPopoverTitle') }}</span>
+                </div>
+                <el-scrollbar max-height="360px">
+                  <div v-if="recentAlerts.length === 0" class="alert-empty">
+                    <el-empty :description="$t('app.alertNoAlerts')" :image-size="60" />
+                  </div>
+                  <div
+                    v-for="alert in recentAlerts"
+                    :key="alert.id"
+                    class="alert-item"
+                    :class="{ 'alert-item-unread': !alert.acknowledged }"
+                  >
+                    <div class="alert-item-icon">
+                      <span v-if="alert.type === 'down'">🔴</span>
+                      <span v-else-if="alert.type === 'recovery'">🟢</span>
+                      <span v-else-if="alert.type === 'warning'">🟡</span>
+                      <span v-else-if="alert.type === 'expiry'">🔐</span>
+                      <span v-else>🔔</span>
+                    </div>
+                    <div class="alert-item-body">
+                      <div class="alert-item-name">{{ alert.service_name || alert.security_config_name || '-' }}</div>
+                      <div class="alert-item-msg">{{ alert.message }}</div>
+                      <div class="alert-item-time">{{ formatAlertTime(alert.created_at) }}</div>
+                    </div>
+                  </div>
+                </el-scrollbar>
+                <div class="alert-popover-footer">
+                  <el-button link type="primary" @click="goToAlerts">{{ $t('app.alertViewAll') }}</el-button>
+                </div>
+              </div>
+            </el-popover>
+            <LangSwitch />
             <el-dropdown @command="handleUserCommand">
               <span class="el-dropdown-link">
                 <el-avatar :size="32" src="https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png" />
-                <span style="margin-left: 8px;">{{ currentUser?.username || 'User' }}</span>
+                <span style="margin-left: 8px;">{{ currentUser?.username || $t('app.defaultUser') }}</span>
                 <el-icon><ArrowDown /></el-icon>
               </span>
               <template #dropdown>
@@ -125,10 +169,10 @@
                     </el-tag>
                   </el-dropdown-item>
                   <el-dropdown-item command="profile" divided>
-                    <el-icon><User /></el-icon> Profile Settings
+                    <el-icon><User /></el-icon> {{ $t('app.profileSettings') }}
                   </el-dropdown-item>
                   <el-dropdown-item command="logout">
-                    <el-icon><SwitchButton /></el-icon> Logout
+                    <el-icon><SwitchButton /></el-icon> {{ $t('app.logout') }}
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -142,45 +186,45 @@
     </el-container>
 
     <!-- Profile Settings Dialog -->
-    <el-dialog v-model="showProfileDialog" title="Profile Settings" width="500px" :close-on-click-modal="false">
+    <el-dialog v-model="showProfileDialog" :title="$t('app.profileDialogTitle')" width="500px" :close-on-click-modal="false">
       <el-tabs v-model="profileActiveTab">
-        <el-tab-pane label="Profile Info" name="profile">
+        <el-tab-pane :label="$t('app.tabProfile')" name="profile">
           <el-form :model="profileForm" label-width="120px" style="padding-top: 10px;">
-            <el-form-item label="Username">
-              <el-input v-model="profileForm.username" placeholder="Enter new username" />
+            <el-form-item :label="$t('app.labelUsername')">
+              <el-input v-model="profileForm.username" :placeholder="$t('app.placeholderNewUsername')" />
             </el-form-item>
-            <el-form-item label="Email">
-              <el-input v-model="profileForm.email" type="email" placeholder="Enter new email" />
+            <el-form-item :label="$t('app.labelEmail')">
+              <el-input v-model="profileForm.email" type="email" :placeholder="$t('app.placeholderNewEmail')" />
             </el-form-item>
-            <el-form-item label="Role">
+            <el-form-item :label="$t('app.labelRole')">
               <el-tag :type="currentUser?.role === 'admin' ? 'warning' : 'info'">
                 {{ currentUser?.role }}
               </el-tag>
-              <span style="margin-left: 8px; color: #909399; font-size: 12px;">(Cannot be changed)</span>
+              <span style="margin-left: 8px; color: #909399; font-size: 12px;">{{ $t('app.roleCannotChange') }}</span>
             </el-form-item>
           </el-form>
         </el-tab-pane>
-        <el-tab-pane label="Change Password" name="password">
+        <el-tab-pane :label="$t('app.tabPassword')" name="password">
           <el-form :model="passwordForm" label-width="140px" style="padding-top: 10px;">
-            <el-form-item label="Current Password">
-              <el-input v-model="passwordForm.currentPassword" type="password" show-password placeholder="Enter current password" />
+            <el-form-item :label="$t('app.labelCurrentPwd')">
+              <el-input v-model="passwordForm.currentPassword" type="password" show-password :placeholder="$t('app.placeholderCurrentPwd')" />
             </el-form-item>
-            <el-form-item label="New Password">
-              <el-input v-model="passwordForm.newPassword" type="password" show-password placeholder="Enter new password (min 6 chars)" />
+            <el-form-item :label="$t('app.labelNewPwd')">
+              <el-input v-model="passwordForm.newPassword" type="password" show-password :placeholder="$t('app.placeholderNewPwd')" />
             </el-form-item>
-            <el-form-item label="Confirm Password">
-              <el-input v-model="passwordForm.confirmPassword" type="password" show-password placeholder="Confirm new password" />
+            <el-form-item :label="$t('app.labelConfirmPwd')">
+              <el-input v-model="passwordForm.confirmPassword" type="password" show-password :placeholder="$t('app.placeholderConfirmPwd')" />
             </el-form-item>
           </el-form>
         </el-tab-pane>
       </el-tabs>
       <template #footer>
-        <el-button @click="showProfileDialog = false">Cancel</el-button>
+        <el-button @click="showProfileDialog = false">{{ $t('common.cancel') }}</el-button>
         <el-button v-if="profileActiveTab === 'profile'" type="primary" :loading="profileSaving" @click="saveProfile">
-          Save Profile
+          {{ $t('app.btnSaveProfile') }}
         </el-button>
         <el-button v-else type="primary" :loading="profileSaving" @click="changePassword">
-          Change Password
+          {{ $t('app.btnChangePwd') }}
         </el-button>
       </template>
     </el-dialog>
@@ -192,15 +236,20 @@ import { computed, ref, onMounted, onUnmounted, provide, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Monitor, Odometer, Box, Bell, Connection, Setting, Tools, ArrowDown, Key, FolderOpened, Share, DataBoard, Expand, Fold, UserFilled, User, SwitchButton, Lock } from '@element-plus/icons-vue';
+import { useI18n } from 'vue-i18n';
 import api from './api';
 import authApi from './api/auth';
 import authUtils from './utils/auth';
 import ProjectSelector from './components/ProjectSelector.vue';
+import LangSwitch from './components/LangSwitch.vue';
 import type { ProjectWithStats } from './api/projects';
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 const alertCount = ref(0);
+const recentAlerts = ref<any[]>([]);
+const alertPopoverRef = ref();
 const currentProjectId = ref<string | undefined>(undefined);
 const currentProjectData = ref<ProjectWithStats | null>(null);
 const projectCount = ref(0);
@@ -251,7 +300,7 @@ async function handleUserCommand(command: string) {
     }
     authUtils.clearAuth();
     currentUser.value = null; // Clear user state
-    ElMessage.success('Logged out successfully');
+    ElMessage.success(t('app.logoutSuccess'));
     router.push('/login');
   } else if (command === 'profile') {
     // Open profile dialog with current values
@@ -271,7 +320,7 @@ async function handleUserCommand(command: string) {
 
 async function saveProfile() {
   if (!profileForm.value.username && !profileForm.value.email) {
-    ElMessage.warning('Please enter at least one field to update');
+    ElMessage.warning(t('app.msgUpdateOneField'));
     return;
   }
 
@@ -291,10 +340,10 @@ async function saveProfile() {
     });
     currentUser.value = authUtils.getUser();
     
-    ElMessage.success('Profile updated successfully');
+    ElMessage.success(t('app.msgProfileUpdated'));
     showProfileDialog.value = false;
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.error || 'Failed to update profile');
+    ElMessage.error(error.response?.data?.error || t('app.msgProfileFailed'));
   } finally {
     profileSaving.value = false;
   }
@@ -304,17 +353,17 @@ async function changePassword() {
   const { currentPassword, newPassword, confirmPassword } = passwordForm.value;
   
   if (!currentPassword || !newPassword || !confirmPassword) {
-    ElMessage.warning('Please fill in all password fields');
+    ElMessage.warning(t('app.msgFillAllPwd'));
     return;
   }
   
   if (newPassword.length < 6) {
-    ElMessage.warning('New password must be at least 6 characters');
+    ElMessage.warning(t('app.msgPwdMinLength'));
     return;
   }
   
   if (newPassword !== confirmPassword) {
-    ElMessage.warning('New password and confirmation do not match');
+    ElMessage.warning(t('app.msgPwdMismatch'));
     return;
   }
 
@@ -324,18 +373,18 @@ async function changePassword() {
       currentPassword: passwordForm.value.currentPassword,
       newPassword: passwordForm.value.newPassword,
     });
-    ElMessage.success('Password changed successfully');
+    ElMessage.success(t('app.msgPwdChanged'));
     showProfileDialog.value = false;
     passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' };
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.error || 'Failed to change password');
+    ElMessage.error(error.response?.data?.error || t('app.msgPwdChangeFailed'));
   } finally {
     profileSaving.value = false;
   }
 }
 
 const currentProjectName = computed(() => {
-  return currentProjectData.value?.name || 'All Projects';
+  return currentProjectData.value?.name || t('projectSelector.allProjects');
 });
 
 // System and shared pages don't need project prefix in breadcrumb
@@ -348,18 +397,18 @@ const showProjectInBreadcrumb = computed(() => {
 
 const currentPage = computed(() => {
   const pathMap: Record<string, string> = {
-    '/': 'Overview',
-    '/projects': 'Projects',
-    '/hosts': 'Hosts',
-    '/services': 'Services',
-    '/security': 'Security',
-    '/alerts': 'Alerts',
-    '/graph': 'Topology',
-    '/grafana': 'Metrics',
-    '/settings': 'Settings',
-    '/users': 'User Management'
+    '/': t('app.menuOverview'),
+    '/projects': t('app.menuProjects'),
+    '/hosts': t('app.menuHosts'),
+    '/services': t('app.menuServices'),
+    '/security': t('app.menuSecurity'),
+    '/alerts': t('app.menuAlerts'),
+    '/graph': t('app.menuTopology'),
+    '/grafana': t('app.menuMetrics'),
+    '/settings': t('app.menuSettings'),
+    '/users': t('app.breadcrumbUserMgmt'),
   };
-  return pathMap[route.path] || 'Dashboard';
+  return pathMap[route.path] || t('app.breadcrumbDashboard');
 });
 
 function handleProjectChange(project: ProjectWithStats | null) {
@@ -400,15 +449,59 @@ provide('notifyProjectsUpdated', notifyProjectsUpdated);
 provide('addProjectTrigger', addProjectTrigger);
 provide('triggerAddProject', triggerAddProject);
 
-onMounted(async () => {
+// ── Alert bell helpers ──
+async function fetchAlertCount() {
   try {
-    const res = await api.get('/alerts');
-    alertCount.value = res.data.filter((a: any) => !a.acknowledged).length;
-  } catch (e) {
-    console.error('Failed to fetch alerts', e);
-  }
+    const res = await api.get('/alerts/unacknowledged/count');
+    alertCount.value = res.data.count ?? 0;
+  } catch { /* ignore */ }
+}
 
-  // 全局 SSE：监听 check 事件，实时刷新项目状态统计
+async function onAlertPopoverShow() {
+  try {
+    const res = await api.get('/alerts', { params: { limit: 5 } });
+    recentAlerts.value = res.data;
+    // Auto-acknowledge: opening the popover = user has seen the alerts
+    if (alertCount.value > 0) {
+      alertCount.value = 0;
+      api.post('/alerts/acknowledge').catch(() => {});
+    }
+  } catch { /* ignore */ }
+}
+
+async function acknowledgeAlerts() {
+  try {
+    await api.post('/alerts/acknowledge');
+    alertCount.value = 0;
+    // Mark local list as read
+    recentAlerts.value = recentAlerts.value.map(a => ({ ...a, acknowledged: 1 }));
+  } catch { /* ignore */ }
+}
+
+function goToAlerts() {
+  alertPopoverRef.value?.hide();
+  router.push('/alerts');
+}
+
+function formatAlertTime(iso: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return t('app.alertJustNow');
+  if (diffMin < 60) return t('app.alertMinutesAgo', { n: diffMin });
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return t('app.alertHoursAgo', { n: diffHour });
+  const diffDay = Math.floor(diffHour / 24);
+  return t('app.alertDaysAgo', { n: diffDay });
+}
+
+onMounted(async () => {
+  // Fetch unacknowledged alert count for bell badge
+  await fetchAlertCount();
+
+  // 全局 SSE：监听 check 事件，实时刷新项目状态统计 + 告警计数
   let _throttle: ReturnType<typeof setTimeout> | null = null;
   const token = authUtils.getToken();
   const apiBase = (api.defaults.baseURL || '/api').replace(/\/$/, '');
@@ -417,6 +510,7 @@ onMounted(async () => {
     if (_throttle) return;
     _throttle = setTimeout(() => {
       notifyProjectsUpdated();
+      fetchAlertCount();
       _throttle = null;
     }, 2000);
   };
@@ -635,5 +729,96 @@ onUnmounted(() => {
 .el-main {
   background-color: #f0f2f5;
   padding: 20px;
+}
+
+/* ── Alert Bell Popover ── */
+.alert-badge-item {
+  display: flex;
+  align-items: center;
+}
+
+.alert-popover-content {
+  margin: -12px;
+}
+
+.alert-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.alert-popover-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: #303133;
+}
+
+.alert-empty {
+  padding: 20px 0;
+}
+
+.alert-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #fafafa;
+  transition: background 0.15s;
+  cursor: default;
+}
+
+.alert-item:hover {
+  background: #f5f7fa;
+}
+
+.alert-item-unread {
+  background: #ecf5ff;
+}
+
+.alert-item-unread:hover {
+  background: #d9ecff;
+}
+
+.alert-item-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.alert-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-item-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-item-msg {
+  font-size: 12px;
+  color: #606266;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.alert-item-time {
+  font-size: 11px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+.alert-popover-footer {
+  text-align: center;
+  padding: 8px 0;
+  border-top: 1px solid #f0f0f0;
 }
 </style>

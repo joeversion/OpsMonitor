@@ -2,19 +2,19 @@
   <div class="cross-project-deps">
     <!-- Feature Coming Soon Watermark -->
     <div class="coming-soon-overlay">
-      <div class="coming-soon-text">Feature Under Development, Stay Tuned...</div>
+      <div class="coming-soon-text">{{ $t('crossDeps.watermark') }}</div>
     </div>
     
     <div class="page-header">
-      <h1>🌐 Cross-Project Dependencies</h1>
+      <h1>{{ $t('crossDeps.title') }}</h1>
       <div class="header-controls">
         <el-button @click="refreshGraph" type="primary">
           <el-icon><Refresh /></el-icon>
-          Refresh
+          {{ $t('common.refresh') }}
         </el-button>
         <el-button @click="showAddDialog = true" v-if="isAdmin">
           <el-icon><Plus /></el-icon>
-          Add Dependency
+          {{ $t('crossDeps.btnAdd') }}
         </el-button>
       </div>
     </div>
@@ -27,7 +27,7 @@
             <el-icon :size="24"><FolderOpened /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Projects</div>
+            <div class="stat-label">{{ $t('crossDeps.statProjects') }}</div>
             <div class="stat-value">{{ projectCount }}</div>
           </div>
         </div>
@@ -38,7 +38,7 @@
             <el-icon :size="24"><Key /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Shared Resources</div>
+            <div class="stat-label">{{ $t('crossDeps.statSharedResources') }}</div>
             <div class="stat-value" style="color: #E6A23C">{{ resourceCount }}</div>
           </div>
         </div>
@@ -49,7 +49,7 @@
             <el-icon :size="24"><Connection /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Cross Dependencies</div>
+            <div class="stat-label">{{ $t('crossDeps.statCrossDeps') }}</div>
             <div class="stat-value" style="color: #6172f3">{{ dependencyCount }}</div>
           </div>
         </div>
@@ -60,7 +60,7 @@
             <el-icon :size="24"><Warning /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Critical Links</div>
+            <div class="stat-label">{{ $t('crossDeps.statCriticalLinks') }}</div>
             <div class="stat-value" style="color: #F56C6C">{{ criticalCount }}</div>
           </div>
         </div>
@@ -75,7 +75,7 @@
         @click="activeTab = 'graph'"
       >
         <el-icon><Share /></el-icon>
-        Graph View
+        {{ $t('crossDeps.tabGraph') }}
       </button>
       <button 
         class="toggle-btn" 
@@ -83,7 +83,7 @@
         @click="activeTab = 'list'"
       >
         <el-icon><List /></el-icon>
-        List View
+        {{ $t('crossDeps.tabList') }}
       </button>
     </div>
     
@@ -93,26 +93,26 @@
         <div class="graph-header">
           <div class="graph-title">
             <span>🌐</span>
-            <span>Cross-Project Dependency Graph</span>
+            <span>{{ $t('crossDeps.graphTitle') }}</span>
           </div>
           <div class="graph-legend">
             <div class="legend-group">
-              <span class="legend-label">Nodes:</span>
+              <span class="legend-label">{{ $t('crossDeps.legendNodes') }}</span>
               <div class="legend-item">
                 <span class="legend-dot project"></span>
-                <span>Project</span>
+                <span>{{ $t('crossDeps.legendProject') }}</span>
               </div>
               <div class="legend-item">
                 <span class="legend-dot resource"></span>
-                <span>Shared Resource</span>
+                <span>{{ $t('crossDeps.legendSharedResource') }}</span>
               </div>
             </div>
             <div class="legend-group">
-              <span class="legend-label">Risk Level:</span>
-              <span class="layer-tag critical">Critical</span>
-              <span class="layer-tag high">High</span>
-              <span class="layer-tag medium">Medium</span>
-              <span class="layer-tag low">Low</span>
+              <span class="legend-label">{{ $t('crossDeps.legendRiskLevel') }}</span>
+              <span class="layer-tag critical">{{ $t('crossDeps.riskCritical') }}</span>
+              <span class="layer-tag high">{{ $t('crossDeps.riskHigh') }}</span>
+              <span class="layer-tag medium">{{ $t('crossDeps.riskMedium') }}</span>
+              <span class="layer-tag low">{{ $t('crossDeps.riskLow') }}</span>
             </div>
           </div>
         </div>
@@ -122,16 +122,16 @@
           >
             <!-- Graph Controls -->
             <div class="graph-controls">
-              <button class="graph-btn" title="Zoom In" @click="zoomIn">
+              <button class="graph-btn" :title="$t('crossDeps.tooltipZoomIn')" @click="zoomIn">
                 <el-icon><ZoomIn /></el-icon>
               </button>
-              <button class="graph-btn" title="Zoom Out" @click="zoomOut">
+              <button class="graph-btn" :title="$t('crossDeps.tooltipZoomOut')" @click="zoomOut">
                 <el-icon><ZoomOut /></el-icon>
               </button>
-              <button class="graph-btn" title="Fit View" @click="fitView">
+              <button class="graph-btn" :title="$t('crossDeps.tooltipFitView')" @click="fitView">
                 <el-icon><FullScreen /></el-icon>
               </button>
-              <button class="graph-btn" title="Refresh" @click="refreshGraph">
+              <button class="graph-btn" :title="$t('common.refresh')" @click="refreshGraph">
                 <el-icon><Refresh /></el-icon>
               </button>
             </div>
@@ -143,22 +143,22 @@
     <!-- List View -->
     <div v-show="activeTab === 'list'" class="list-section">
       <el-table :data="dependencies" stripe>
-        <el-table-column label="Source" min-width="200">
+        <el-table-column :label="$t('crossDeps.colSource')" min-width="200">
           <template #default="{ row }">
             <div class="dep-cell">
-              <el-tag size="small" type="info">{{ row.source_project_name || 'N/A' }}</el-tag>
+              <el-tag size="small" type="info">{{ row.source_project_name || $t('crossDeps.na') }}</el-tag>
               <span class="service-name">{{ row.source_service_name }}</span>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="Type" width="120">
+        <el-table-column :label="$t('crossDeps.colType')" width="120">
           <template #default="{ row }">
             <el-tag :type="getTypeTagType(row.dependency_type)" size="small">
               {{ row.dependency_type }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Target" min-width="200">
+        <el-table-column :label="$t('crossDeps.colTarget')" min-width="200">
           <template #default="{ row }">
             <div class="dep-cell">
               <el-tag v-if="row.target_project_name" size="small" type="info">
@@ -173,21 +173,21 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="Risk" width="100">
+        <el-table-column :label="$t('crossDeps.colRisk')" width="100">
           <template #default="{ row }">
             <el-tag :type="getRiskTagType(row.risk_level)" size="small">
               {{ row.risk_level }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Description" prop="description" min-width="150" />
-        <el-table-column label="Actions" width="120" fixed="right" v-if="isAdmin">
+        <el-table-column :label="$t('crossDeps.colDesc')" prop="description" min-width="150" />
+        <el-table-column :label="$t('common.actions')" width="120" fixed="right" v-if="isAdmin">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="editDependency(row)">
-              Edit
+              {{ $t('common.edit') }}
             </el-button>
             <el-button link type="danger" size="small" @click="deleteDep(row.id)">
-              Delete
+              {{ $t('common.delete') }}
             </el-button>
           </template>
         </el-table-column>
@@ -197,12 +197,12 @@
     <!-- Add/Edit Dialog -->
     <el-dialog 
       v-model="showAddDialog" 
-      :title="editingDep ? 'Edit Dependency' : 'Add Dependency'"
+      :title="editingDep ? $t('crossDeps.titleEdit') : $t('crossDeps.titleAdd')"
       width="500px"
     >
       <el-form :model="depForm" label-position="top">
-        <el-form-item label="Source Service" required>
-          <el-select v-model="depForm.source_service_id" placeholder="Select source service" filterable>
+        <el-form-item :label="$t('crossDeps.labelSource')" required>
+          <el-select v-model="depForm.source_service_id" :placeholder="$t('crossDeps.placeholderSource')" filterable>
             <el-option-group 
               v-for="project in projectsWithServices" 
               :key="project.id" 
@@ -218,15 +218,15 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item label="Target Type" required>
+        <el-form-item :label="$t('crossDeps.labelTargetType')" required>
           <el-radio-group v-model="depForm.targetType">
-            <el-radio value="service">Service</el-radio>
-            <el-radio value="resource">Shared Resource</el-radio>
+            <el-radio value="service">{{ $t('crossDeps.optService') }}</el-radio>
+            <el-radio value="resource">{{ $t('crossDeps.optSharedResource') }}</el-radio>
           </el-radio-group>
         </el-form-item>
         
-        <el-form-item v-if="depForm.targetType === 'service'" label="Target Service" required>
-          <el-select v-model="depForm.target_service_id" placeholder="Select target service" filterable>
+        <el-form-item v-if="depForm.targetType === 'service'" :label="$t('crossDeps.labelTargetService')" required>
+          <el-select v-model="depForm.target_service_id" :placeholder="$t('crossDeps.placeholderTarget')" filterable>
             <el-option-group 
               v-for="project in projectsWithServices" 
               :key="project.id" 
@@ -242,8 +242,8 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item v-if="depForm.targetType === 'resource'" label="Target Resource" required>
-          <el-select v-model="depForm.target_resource_id" placeholder="Select resource" filterable>
+        <el-form-item v-if="depForm.targetType === 'resource'" :label="$t('crossDeps.labelTargetResource')" required>
+          <el-select v-model="depForm.target_resource_id" :placeholder="$t('crossDeps.placeholderResource')" filterable>
             <el-option 
               v-for="resource in resources" 
               :key="resource.id" 
@@ -253,33 +253,33 @@
           </el-select>
         </el-form-item>
         
-        <el-form-item label="Dependency Type" required>
-          <el-select v-model="depForm.dependency_type" placeholder="Select type">
-            <el-option value="depends" label="Depends (strong dependency)" />
-            <el-option value="uses" label="Uses (weak dependency)" />
-            <el-option value="sync" label="Sync (data synchronization)" />
-            <el-option value="backup" label="Backup (backup relation)" />
+        <el-form-item :label="$t('crossDeps.labelDepType')" required>
+          <el-select v-model="depForm.dependency_type" :placeholder="$t('crossDeps.labelDepType')">
+            <el-option value="depends" :label="$t('crossDeps.depDepends')" />
+            <el-option value="uses" :label="$t('crossDeps.depUses')" />
+            <el-option value="sync" :label="$t('crossDeps.depSync')" />
+            <el-option value="backup" :label="$t('crossDeps.depBackup')" />
           </el-select>
         </el-form-item>
         
-        <el-form-item label="Risk Level">
-          <el-select v-model="depForm.risk_level" placeholder="Select risk level">
-            <el-option value="low" label="Low" />
-            <el-option value="medium" label="Medium" />
-            <el-option value="high" label="High" />
-            <el-option value="critical" label="Critical" />
+        <el-form-item :label="$t('crossDeps.labelRisk')">
+          <el-select v-model="depForm.risk_level" :placeholder="$t('crossDeps.labelRisk')">
+            <el-option value="low" :label="$t('crossDeps.riskLow')" />
+            <el-option value="medium" :label="$t('crossDeps.riskMedium')" />
+            <el-option value="high" :label="$t('crossDeps.riskHigh')" />
+            <el-option value="critical" :label="$t('crossDeps.riskCritical')" />
           </el-select>
         </el-form-item>
         
-        <el-form-item label="Description">
+        <el-form-item :label="$t('crossDeps.labelDesc')">
           <el-input v-model="depForm.description" type="textarea" rows="2" />
         </el-form-item>
       </el-form>
       
       <template #footer>
-        <el-button @click="showAddDialog = false">Cancel</el-button>
+        <el-button @click="showAddDialog = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="saveDependency">
-          {{ editingDep ? 'Update' : 'Create' }}
+          {{ editingDep ? $t('common.update') : $t('common.create') }}
         </el-button>
       </template>
     </el-dialog>
@@ -288,6 +288,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { Graph } from '@antv/g6';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
@@ -308,6 +309,9 @@ import { getProjects, type ProjectWithStats } from '../api/projects';
 import { getServices } from '../api/services';
 import api from '../api';
 import authUtils from '../utils/auth';
+
+// i18n
+const { t } = useI18n();
 
 // Permission check
 const isAdmin = computed(() => authUtils.isAdmin());
@@ -412,7 +416,7 @@ async function loadData() {
     }
   } catch (error) {
     console.error('Failed to load data', error);
-    ElMessage.error('Failed to load cross-project dependencies');
+    ElMessage.error(t('crossDeps.msgLoadFailed'));
   }
 }
 
@@ -510,7 +514,7 @@ function fitView() {
 
 async function refreshGraph() {
   await loadData();
-  ElMessage.success('Data refreshed');
+  ElMessage.success(t('crossDeps.msgRefreshed'));
 }
 
 function editDependency(dep: ServiceDependency) {
@@ -544,10 +548,10 @@ async function saveDependency() {
         risk_level: data.risk_level,
         description: data.description
       });
-      ElMessage.success('Dependency updated');
+      ElMessage.success(t('crossDeps.msgUpdated'));
     } else {
       await createDependency(data);
-      ElMessage.success('Dependency created');
+      ElMessage.success(t('crossDeps.msgCreated'));
     }
     
     showAddDialog.value = false;
@@ -555,22 +559,22 @@ async function saveDependency() {
     resetForm();
     await loadData();
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.error || 'Failed to save dependency');
+    ElMessage.error(error.response?.data?.error || t('crossDeps.msgSaveFailed'));
   }
 }
 
 async function deleteDep(id: string) {
   try {
-    await ElMessageBox.confirm('Are you sure to delete this dependency?', 'Confirm', {
+    await ElMessageBox.confirm(t('crossDeps.confirmDeleteMsg'), t('crossDeps.confirmDeleteTitle'), {
       type: 'warning'
     });
     
     await deleteDependency(id);
-    ElMessage.success('Dependency deleted');
+    ElMessage.success(t('crossDeps.msgDeleted'));
     await loadData();
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('Failed to delete dependency');
+      ElMessage.error(t('crossDeps.msgDeleteFailed'));
     }
   }
 }

@@ -476,6 +476,14 @@ function runMigrations() {
     
     // Make service_id nullable if it's not already
     // SQLite doesn't support directly modifying column constraints, so we check if we need to do anything
+
+    // Add acknowledged column for bell icon read/unread tracking
+    const hasAcknowledged = alertColumns.some(col => col.name === 'acknowledged');
+    if (!hasAcknowledged) {
+      console.log('Running migration: add acknowledged to alerts...');
+      db.exec('ALTER TABLE alerts ADD COLUMN acknowledged INTEGER NOT NULL DEFAULT 0');
+      console.log('Migration complete: acknowledged added to alerts');
+    }
   }
 
   // 检查 services 表是否有 layer 列
@@ -1188,9 +1196,18 @@ export function cleanupOldCheckRecords(retentionDays: number = 30) {
     `).run(cutoffISO);
     
     console.log(`Cleaned up ${result.changes} check records older than ${retentionDays} days`);
-    return result.changes;
+
+    // Also clean up old alerts using the same retention period
+    const alertResult = db.prepare(`
+      DELETE FROM alerts 
+      WHERE created_at < ?
+    `).run(cutoffISO);
+    
+    console.log(`Cleaned up ${alertResult.changes} alerts older than ${retentionDays} days`);
+
+    return result.changes + alertResult.changes;
   } catch (error) {
-    console.error('Error cleaning up old check records:', error);
+    console.error('Error cleaning up old records:', error);
     throw error;
   }
 }

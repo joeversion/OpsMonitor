@@ -3,6 +3,7 @@ import axios from 'axios';
 import https from 'https';
 import db from '../db/database';
 import logger from '../utils/logger';
+import { nt } from '../utils/notification-i18n';
 
 // Create axios instance that ignores SSL certificate errors (for Power Automate webhooks)
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
@@ -197,13 +198,13 @@ export class NotificationService {
             "items": [
               {
                 "type": "TextBlock",
-                "text": "OpsMonitor Notification",
+                "text": nt('card.opsmonitorNotification'),
                 "weight": "bolder",
                 "size": "medium"
               },
               {
                 "type": "TextBlock",
-                "text": "Service Monitoring Alert System",
+                "text": nt('card.serviceMonitoring'),
                 "size": "small",
                 "isSubtle": true
               }
@@ -245,7 +246,7 @@ export class NotificationService {
         "items": [
           {
             "type": "TextBlock",
-            "text": "⚡ Impact Scope",
+            "text": nt('card.impactScope'),
             "weight": "bolder",
             "size": "small"
           },
@@ -263,7 +264,7 @@ export class NotificationService {
     if (data.affectedServices && data.affectedServices.length > 0) {
       body.push({
         "type": "TextBlock",
-        "text": "**Affected Services:** " + data.affectedServices.join(', '),
+        "text": nt('card.affectedServices', { list: data.affectedServices.join(', ') }),
         "wrap": true,
         "size": "small",
         "spacing": "small"
@@ -325,14 +326,14 @@ export class NotificationService {
     if (data.dashboardUrl) {
       actions.push({
         "type": "Action.OpenUrl",
-        "title": "View Details",
+        "title": nt('card.viewDetails'),
         "url": data.dashboardUrl
       });
     }
     if (data.consoleUrl) {
       actions.push({
         "type": "Action.OpenUrl",
-        "title": "Go to Console",
+        "title": nt('card.goToConsole'),
         "url": data.consoleUrl
       });
     }

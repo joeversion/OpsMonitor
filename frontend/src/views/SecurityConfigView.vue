@@ -8,7 +8,7 @@
             <el-icon :size="24"><CircleCheckFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Normal</div>
+            <div class="stat-label">{{ $t('security.normal') }}</div>
             <div class="stat-value" style="color: #67C23A">{{ stats.normal }}</div>
           </div>
         </div>
@@ -19,7 +19,7 @@
             <el-icon :size="24"><WarningFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Warning</div>
+            <div class="stat-label">{{ $t('security.warning') }}</div>
             <div class="stat-value" style="color: #E6A23C">{{ stats.warning }}</div>
           </div>
         </div>
@@ -30,7 +30,7 @@
             <el-icon :size="24"><WarningFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Critical</div>
+            <div class="stat-label">{{ $t('security.critical') }}</div>
             <div class="stat-value" style="color: #F56C6C">{{ stats.critical }}</div>
           </div>
         </div>
@@ -41,7 +41,7 @@
             <el-icon :size="24"><CircleCloseFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Expired</div>
+            <div class="stat-label">{{ $t('security.expired') }}</div>
             <div class="stat-value" style="color: #909399">{{ stats.expired }}</div>
           </div>
         </div>
@@ -52,16 +52,16 @@
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="card-title">🔐 Security Configs</span>
+          <span class="card-title">🔐 {{ $t('security.title') }}</span>
           <div class="actions">
             <el-button @click="triggerExpiryCheck" :loading="checking">
-              <el-icon><Bell /></el-icon> Check Expiry Now
+              <el-icon><Bell /></el-icon> {{ $t('security.btnCheckExpiry') }}
             </el-button>
             <el-button @click="loadData">
-              <el-icon><Refresh /></el-icon> Refresh
+              <el-icon><Refresh /></el-icon> {{ $t('common.refresh') }}
             </el-button>
             <el-button type="primary" @click="handleAdd" v-if="isAdmin">
-              <el-icon><Plus /></el-icon> Add
+              <el-icon><Plus /></el-icon> {{ $t('security.btnAdd') }}
             </el-button>
           </div>
         </div>
@@ -69,49 +69,49 @@
 
       <!-- Filters -->
       <div class="filter-bar">
-        <el-input v-model="searchQuery" placeholder="Search name..." :prefix-icon="Search" style="width: 250px;" clearable />
-        <el-select v-model="filterType" placeholder="Type" clearable style="width: 130px;">
-          <el-option label="All Types" value="" />
-          <el-option label="AccessKey" value="accesskey" />
-          <el-option label="FTP Password" value="ftp" />
-          <el-option label="SSL Certificate" value="ssl" />
+        <el-input v-model="searchQuery" :placeholder="$t('security.searchPlaceholder')" :prefix-icon="Search" style="width: 250px;" clearable />
+        <el-select v-model="filterType" :placeholder="$t('common.type')" clearable style="width: 130px;">
+          <el-option :label="$t('security.allTypes')" value="" />
+          <el-option :label="$t('security.typeAccessKey')" value="accesskey" />
+          <el-option :label="$t('security.typeFtpPassword')" value="ftp" />
+          <el-option :label="$t('security.typeSSL')" value="ssl" />
         </el-select>
-        <el-select v-model="filterStatus" placeholder="Status" clearable style="width: 130px;">
-          <el-option label="All Status" value="" />
-          <el-option label="Normal" value="normal" />
-          <el-option label="Warning" value="warning" />
-          <el-option label="Critical" value="critical" />
-          <el-option label="Expired" value="expired" />
+        <el-select v-model="filterStatus" :placeholder="$t('common.status')" clearable style="width: 130px;">
+          <el-option :label="$t('security.allStatus')" value="" />
+          <el-option :label="$t('security.normal')" value="normal" />
+          <el-option :label="$t('security.warning')" value="warning" />
+          <el-option :label="$t('security.critical')" value="critical" />
+          <el-option :label="$t('security.expired')" value="expired" />
         </el-select>
       </div>
 
       <el-table :data="paginatedConfigs" style="width: 100%" v-loading="loading" row-key="id">
-        <el-table-column label="No." width="60" align="center">
+        <el-table-column :label="$t('security.colNo')" width="60" align="center">
           <template #default="{ $index }">
             {{ (currentPage - 1) * pageSize + $index + 1 }}
           </template>
         </el-table-column>
-        <el-table-column label="Status" width="80" align="center">
+        <el-table-column :label="$t('security.colStatus')" width="80" align="center">
           <template #default="scope">
             <el-tag :type="getStatusTagType(scope.row.status)" size="small" effect="dark">
               {{ getStatusLabel(scope.row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Name" min-width="200">
+        <el-table-column :label="$t('security.colName')" min-width="200">
           <template #default="scope">
             <div class="config-name">{{ scope.row.name }}</div>
             <div class="config-services" v-if="scope.row.affected_services?.length">
-              Affects: {{ scope.row.affected_services.length }} services
+              {{ $t('security.affectsN', { n: scope.row.affected_services.length }) }}
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="Type" width="110">
+        <el-table-column :label="$t('security.colType')" width="110">
           <template #default="scope">
             <el-tag size="small" effect="plain">{{ getTypeLabel(scope.row.type) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Days Remaining" width="150">
+        <el-table-column :label="$t('security.colDaysRemaining')" width="150">
           <template #default="scope">
             <div class="days-cell">
               <el-progress 
@@ -122,23 +122,23 @@
                 style="width: 60px;"
               />
               <span :class="['days-text', scope.row.status]">
-                {{ scope.row.days_remaining > 0 ? scope.row.days_remaining + ' days' : 'Expired' }}
+                {{ scope.row.days_remaining > 0 ? $t('security.daysN', { n: scope.row.days_remaining }) : $t('security.expired') }}
               </span>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="Expiry Date" width="130">
+        <el-table-column :label="$t('security.colExpiryDate')" width="130">
           <template #default="scope">
             {{ formatDate(scope.row.expiry_date) }}
           </template>
         </el-table-column>
-        <el-table-column label="Actions" width="180" align="right" v-if="isAdmin">
+        <el-table-column :label="$t('security.colActions')" width="180" align="right" v-if="isAdmin">
           <template #default="scope">
             <el-button link type="success" size="small" @click="handleExtend(scope.row)">
-              <el-icon><Promotion /></el-icon> Extend
+              <el-icon><Promotion /></el-icon> {{ $t('security.btnExtend') }}
             </el-button>
-            <el-button link type="primary" size="small" @click="handleEdit(scope.row)">Edit</el-button>
-            <el-button link type="danger" size="small" @click="handleDelete(scope.row)">Delete</el-button>
+            <el-button link type="primary" size="small" @click="handleEdit(scope.row)">{{ $t('security.btnEdit') }}</el-button>
+            <el-button link type="danger" size="small" @click="handleDelete(scope.row)">{{ $t('security.btnDelete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -156,43 +156,43 @@
     </el-card>
 
     <!-- Add/Edit Dialog -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? 'Edit Configuration' : 'Add Configuration'" width="550px">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? $t('security.titleEdit') : $t('security.titleAdd')" width="550px">
       <el-form :model="form" label-width="120px">
-        <el-form-item label="Name" required>
-          <el-input v-model="form.name" placeholder="e.g., Nova Email AccessKeys" />
+        <el-form-item :label="$t('security.labelName')" required>
+          <el-input v-model="form.name" :placeholder="$t('security.placeholderName')" />
         </el-form-item>
-        <el-form-item label="Type" required>
+        <el-form-item :label="$t('security.labelType')" required>
           <el-radio-group v-model="form.type">
-            <el-radio value="accesskey">AccessKey</el-radio>
-            <el-radio value="ftp">Password</el-radio>
-            <el-radio value="ssl">SSL Certificate</el-radio>
+            <el-radio value="accesskey">{{ $t('security.typeAccessKey') }}</el-radio>
+            <el-radio value="ftp">{{ $t('security.typePassword') }}</el-radio>
+            <el-radio value="ssl">{{ $t('security.typeSSL') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="Validity Period">
-          <el-input-number v-model="form.validity_days" :min="1" :max="365" /> days
-          <span style="color: #909399; margin-left: 10px;">Default: 60 days</span>
+        <el-form-item :label="$t('security.labelValidity')">
+          <el-input-number v-model="form.validity_days" :min="1" :max="365" /> {{ $t('common.days') }}
+          <span style="color: #909399; margin-left: 10px;">{{ $t('security.defaultValidity', { n: 60 }) }}</span>
         </el-form-item>
-        <el-form-item label="Expiry Date">
+        <el-form-item :label="$t('security.labelExpiry')">
           <el-date-picker 
             v-model="form.expiry_date" 
             type="date" 
-            placeholder="Select expiry date"
+            :placeholder="$t('security.placeholderExpiry')"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
           />
         </el-form-item>
-        <el-form-item label="Reminder Rules">
+        <el-form-item :label="$t('security.labelReminder')">
           <el-checkbox-group v-model="form.reminder_days">
-            <el-checkbox :value="7">7 days before</el-checkbox>
-            <el-checkbox :value="3">3 days before</el-checkbox>
-            <el-checkbox :value="1">1 day before</el-checkbox>
+            <el-checkbox :value="7">{{ $t('security.reminderDays', { n: 7 }) }}</el-checkbox>
+            <el-checkbox :value="3">{{ $t('security.reminderDays', { n: 3 }) }}</el-checkbox>
+            <el-checkbox :value="1">{{ $t('security.reminderDays', { n: 1 }) }}</el-checkbox>
           </el-checkbox-group>
         </el-form-item>
-        <el-form-item label="Affected Services">
+        <el-form-item :label="$t('security.labelAffectedServices')">
           <el-select 
             v-model="form.affected_services" 
             multiple 
-            placeholder="Select affected services" 
+            :placeholder="$t('security.placeholderAffectedServices')" 
             style="width: 100%;"
             filterable
           >
@@ -210,36 +210,36 @@
             </el-option-group>
           </el-select>
           <div v-if="form.affected_services.length > 0" class="selected-summary">
-            ✓ {{ form.affected_services.length }} services selected
+            {{ $t('security.summarySelected', { n: form.affected_services.length }) }}
           </div>
         </el-form-item>
-        <el-form-item label="Notes">
+        <el-form-item :label="$t('security.labelNotes')">
           <el-input 
             v-model="form.notes" 
             type="textarea" 
             :rows="3" 
-            placeholder="Add any comments or notes about this configuration..."
+            :placeholder="$t('security.placeholderNotes')"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">Cancel</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">Save</el-button>
+        <el-button @click="dialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleSubmit" :loading="submitting">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- Extend Dialog -->
-    <el-dialog v-model="extendDialogVisible" title="Confirm Extension" width="400px">
+    <el-dialog v-model="extendDialogVisible" :title="$t('security.titleExtend')" width="400px">
       <div style="margin-bottom: 20px;">
-        <p>Current Config: <strong>{{ currentConfig?.name }}</strong></p>
-        <p>Days Remaining: <strong :class="currentConfig?.status">{{ currentConfig?.days_remaining }} days</strong></p>
+        <p>{{ $t('security.labelCurrentConfig') }} <strong>{{ currentConfig?.name }}</strong></p>
+        <p>{{ $t('security.labelDaysRemaining') }} <strong :class="currentConfig?.status">{{ $t('security.daysN', { n: currentConfig?.days_remaining }) }}</strong></p>
       </div>
-      <el-form-item label="Extend Days">
-        <el-input-number v-model="extendDays" :min="1" :max="365" style="width: 150px;" /> days
+      <el-form-item :label="$t('security.labelExtendDays')">
+        <el-input-number v-model="extendDays" :min="1" :max="365" style="width: 150px;" /> {{ $t('common.days') }}
       </el-form-item>
       <template #footer>
-        <el-button @click="extendDialogVisible = false">Cancel</el-button>
-        <el-button type="primary" @click="confirmExtend" :loading="extending">Confirm Extension</el-button>
+        <el-button @click="extendDialogVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="confirmExtend" :loading="extending">{{ $t('security.btnConfirmExtend') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -247,6 +247,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
   CircleCheckFilled, WarningFilled, CircleCloseFilled, 
@@ -261,6 +262,8 @@ import { getServices, type Service } from '../api/services';
 import { getProjects, type ProjectWithStats } from '../api/projects';
 import authUtils from '../utils/auth';
 import api from '../api';
+
+const { t } = useI18n();
 
 // Permission check
 const isAdmin = computed(() => authUtils.isAdmin());
@@ -338,12 +341,12 @@ const triggerExpiryCheck = async () => {
   checking.value = true;
   try {
     await api.post('/config/security-check/trigger');
-    ElMessage.success('Expiry check triggered successfully! Check Teams/Email for alerts.');
+    ElMessage.success(t('security.msgCheckTriggered'));
     
     // Refresh data to show updated last_reminded_at
     await loadData();
   } catch (error: any) {
-    ElMessage.error('Failed to trigger expiry check: ' + (error.response?.data?.error || error.message));
+    ElMessage.error(t('security.msgCheckFailed') + ': ' + (error.response?.data?.error || error.message));
   } finally {
     checking.value = false;
   }
@@ -363,7 +366,7 @@ const loadData = async () => {
     services.value = servicesData;
     projects.value = projectsData;
   } catch (error: any) {
-    ElMessage.error('Failed to load data: ' + error.message);
+    ElMessage.error(t('security.msgLoadFailed') + ': ' + error.message);
   } finally {
     loading.value = false;
   }
@@ -401,7 +404,7 @@ const handleEdit = (row: SecurityConfig) => {
 
 const handleSubmit = async () => {
   if (!form.value.name) {
-    ElMessage.warning('Please enter a name');
+    ElMessage.warning(t('security.msgEnterName'));
     return;
   }
   
@@ -419,15 +422,15 @@ const handleSubmit = async () => {
 
     if (isEdit.value) {
       await updateSecurityConfig(form.value.id, data);
-      ElMessage.success('Updated successfully');
+      ElMessage.success(t('security.msgUpdated'));
     } else {
       await createSecurityConfig(data);
-      ElMessage.success('Created successfully');
+      ElMessage.success(t('security.msgCreated'));
     }
     dialogVisible.value = false;
     loadData();
   } catch (error: any) {
-    ElMessage.error('Operation failed: ' + error.message);
+    ElMessage.error(t('security.msgOperationFailed') + ': ' + error.message);
   } finally {
     submitting.value = false;
   }
@@ -435,15 +438,15 @@ const handleSubmit = async () => {
 
 const handleDelete = async (row: SecurityConfig) => {
   try {
-    await ElMessageBox.confirm(`Are you sure to delete "${row.name}"?`, 'Confirm Delete', {
+    await ElMessageBox.confirm(t('security.confirmDeleteMsg', { name: row.name }), t('security.confirmDeleteTitle'), {
       type: 'warning'
     });
     await deleteSecurityConfig(row.id);
-    ElMessage.success('Deleted successfully');
+    ElMessage.success(t('security.msgDeleted'));
     loadData();
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('Delete failed: ' + error.message);
+      ElMessage.error(t('security.msgDeleteFailed') + ': ' + error.message);
     }
   }
 };
@@ -460,11 +463,11 @@ const confirmExtend = async () => {
   extending.value = true;
   try {
     const result = await extendSecurityConfig(currentConfig.value.id, extendDays.value);
-    ElMessage.success(`Extended by ${extendDays.value} days, new expiry date: ${formatDate(result.new_expiry_date)}`);
+    ElMessage.success(t('security.msgExtended', { n: extendDays.value, date: formatDate(result.new_expiry_date) }));
     extendDialogVisible.value = false;
     loadData();
   } catch (error: any) {
-    ElMessage.error('Extension failed: ' + error.message);
+    ElMessage.error(t('security.msgExtendFailed') + ': ' + error.message);
   } finally {
     extending.value = false;
   }
@@ -483,19 +486,19 @@ const getStatusTagType = (status: string) => {
 
 const getStatusLabel = (status: string) => {
   switch (status) {
-    case 'normal': return 'Normal';
-    case 'warning': return 'Warning';
-    case 'critical': return 'Critical';
-    case 'expired': return 'Expired';
+    case 'normal': return t('security.normal');
+    case 'warning': return t('security.warning');
+    case 'critical': return t('security.critical');
+    case 'expired': return t('security.expired');
     default: return status;
   }
 };
 
 const getTypeLabel = (type: string) => {
   switch (type) {
-    case 'accesskey': return 'AccessKey';
-    case 'ftp': return 'FTP Password';
-    case 'ssl': return 'SSL Certificate';
+    case 'accesskey': return t('security.typeAccessKey');
+    case 'ftp': return t('security.typeFtpPassword');
+    case 'ssl': return t('security.typeSSL');
     default: return type;
   }
 };

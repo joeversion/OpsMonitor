@@ -1,10 +1,10 @@
 <template>
   <div class="user-management">
     <div class="page-header">
-      <h1>User Management</h1>
+      <h1>{{ $t('users.title') }}</h1>
       <el-button type="primary" @click="showAddDialog">
         <el-icon><Plus /></el-icon>
-        Add User
+        {{ $t('users.addUser') }}
       </el-button>
     </div>
 
@@ -16,7 +16,7 @@
             <el-icon :size="24"><User /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Total Users</div>
+            <div class="stat-label">{{ $t('users.totalUsers') }}</div>
             <div class="stat-value">{{ stats.total }}</div>
           </div>
         </div>
@@ -27,7 +27,7 @@
             <el-icon :size="24"><Avatar /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Administrators</div>
+            <div class="stat-label">{{ $t('users.administrators') }}</div>
             <div class="stat-value" style="color: #E6A23C">{{ stats.admins }}</div>
           </div>
         </div>
@@ -38,7 +38,7 @@
             <el-icon :size="24"><Tickets /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Viewers</div>
+            <div class="stat-label">{{ $t('users.viewers') }}</div>
             <div class="stat-value" style="color: #67C23A">{{ stats.viewers }}</div>
           </div>
         </div>
@@ -51,21 +51,21 @@
         <el-col :span="8">
           <el-input
             v-model="searchQuery"
-            placeholder="Search users..."
+            :placeholder="$t('users.searchPlaceholder')"
             :prefix-icon="Search"
             clearable
           />
         </el-col>
         <el-col :span="6">
-          <el-select v-model="filterRole" placeholder="Filter by Role" clearable style="width: 100%">
-            <el-option label="Admin" value="admin" />
-            <el-option label="Viewer" value="viewer" />
+          <el-select v-model="filterRole" :placeholder="$t('users.filterByRole')" clearable style="width: 100%">
+            <el-option :label="$t('users.roleAdmin')" value="admin" />
+            <el-option :label="$t('users.roleViewer')" value="viewer" />
           </el-select>
         </el-col>
         <el-col :span="6">
-          <el-select v-model="filterStatus" placeholder="Filter by Status" clearable style="width: 100%">
-            <el-option label="Active" value="active" />
-            <el-option label="Inactive" value="inactive" />
+          <el-select v-model="filterStatus" :placeholder="$t('users.filterByStatus')" clearable style="width: 100%">
+            <el-option :label="$t('users.statusActive')" value="active" />
+            <el-option :label="$t('users.statusInactive')" value="inactive" />
           </el-select>
         </el-col>
       </el-row>
@@ -74,37 +74,37 @@
     <!-- Users Table -->
     <el-card>
       <el-table :data="paginatedUsers" v-loading="loading" style="width: 100%">
-        <el-table-column label="No." width="60" align="center">
+        <el-table-column :label="$t('users.colNo')" width="60" align="center">
           <template #default="{ $index }">
             {{ (currentPage - 1) * pageSize + $index + 1 }}
           </template>
         </el-table-column>
-        <el-table-column prop="username" label="Username" min-width="150" />
-        <el-table-column prop="email" label="Email" min-width="200">
+        <el-table-column prop="username" :label="$t('users.colUsername')" min-width="150" />
+        <el-table-column prop="email" :label="$t('users.colEmail')" min-width="200">
           <template #default="{ row }">
             {{ row.email || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="role" label="Role" width="120">
+        <el-table-column prop="role" :label="$t('users.colRole')" width="120">
           <template #default="{ row }">
             <el-tag :type="row.role === 'admin' ? 'warning' : 'info'">
               {{ row.role }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="Status" width="100">
+        <el-table-column prop="status" :label="$t('users.colStatus')" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === 'active' ? 'success' : 'danger'">
               {{ row.status }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="last_login_at" label="Last Login" width="180">
+        <el-table-column prop="last_login_at" :label="$t('users.colLastLogin')" width="180">
           <template #default="{ row }">
             {{ formatDate(row.last_login_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="Actions" width="200" fixed="right">
+        <el-table-column :label="$t('users.colActions')" width="200" fixed="right">
           <template #default="{ row }">
             <el-button-group>
               <el-button size="small" @click="showEditDialog(row)">
@@ -141,7 +141,7 @@
     <!-- Add/Edit User Dialog -->
     <el-dialog
       v-model="userDialogVisible"
-      :title="isEditing ? 'Edit User' : 'Add User'"
+      :title="isEditing ? $t('users.dialogEdit') : $t('users.dialogCreate')"
       width="500px"
     >
       <el-form
@@ -150,55 +150,55 @@
         :rules="userRules"
         label-width="100px"
       >
-        <el-form-item label="Username" prop="username">
+        <el-form-item :label="$t('users.labelUsername')" prop="username">
           <el-input v-model="userForm.username" />
         </el-form-item>
-        <el-form-item label="Email" prop="email">
+        <el-form-item :label="$t('users.labelEmail')" prop="email">
           <el-input v-model="userForm.email" />
         </el-form-item>
-        <el-form-item v-if="!isEditing" label="Password" prop="password">
+        <el-form-item v-if="!isEditing" :label="$t('users.labelPassword')" prop="password">
           <el-input v-model="userForm.password" type="password" show-password />
         </el-form-item>
-        <el-form-item label="Role" prop="role">
+        <el-form-item :label="$t('users.labelRole')" prop="role">
           <el-select v-model="userForm.role" style="width: 100%">
-            <el-option label="Admin" value="admin" />
-            <el-option label="Viewer" value="viewer" />
+            <el-option :label="$t('users.roleAdmin')" value="admin" />
+            <el-option :label="$t('users.roleViewer')" value="viewer" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="isEditing" label="Status" prop="status">
+        <el-form-item v-if="isEditing" :label="$t('users.labelStatus')" prop="status">
           <el-select v-model="userForm.status" style="width: 100%">
-            <el-option label="Active" value="active" />
-            <el-option label="Inactive" value="inactive" />
+            <el-option :label="$t('users.statusActive')" value="active" />
+            <el-option :label="$t('users.statusInactive')" value="inactive" />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="userDialogVisible = false">Cancel</el-button>
+        <el-button @click="userDialogVisible = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="handleSaveUser" :loading="saving">
-          {{ isEditing ? 'Update' : 'Create' }}
+          {{ isEditing ? $t('common.update') : $t('common.create') }}
         </el-button>
       </template>
     </el-dialog>
 
     <!-- Reset Password Dialog -->
-    <el-dialog v-model="passwordDialogVisible" title="Reset Password" width="400px">
+    <el-dialog v-model="passwordDialogVisible" :title="$t('users.resetPassword')" width="400px">
       <el-form
         ref="passwordFormRef"
         :model="passwordForm"
         :rules="passwordRules"
         label-width="120px"
       >
-        <el-form-item label="New Password" prop="password">
+        <el-form-item :label="$t('users.labelNewPassword')" prop="password">
           <el-input v-model="passwordForm.password" type="password" show-password />
         </el-form-item>
-        <el-form-item label="Confirm" prop="confirmPassword">
+        <el-form-item :label="$t('users.labelConfirmPassword')" prop="confirmPassword">
           <el-input v-model="passwordForm.confirmPassword" type="password" show-password />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="passwordDialogVisible = false">Cancel</el-button>
+        <el-button @click="passwordDialogVisible = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="handleResetPassword" :loading="saving">
-          Reset Password
+          {{ $t('users.resetPassword') }}
         </el-button>
       </template>
     </el-dialog>
@@ -207,6 +207,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus, User, Avatar, Tickets, Search, Edit, Key, Delete } from '@element-plus/icons-vue';
 import usersApi, { type User as UserType, type CreateUserRequest, type UpdateUserRequest } from '@/api/users';
@@ -219,6 +220,7 @@ const searchQuery = ref('');
 const filterRole = ref('');
 const filterStatus = ref('');
 const currentUser = authUtils.getUser();
+const { t } = useI18n();
 
 // Stats
 const stats = computed(() => ({
@@ -263,22 +265,22 @@ const userForm = reactive({
   status: 'active' as 'active' | 'inactive',
 });
 
-const userRules: FormRules = {
+const userRules = computed<FormRules>(() => ({
   username: [
-    { required: true, message: 'Please enter username', trigger: 'blur' },
-    { min: 3, max: 50, message: 'Username must be 3-50 characters', trigger: 'blur' },
+    { required: true, message: t('users.ruleUsernameRequired'), trigger: 'blur' },
+    { min: 3, max: 50, message: t('users.ruleUsernameLength'), trigger: 'blur' },
   ],
   email: [
-    { type: 'email', message: 'Please enter a valid email', trigger: 'blur' },
+    { type: 'email', message: t('users.ruleEmailValid'), trigger: 'blur' },
   ],
   password: [
-    { required: true, message: 'Please enter password', trigger: 'blur' },
-    { min: 6, message: 'Password must be at least 6 characters', trigger: 'blur' },
+    { required: true, message: t('users.rulePasswordRequired'), trigger: 'blur' },
+    { min: 6, message: t('users.rulePasswordLength'), trigger: 'blur' },
   ],
   role: [
-    { required: true, message: 'Please select a role', trigger: 'change' },
+    { required: true, message: t('users.ruleRoleRequired'), trigger: 'change' },
   ],
-};
+}));
 
 // Password Dialog
 const passwordDialogVisible = ref(false);
@@ -289,17 +291,17 @@ const passwordForm = reactive({
   confirmPassword: '',
 });
 
-const passwordRules: FormRules = {
+const passwordRules = computed<FormRules>(() => ({
   password: [
-    { required: true, message: 'Please enter new password', trigger: 'blur' },
-    { min: 6, message: 'Password must be at least 6 characters', trigger: 'blur' },
+    { required: true, message: t('users.ruleNewPasswordRequired'), trigger: 'blur' },
+    { min: 6, message: t('users.rulePasswordLength'), trigger: 'blur' },
   ],
   confirmPassword: [
-    { required: true, message: 'Please confirm password', trigger: 'blur' },
+    { required: true, message: t('users.ruleConfirmPasswordRequired'), trigger: 'blur' },
     {
-      validator: (rule, value, callback) => {
+      validator: (rule: any, value: any, callback: any) => {
         if (value !== passwordForm.password) {
-          callback(new Error('Passwords do not match'));
+          callback(new Error(t('users.rulePasswordMismatch')));
         } else {
           callback();
         }
@@ -307,14 +309,14 @@ const passwordRules: FormRules = {
       trigger: 'blur',
     },
   ],
-};
+}));
 
 const fetchUsers = async () => {
   loading.value = true;
   try {
     users.value = await usersApi.getAll();
   } catch (error) {
-    ElMessage.error('Failed to load users');
+    ElMessage.error(t('users.loadFailed'));
   } finally {
     loading.value = false;
   }
@@ -365,7 +367,7 @@ const handleSaveUser = async () => {
           status: userForm.status,
         };
         await usersApi.update(editingUserId.value, data);
-        ElMessage.success('User updated successfully');
+        ElMessage.success(t('users.updateSuccess'));
       } else {
         const data: CreateUserRequest = {
           username: userForm.username,
@@ -374,12 +376,12 @@ const handleSaveUser = async () => {
           role: userForm.role,
         };
         await usersApi.create(data);
-        ElMessage.success('User created successfully');
+        ElMessage.success(t('users.createSuccess'));
       }
       userDialogVisible.value = false;
       await fetchUsers();
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Operation failed';
+      const message = error.response?.data?.error || t('users.saveFailed');
       ElMessage.error(message);
     } finally {
       saving.value = false;
@@ -396,10 +398,10 @@ const handleResetPassword = async () => {
     saving.value = true;
     try {
       await usersApi.updatePassword(passwordUserId.value!, { password: passwordForm.password });
-      ElMessage.success('Password reset successfully');
+      ElMessage.success(t('users.passwordResetSuccess'));
       passwordDialogVisible.value = false;
     } catch (error: any) {
-      const message = error.response?.data?.error || 'Failed to reset password';
+      const message = error.response?.data?.error || t('users.resetPasswordFailed');
       ElMessage.error(message);
     } finally {
       saving.value = false;
@@ -410,24 +412,24 @@ const handleResetPassword = async () => {
 const handleDelete = async (user: UserType) => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete user "${user.username}"?`,
-      'Confirm Delete',
+      t('users.deleteConfirm', { name: user.username }),
+      t('users.confirmDeleteTitle'),
       { type: 'warning' }
     );
 
     await usersApi.delete(user.id);
-    ElMessage.success('User deleted successfully');
+    ElMessage.success(t('users.deleteSuccess'));
     await fetchUsers();
   } catch (error: any) {
     if (error !== 'cancel') {
-      const message = error.response?.data?.error || 'Failed to delete user';
+      const message = error.response?.data?.error || t('users.deleteFailed');
       ElMessage.error(message);
     }
   }
 };
 
 const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return 'Never';
+  if (!dateStr) return t('common.never');
   return new Date(dateStr).toLocaleString();
 };
 

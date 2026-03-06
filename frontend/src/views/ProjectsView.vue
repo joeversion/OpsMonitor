@@ -1,10 +1,10 @@
 <template>
   <div class="projects-view">
     <div class="page-header">
-      <h1>📋 All Projects</h1>
+      <h1>📋 {{ $t('projectsPage.title') }}</h1>
       <el-button type="primary" @click="showAddDialog = true" v-if="isAdmin">
         <el-icon><Plus /></el-icon>
-        New Project
+        {{ $t('projectsPage.createProject') }}
       </el-button>
     </div>
 
@@ -16,7 +16,7 @@
             <el-icon :size="24"><FolderOpened /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Total Projects</div>
+            <div class="stat-label">{{ $t('projectsPage.totalProjects') }}</div>
             <div class="stat-value">{{ filteredProjects.length }}</div>
           </div>
         </div>
@@ -27,7 +27,7 @@
             <el-icon :size="24"><Monitor /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Total Services</div>
+            <div class="stat-label">{{ $t('projectsPage.totalServices') }}</div>
             <div class="stat-value">{{ totalServices }}</div>
           </div>
         </div>
@@ -38,7 +38,7 @@
             <el-icon :size="24"><CircleCheckFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Healthy</div>
+            <div class="stat-label">{{ $t('statusLabels.healthy') }}</div>
             <div class="stat-value" style="color: #67C23A">{{ totalHealthy }}</div>
           </div>
         </div>
@@ -49,7 +49,7 @@
             <el-icon :size="24"><WarningFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Warning</div>
+            <div class="stat-label">{{ $t('statusLabels.warning') }}</div>
             <div class="stat-value" style="color: #E6A23C">{{ totalWarning }}</div>
           </div>
         </div>
@@ -60,7 +60,7 @@
             <el-icon :size="24"><CircleCloseFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">Down</div>
+            <div class="stat-label">{{ $t('statusLabels.down') }}</div>
             <div class="stat-value" style="color: #F56C6C">{{ totalDown }}</div>
           </div>
         </div>
@@ -103,12 +103,12 @@
               popper-class="project-desc-tooltip"
             >
               <template #content>
-                <div v-html="project.description || 'No description'" style="max-width: 300px; color: #303133;"></div>
+                <div v-html="project.description || $t('projectsPage.noDescription')" style="max-width: 300px; color: #303133;"></div>
               </template>
               <div 
                 class="project-desc" 
                 @click.stop="copyDescription(project.description)"
-                v-html="project.description || '<span style=&quot;color:#999&quot;>No description</span>'"
+                v-html="project.description || `<span style='color:#999'>${$t('projectsPage.noDescription')}</span>`"
               ></div>
             </el-tooltip>
           </div>
@@ -117,11 +117,11 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item @click.stop="editProject(project)">
-                  <el-icon><Edit /></el-icon> Edit
+                  <el-icon><Edit /></el-icon> {{ $t('common.edit') }}
                 </el-dropdown-item>
                 <el-dropdown-item @click.stop="confirmDelete(project)" divided>
                   <el-icon color="#f56c6c"><Delete /></el-icon> 
-                  <span style="color: #f56c6c">Delete</span>
+                  <span style="color: #f56c6c">{{ $t('common.delete') }}</span>
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -130,19 +130,19 @@
         <div class="card-stats">
           <div class="pstat">
             <div class="pstat-value">{{ project.service_count }}</div>
-            <div class="pstat-label">Services</div>
+            <div class="pstat-label">{{ $t('projectsPage.services') }}</div>
           </div>
           <div class="pstat">
             <div class="pstat-value healthy">{{ project.healthy_count }}</div>
-            <div class="pstat-label">Healthy</div>
+            <div class="pstat-label">{{ $t('statusLabels.healthy') }}</div>
           </div>
           <div class="pstat">
             <div class="pstat-value warning">{{ project.warning_count }}</div>
-            <div class="pstat-label">Warning</div>
+            <div class="pstat-label">{{ $t('statusLabels.warning') }}</div>
           </div>
           <div class="pstat">
             <div class="pstat-value down">{{ project.down_count }}</div>
-            <div class="pstat-label">Down</div>
+            <div class="pstat-label">{{ $t('statusLabels.down') }}</div>
           </div>
         </div>
       </div>
@@ -153,8 +153,8 @@
           <div class="add-icon">
             <el-icon :size="32"><Plus /></el-icon>
           </div>
-          <div class="add-text">Add New Project</div>
-          <div class="add-subtext">Create a new monitoring project</div>
+          <div class="add-text">{{ $t('projectsPage.dialogCreate') }}</div>
+          <div class="add-subtext">{{ $t('projectsPage.createProjectDesc') }}</div>
         </div>
       </div>
     </div>
@@ -162,16 +162,16 @@
     <!-- Add/Edit Project Dialog -->
     <el-dialog 
       v-model="showAddDialog" 
-      :title="editingProject ? 'Edit Project' : 'Add New Project'" 
+      :title="editingProject ? $t('projectsPage.dialogEdit') : $t('projectsPage.dialogCreate')" 
       width="450px"
       destroy-on-close
       @closed="resetForm"
     >
       <el-form :model="projectForm" label-position="top">
-        <el-form-item label="Project Name" required>
-          <el-input v-model="projectForm.name" placeholder="Enter project name" />
+        <el-form-item :label="$t('projectsPage.labelName')" required>
+          <el-input v-model="projectForm.name" :placeholder="$t('projectsPage.placeholderName')" />
         </el-form-item>
-        <el-form-item label="Description">
+        <el-form-item :label="$t('projectsPage.labelDesc')">
           <div class="rich-editor-container">
             <Toolbar
               style="border-bottom: 1px solid #dcdfe6"
@@ -188,7 +188,7 @@
             />
           </div>
         </el-form-item>
-        <el-form-item label="Icon Color">
+        <el-form-item :label="$t('projectsPage.labelIconColor')">
           <div class="color-options">
             <el-tooltip 
               v-for="color in colorOptions" 
@@ -210,9 +210,9 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showAddDialog = false">Cancel</el-button>
+        <el-button @click="showAddDialog = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="handleSave" :loading="saving">
-          {{ editingProject ? 'Save Changes' : 'Create Project' }}
+          {{ editingProject ? $t('common.save') : $t('projectsPage.createProject') }}
         </el-button>
       </template>
     </el-dialog>
@@ -222,6 +222,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, inject, shallowRef, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
   Plus, FolderOpened, Monitor, CircleCheckFilled, WarningFilled, CircleCloseFilled,
@@ -240,6 +241,7 @@ import authUtils from '../utils/auth';
 const isAdmin = computed(() => authUtils.isAdmin());
 
 const router = useRouter();
+const { t } = useI18n();
 const setCurrentProject = inject<(id: number | string | null) => void>('setCurrentProject');
 const currentProjectId = inject<import('vue').Ref<string | undefined>>('currentProjectId');
 const refreshProjects = inject<() => void>('refreshProjects');
@@ -275,7 +277,7 @@ const toolbarConfig = {
 };
 
 const editorConfig = {
-  placeholder: 'Enter project description...',
+  placeholder: t('projectsPage.placeholderDesc'),
   MENU_CONF: {
     fontSize: {
       fontSizeList: ['12px', '14px', '16px', '18px', '20px', '24px']
@@ -344,9 +346,9 @@ function getStatusType(project: ProjectWithStats): 'success' | 'warning' | 'dang
 }
 
 function getStatusText(project: ProjectWithStats): string {
-  if (project.down_count > 0) return 'Critical';
-  if (project.warning_count > 0) return 'Warning';
-  return 'Healthy';
+  if (project.down_count > 0) return t('statusLabels.critical');
+  if (project.warning_count > 0) return t('statusLabels.warning');
+  return t('statusLabels.healthy');
 }
 
 function isDescriptionOverflow(description: string | undefined): boolean {
@@ -363,9 +365,9 @@ function copyDescription(description: string | undefined) {
   tempDiv.innerHTML = description;
   const plainText = tempDiv.textContent || tempDiv.innerText || '';
   navigator.clipboard.writeText(plainText).then(() => {
-    ElMessage.success('Description copied to clipboard');
+    ElMessage.success(t('projectsPage.copiedToClipboard'));
   }).catch(() => {
-    ElMessage.error('Failed to copy');
+    ElMessage.error(t('projectsPage.copyFailed'));
   });
 }
 
@@ -374,7 +376,7 @@ async function loadProjects() {
   try {
     projects.value = await getProjects();
   } catch (error) {
-    ElMessage.error('Failed to load projects');
+    ElMessage.error(t('projectsPage.loadFailed'));
   } finally {
     loading.value = false;
   }
@@ -401,7 +403,7 @@ function editProject(project: ProjectWithStats) {
 
 async function handleSave() {
   if (!projectForm.value.name.trim()) {
-    ElMessage.warning('Please enter a project name');
+    ElMessage.warning(t('projectsPage.ruleNameRequired'));
     return;
   }
 
@@ -409,16 +411,16 @@ async function handleSave() {
   try {
     if (editingProject.value) {
       await updateProject(editingProject.value.id, projectForm.value);
-      ElMessage.success('Project updated successfully');
+      ElMessage.success(t('projectsPage.updateSuccess'));
     } else {
       await createProject(projectForm.value);
-      ElMessage.success('Project created successfully');
+      ElMessage.success(t('projectsPage.createSuccess'));
     }
     showAddDialog.value = false;
     await loadProjects();
     refreshProjects?.();
   } catch (error) {
-    ElMessage.error('Failed to save project');
+    ElMessage.error(t('projectsPage.saveFailed'));
   } finally {
     saving.value = false;
   }
@@ -438,17 +440,17 @@ function resetForm() {
 async function confirmDelete(project: ProjectWithStats) {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete "${project.name}"? Services in this project will become unassigned.`,
-      'Delete Project',
-      { type: 'warning', confirmButtonText: 'Delete', cancelButtonText: 'Cancel' }
+      t('projectsPage.deleteConfirm', { name: project.name }),
+      t('projectsPage.deleteProject'),
+      { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') }
     );
     await deleteProject(project.id);
-    ElMessage.success('Project deleted');
+    ElMessage.success(t('projectsPage.deleteSuccess'));
     await loadProjects();
     refreshProjects?.();
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('Failed to delete project');
+      ElMessage.error(t('projectsPage.deleteFailed'));
     }
   }
 }

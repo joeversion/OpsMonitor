@@ -2,22 +2,22 @@
   <div class="schedule-config-panel">
     <el-form :model="config" label-width="140px">
       <!-- Schedule Type -->
-      <el-form-item label="Schedule Mode">
+      <el-form-item :label="$t('schedule.labelMode')">
         <el-radio-group v-model="config.type" @change="onTypeChange">
           <el-radio-button label="fixed">
             <el-icon><Clock /></el-icon>
-            Fixed Interval
+            {{ $t('schedule.modeFixed') }}
           </el-radio-button>
           <el-radio-button label="timeRange">
             <el-icon><Calendar /></el-icon>
-            Time Rules
+            {{ $t('schedule.modeTimeRules') }}
           </el-radio-button>
         </el-radio-group>
       </el-form-item>
       
       <!-- Fixed Interval Mode -->
       <div v-if="config.type === 'fixed'" class="fixed-mode">
-        <el-form-item label="Check Interval">
+        <el-form-item :label="$t('schedule.labelInterval')">
           <div class="interval-controls">
             <el-input-number 
               v-model="intervalValue" 
@@ -30,9 +30,9 @@
               style="width: 100px;"
               @change="updateFixedInterval"
             >
-              <el-option label="Seconds" value="seconds" />
-              <el-option label="Minutes" value="minutes" />
-              <el-option label="Hours" value="hours" />
+              <el-option :label="$t('schedule.unitSeconds')" value="seconds" />
+              <el-option :label="$t('schedule.unitMinutes')" value="minutes" />
+              <el-option :label="$t('schedule.unitHours')" value="hours" />
             </el-select>
           </div>
           <div class="interval-desc">
@@ -46,7 +46,7 @@
       <!-- Time Range Mode -->
       <div v-else class="time-range-mode">
         <!-- Default Interval -->
-        <el-form-item label="Default Interval">
+        <el-form-item :label="$t('schedule.labelDefaultInterval')">
           <div class="interval-controls">
             <el-input-number 
               v-model="defaultIntervalValue" 
@@ -59,9 +59,9 @@
               style="width: 100px;"
               @change="updateDefaultInterval"
             >
-              <el-option label="Seconds" value="seconds" />
-              <el-option label="Minutes" value="minutes" />
-              <el-option label="Hours" value="hours" />
+              <el-option :label="$t('schedule.unitSeconds')" value="seconds" />
+              <el-option :label="$t('schedule.unitMinutes')" value="minutes" />
+              <el-option :label="$t('schedule.unitHours')" value="hours" />
             </el-select>
           </div>
           <div class="interval-desc">
@@ -71,17 +71,16 @@
           </div>
         </el-form-item>
         
-        <!-- Time Rules List -->
-        <el-form-item label="Time Rules">
+        <el-form-item :label="$t('schedule.modeTimeRules')">
           <div class="time-ranges-container" v-loading="previewLoading">
             <el-empty 
               v-if="!config.timeRanges || config.timeRanges.length === 0"
-              description="No time rules"
+              :description="$t('schedule.emptyRules')"
               :image-size="60"
             >
               <el-button type="primary" @click="addTimeRange">
                 <el-icon><Plus /></el-icon>
-                Add First Rule
+                {{ $t('schedule.btnAddFirstRule') }}
               </el-button>
             </el-empty>
             
@@ -103,19 +102,19 @@
                 style="width: 100%;"
               >
                 <el-icon><Plus /></el-icon>
-                Add Time Rule
+                {{ $t('schedule.btnAddRule') }}
               </el-button>
             </div>
           </div>
         </el-form-item>
         
         <!-- Execution Preview -->
-        <el-form-item label="Execution Preview">
+        <el-form-item :label="$t('schedule.previewTitle')">
           <div class="preview-container">
             <el-card shadow="never" class="preview-card">
               <template #header>
                 <div class="preview-header">
-                  <span>Next Check Time</span>
+                  <span>{{ $t('schedule.nextCheckTime') }}</span>
                   <el-button 
                     size="small" 
                     text 
@@ -123,31 +122,31 @@
                     @click="refreshPreview"
                     :loading="previewLoading"
                   >
-                    Refresh
+                    {{ $t('common.refresh') }}
                   </el-button>
                 </div>
               </template>
               
               <div v-if="previewData" class="preview-content">
                 <el-descriptions :column="1" border size="small">
-                  <el-descriptions-item label="Current Time">
+                  <el-descriptions-item :label="$t('schedule.currentTime')">
                     {{ previewData.currentTimeString }}
                   </el-descriptions-item>
-                  <el-descriptions-item label="Current Range">
+                  <el-descriptions-item :label="$t('schedule.currentRange')">
                     <el-tag :type="previewData.currentRange === 'default' ? 'info' : 'success'">
                       {{ previewData.currentRange }}
                     </el-tag>
                   </el-descriptions-item>
-                  <el-descriptions-item label="Current Interval">
-                    {{ previewData.currentInterval }} seconds
+                  <el-descriptions-item :label="$t('schedule.currentInterval')">
+                    {{ previewData.currentInterval }} {{ $t('common.seconds') }}
                   </el-descriptions-item>
-                  <el-descriptions-item label="Next Run">
+                  <el-descriptions-item :label="$t('schedule.nextRun')">
                     <el-text type="primary">{{ formatNextRun(previewData.nextRunTime) }}</el-text>
                   </el-descriptions-item>
                 </el-descriptions>
                 
                 <!-- Future execution schedule -->
-                <el-divider content-position="left">Execution Plan (Next 24 Hours)</el-divider>
+                <el-divider content-position="left">{{ $t('schedule.executionPlan') }}</el-divider>
                 <div class="future-runs">
                   <el-timeline>
                     <el-timeline-item
@@ -158,7 +157,7 @@
                     >
                       <el-tag size="small">{{ item.range }}</el-tag>
                       <el-text size="small" type="info" style="margin-left: 8px;">
-                        interval {{ item.interval }}s
+                        {{ $t('schedule.previewInterval', { n: item.interval }) }}
                       </el-text>
                     </el-timeline-item>
                   </el-timeline>
@@ -183,6 +182,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { Clock, Calendar, Plus, Refresh } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n';
 import axios from 'axios';
 import type { ScheduleConfig, TimeRange, SchedulePreview } from '@/types/schedule';
 import TimeRangeEditor from './TimeRangeEditor.vue';
@@ -197,6 +197,7 @@ const emit = defineEmits<{
 
 // Configuration data
 const config = ref<ScheduleConfig>({ ...props.modelValue });
+const { t } = useI18n();
 
 // Fixed interval related
 const intervalValue = ref(1);
@@ -244,13 +245,13 @@ const fixedIntervalDescription = computed(() => {
   if (config.value.type === 'fixed') {
     const seconds = config.value.defaultInterval;
     if (seconds < 60) {
-      return `Check every ${seconds} seconds`;
+      return t('schedule.checkEvery', { n: seconds, unit: t('common.seconds') });
     } else if (seconds < 3600) {
       const minutes = Math.floor(seconds / 60);
-      return `Check every ${minutes} minute${minutes > 1 ? 's' : ''}`;
+      return t('schedule.checkEvery', { n: minutes, unit: t('common.minutes') });
     } else {
       const hours = Math.floor(seconds / 3600);
-      return `Check every ${hours} hour${hours > 1 ? 's' : ''}`;
+      return t('schedule.checkEvery', { n: hours, unit: t('common.hours') });
     }
   }
   return '';
@@ -260,13 +261,13 @@ const fixedIntervalDescription = computed(() => {
 const defaultIntervalDescription = computed(() => {
   const seconds = config.value.defaultInterval;
   if (seconds < 60) {
-    return `Used when no time rule matches (${seconds} seconds)`;
+    return t('schedule.defaultIntervalHint', { n: seconds, unit: t('common.seconds') });
   } else if (seconds < 3600) {
     const minutes = Math.floor(seconds / 60);
-    return `Used when no time rule matches (${minutes} minute${minutes > 1 ? 's' : ''})`;
+    return t('schedule.defaultIntervalHint', { n: minutes, unit: t('common.minutes') });
   } else {
     const hours = Math.floor(seconds / 3600);
-    return `Used when no time rule matches (${hours} hour${hours > 1 ? 's' : ''})`;
+    return t('schedule.defaultIntervalHint', { n: hours, unit: t('common.hours') });
   }
 });
 
@@ -341,7 +342,7 @@ function onTypeChange() {
     // Add default rule if no rules exist
     if (config.value.timeRanges.length === 0) {
       config.value.timeRanges.push({
-        name: 'Business Hours',
+        name: t('timeRange.defaultName'),
         start: '09:00',
         end: '18:00',
         interval: config.value.defaultInterval,
@@ -359,7 +360,7 @@ function addTimeRange() {
     config.value.timeRanges = [];
   }
   const newRange: TimeRange = {
-    name: `Range ${config.value.timeRanges.length + 1}`,
+    name: t('timeRange.defaultRangeName', { n: config.value.timeRanges.length + 1 }),
     start: '09:00',
     end: '18:00',
     interval: config.value.defaultInterval,
@@ -384,7 +385,7 @@ function deleteRange(index: number) {
   // If all time rules are deleted, switch back to Fixed Interval mode
   if (!config.value.timeRanges || config.value.timeRanges.length === 0) {
     config.value.type = 'fixed';
-    ElMessage.info('Switched to Fixed Interval mode as all time rules were deleted');
+    ElMessage.info(t('schedule.msgSwitchedToFixed'));
   }
   
   emitUpdate();
@@ -420,7 +421,7 @@ async function refreshPreview() {
     const response = await axios.post('/api/preview', config.value);
     previewData.value = response.data;
   } catch (error: any) {
-    previewError.value = 'Preview failed: ' + (error.response?.data?.error || error.message);
+    previewError.value = t('schedule.previewFailed', { error: error.response?.data?.error || error.message });
     console.error('Preview failed:', error);
   } finally {
     previewLoading.value = false;
@@ -435,12 +436,12 @@ function formatNextRun(isoString: string): string {
   const seconds = Math.floor(diff / 1000);
   
   if (seconds < 60) {
-    return `in ${seconds} seconds`;
+    return t('schedule.inNSeconds', { n: seconds });
   } else if (seconds < 3600) {
     const mins = Math.floor(seconds / 60);
-    return `in ${mins} minute${mins > 1 ? 's' : ''}`;
+    return t('schedule.inNMinutes', { n: mins });
   } else {
-    return date.toLocaleString('en-US');
+    return date.toLocaleString();
   }
 }
 
@@ -467,7 +468,7 @@ onMounted(() => {
         config.value.timeRanges = [];
       }
       config.value.timeRanges.push({
-        name: 'Business Hours',
+        name: t('timeRange.defaultName'),
         start: '09:00',
         end: '18:00',
         interval: config.value.defaultInterval,
