@@ -332,31 +332,101 @@ This project is a modern monitoring system primarily led and developed by AI:
 ```
 OpsMonitor/
 ├── backend/                    # Node.js + Express API server
-│   ├── src/
+│   ├── src/                   # Source code
 │   │   ├── routes/          # API routes (15 modules)
+│   │   │   ├── auth.ts               # Authentication
+│   │   │   ├── projects.ts           # Project management
+│   │   │   ├── hosts.ts              # Host management
+│   │   │   ├── services.ts           # Service management
+│   │   │   ├── checks.ts             # Health check records
+│   │   │   ├── dependencies.ts       # Dependency management
+│   │   │   ├── dependency-types.ts   # Dependency type management
+│   │   │   ├── alerts.ts             # Alert configuration
+│   │   │   ├── security-configs.ts   # Security config (SSH/AccessKey/SSL)
+│   │   │   ├── grafana-dashboards.ts # Grafana dashboard management
+│   │   │   ├── schedule.ts           # Schedule configuration
+│   │   │   ├── system-settings.ts    # System settings
+│   │   │   ├── users.ts              # User management
+│   │   │   ├── config.ts             # General config API
+│   │   │   └── ssh-pool.ts           # SSH connection pool management
 │   │   ├── services/        # Business logic (10 services)
-│   │   ├── db/              # Database config & schema
-│   │   ├── middleware/      # JWT auth & validation
-│   │   ├── utils/           # Logger, schedule validator & notification i18n
+│   │   │   ├── health-checker.ts     # Health check service
+│   │   │   ├── ssh-service.ts        # SSH connection service
+│   │   │   ├── ssh-checker.ts        # SSH check service
+│   │   │   ├── ssh-connection-pool.ts # SSH connection pool
+│   │   │   ├── scheduler.ts          # Scheduled task scheduler
+│   │   │   ├── dynamic-scheduler.ts  # Dynamic scheduler
+│   │   │   ├── check-event-bus.ts    # Check result event bus (SSE)
+│   │   │   ├── alert-service.ts      # Alert service
+│   │   │   ├── notification-service.ts # Notification service (Email/Teams)
+│   │   │   └── auth-service.ts       # Auth service
+│   │   ├── db/              # Database
+│   │   │   ├── database.ts           # Database config & migrations
+│   │   │   └── schema.sql            # Database schema
+│   │   ├── middleware/      # Middleware
+│   │   │   ├── auth.ts               # JWT auth middleware
+│   │   │   └── validation.ts         # Request validation middleware
+│   │   ├── utils/           # Utilities
+│   │   │   ├── logger.ts             # Logging utility
+│   │   │   ├── notification-i18n.ts  # Notification i18n support
+│   │   │   └── schedule-validator.ts # Schedule validation utility
 │   │   ├── types/           # TypeScript type definitions
-│   │   └── app.ts           # Express entry point
-│   ├── scripts/             # Maintenance scripts (3)
-│   ├── Dockerfile
+│   │   └── app.ts           # Express app entry point
+│   ├── scripts/               # Maintenance scripts (3)
+│   │   ├── check-data-consistency.js
+│   │   ├── add-data-consistency-triggers.js
+│   │   └── add-host-sync-trigger.js
+│   ├── Dockerfile             # Production Docker image
 │   ├── package.json
 │   └── tsconfig.json
 ├── frontend/                   # Vue 3 + TypeScript SPA
-│   ├── src/
+│   ├── src/                   # Source code
 │   │   ├── views/           # Page components (13)
+│   │   │   ├── LoginView.vue         # Login page
+│   │   │   ├── HomeView.vue          # Home dashboard
+│   │   │   ├── ProjectsView.vue      # Project management
+│   │   │   ├── HostsView.vue         # Host management
+│   │   │   ├── ServiceListView.vue   # Service list
+│   │   │   ├── DependencyGraphView.vue # Dependency graph
+│   │   │   ├── CrossProjectDepsView.vue # Cross-project dependencies
+│   │   │   ├── AlertConfigView.vue   # Alert configuration
+│   │   │   ├── SecurityConfigView.vue # Security configuration
+│   │   │   ├── GrafanaDashboardsView.vue # Grafana dashboards
+│   │   │   ├── ConnectionsView.vue   # SSH connection management
+│   │   │   ├── SettingsView.vue      # System settings
+│   │   │   └── UserManagementView.vue # User management
 │   │   ├── components/      # Reusable components (14)
+│   │   │   ├── AddServiceWizard.vue  # Add service wizard
+│   │   │   ├── LangSwitch.vue        # Language switch component
+│   │   │   ├── ProjectSelector.vue   # Project selector
+│   │   │   ├── StatusBadge.vue       # Service status badge
+│   │   │   ├── ResponseChart.vue     # Response time chart
+│   │   │   ├── InteractiveGraphCanvas.vue # Interactive dependency graph canvas
+│   │   │   ├── LayeredGraphCanvas.vue # Layered dependency graph canvas
+│   │   │   ├── ScheduleConfigPanel.vue # Schedule config panel
+│   │   │   ├── ScheduleTemplateSelector.vue # Schedule template selector
+│   │   │   ├── TimeRangeEditor.vue   # Time range editor
+│   │   │   ├── WeekdaySelector.vue   # Weekday selector
+│   │   │   ├── IconSelector.vue      # Icon selector
+│   │   │   ├── ServiceIcon.vue       # Service icon
+│   │   │   └── HelloWorld.vue        # Example component
 │   │   ├── api/             # API call wrappers
 │   │   ├── i18n/            # Internationalization (zh-CN / en-US)
 │   │   ├── router/          # Vue Router configuration
 │   │   ├── types/           # TypeScript type definitions
-│   │   └── utils/           # Utilities
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   └── package.json
-├── docs/
+│   │   ├── utils/           # Utilities
+│   │   ├── assets/          # Static assets
+│   │   ├── App.vue          # Vue root component
+│   │   ├── main.ts          # App entry point
+│   │   └── style.css        # Global styles
+│   ├── public/                # Public assets
+│   ├── Dockerfile             # Nginx production image
+│   ├── nginx.conf             # Nginx configuration
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── tsconfig.json
+├── docs/                      # Documentation
 │   ├── USER_MANUAL_CN.md
 │   └── USER_MANUAL_EN.md
 ├── docker-compose.yml
