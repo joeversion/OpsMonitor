@@ -8,7 +8,6 @@ import { HealthChecker } from '../services/health-checker';
 import { Scheduler } from '../services/scheduler';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import * as net from 'net';
 import logger from '../utils/logger';
 
 const execAsync = promisify(exec);
@@ -1109,6 +1108,11 @@ router.post('/:id/test', async (req: Request, res: Response) => {
       const { promisify } = await import('util');
       const execAsync = promisify(exec);
       
+      // Bug #031: Validate IP/hostname to prevent shell command injection
+      if (!host.ip || !/^[a-zA-Z0-9.\-]+$/.test(host.ip)) {
+        return res.status(400).json({ success: false, message: 'Invalid host IP address format' });
+      }
+
       const startTime = Date.now();
       const isWindows = process.platform === 'win32';
       // Windows: ping -n 1, Unix: ping -c 1
@@ -1128,65 +1132,13 @@ router.post('/:id/test', async (req: Request, res: Response) => {
           method: 'ping'
         };
       } catch (pingError: any) {
-        // Ping failed - try TCP connection as fallback (common in Docker containers)
-        logger.api.debug('Ping failed, trying TCP fallback', { ip: host.ip, error: pingError.message });
-        
-        try {
-          // Try common ports: SSH(22), HTTP(80), HTTPS(443)
-          const portsToTry = [22, 80, 443];
-          let tcpSuccess = false;
-          
-          for (const port of portsToTry) {
-            try {
-              await new Promise<void>((resolve, reject) => {
-                const socket = net.createConnection({ host: host.ip, port, timeout: 2000 }, () => {
-                  socket.destroy();
-                  tcpSuccess = true;
-                  resolve();
-                });
-                socket.on('error', (err: Error) => {
-                  socket.destroy();
-                  reject(err);
-                });
-                socket.on('timeout', () => {
-                  socket.destroy();
-                  reject(new Error('Connection timeout'));
-                });
-              });
-              
-              if (tcpSuccess) break;
-            } catch (err) {
-              // Try next port
-              continue;
-            }
-          }
-          
-          const latency = Date.now() - startTime;
-          
-          if (tcpSuccess) {
-            testResult = {
-              success: true,
-              message: `Host ${host.ip} is reachable (TCP check)`,
-              latency,
-              method: 'tcp'
-            };
-          } else {
-            testResult = {
-              success: false,
-              message: `Host ${host.ip} is unreachable (ping and TCP failed)`,
-              latency,
-              method: 'both_failed'
-            };
-          }
-        } catch (tcpError: any) {
-          const latency = Date.now() - startTime;
-          testResult = {
-            success: false,
-            message: `Host ${host.ip} is unreachable`,
-            latency,
-            method: 'both_failed'
-          };
-        }
+        const latency = Date.now() - startTime;
+        testResult = {
+          success: false,
+          message: `Host ${host.ip} is unreachable`,
+          latency,
+          method: 'ping'
+        };
       }
       
       // Save test result
@@ -1301,7 +1253,7 @@ async function testConnectionAfterUpdate(host: any): Promise<void> {
       console.log(`[Host Update] Auto SSH test for ${host.name}: ${status}`);
       
     } else if (host.connection_type === 'local') {
-      // Local类型：使用Ping + TCP回退测试（与Test ping API逻辑保持一致）
+      // Local类型：仅使用Ping测试（与Test ping API逻辑保持一致）
       let testResult: { success: boolean; message: string; latency: number; method?: string } | null = null;
       
       try {
@@ -1320,65 +1272,13 @@ async function testConnectionAfterUpdate(host: any): Promise<void> {
           method: 'ping'
         };
       } catch (pingError: any) {
-        // Ping失败 - 尝试TCP连接作为回退（在Docker容器中很常见）
-        logger.api.debug('Ping failed in auto test, trying TCP fallback', { ip: host.ip, error: pingError.message });
-        
-        try {
-          // 尝试常用端口: SSH(22), HTTP(80), HTTPS(443)
-          const portsToTry = [22, 80, 443];
-          let tcpSuccess = false;
-          
-          for (const port of portsToTry) {
-            try {
-              await new Promise<void>((resolve, reject) => {
-                const socket = net.createConnection({ host: host.ip, port, timeout: 2000 }, () => {
-                  socket.destroy();
-                  tcpSuccess = true;
-                  resolve();
-                });
-                socket.on('error', (err: Error) => {
-                  socket.destroy();
-                  reject(err);
-                });
-                socket.on('timeout', () => {
-                  socket.destroy();
-                  reject(new Error('Connection timeout'));
-                });
-              });
-              
-              if (tcpSuccess) break;
-            } catch (err) {
-              // 尝试下一个端口
-              continue;
-            }
-          }
-          
-          const latency = Date.now() - startTime;
-          
-          if (tcpSuccess) {
-            testResult = {
-              success: true,
-              message: `Host ${host.ip} is reachable (TCP check)`,
-              latency,
-              method: 'tcp'
-            };
-          } else {
-            testResult = {
-              success: false,
-              message: `Host ${host.ip} is unreachable (ping and TCP failed)`,
-              latency,
-              method: 'both_failed'
-            };
-          }
-        } catch (tcpError: any) {
-          const latency = Date.now() - startTime;
-          testResult = {
-            success: false,
-            message: `Host ${host.ip} is unreachable`,
-            latency,
-            method: 'both_failed'
-          };
-        }
+        const latency = Date.now() - startTime;
+        testResult = {
+          success: false,
+          message: `Host ${host.ip} is unreachable`,
+          latency,
+          method: 'ping'
+        };
       }
       
       // 保存测试结果

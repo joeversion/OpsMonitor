@@ -595,7 +595,8 @@ export class Scheduler {
 
   /**
    * Perform ping check for local type hosts
-   * Uses system ping command to check host reachability
+    * Uses system ping command to check host reachability.
+    * Ping-only behavior: no TCP fallback.
    */
   private static async performPingCheck(host: any): Promise<{ success: boolean; message: string; latency?: number }> {
     const { exec } = require('child_process');
@@ -607,6 +608,11 @@ export class Scheduler {
     
     if (!targetIp) {
       return { success: false, message: 'Host IP address is not configured', latency: 0 };
+    }
+
+    // Bug #031: Validate IP/hostname to prevent shell command injection
+    if (!/^[a-zA-Z0-9.\-]+$/.test(targetIp)) {
+      return { success: false, message: 'Invalid host IP address format', latency: 0 };
     }
     
     // Use different ping command based on platform
@@ -626,7 +632,6 @@ export class Scheduler {
       };
     } catch (error: any) {
       const latency = Date.now() - startTime;
-      
       return { 
         success: false, 
         message: `Host ${targetIp} is unreachable`, 
