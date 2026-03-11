@@ -1511,7 +1511,7 @@ const checkIntervalUnit = ref<'seconds' | 'minutes' | 'hours'>('seconds');
 
 const httpConfig = reactive({
   protocol: 'https',
-  path: '/',
+  path: '',
   expected_status: 200,
   timeout: 5000,
 });
@@ -2104,7 +2104,7 @@ const resetForm = () => {
   
   // HTTP config
   httpConfig.protocol = 'https';
-  httpConfig.path = '/';
+  httpConfig.path = '';
   httpConfig.expected_status = 200;
   httpConfig.timeout = 5000;
   

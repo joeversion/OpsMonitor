@@ -963,7 +963,7 @@ const newHostForm = reactive<CreateHostDto>({
 // HTTP config
 const httpConfig = reactive({
   protocol: 'https',
-  path: '/',
+  path: '',
   expected_status: 200,
   timeout: 5000
 });
@@ -1344,7 +1344,7 @@ const resetForm = () => {
   // Reset health check configurations
   Object.assign(httpConfig, {
     protocol: 'https',
-    path: '/',
+    path: '',
     expected_status: 200,
     timeout: 5000
   });
@@ -1369,11 +1369,10 @@ watch(() => props.modelValue, async (newVal) => {
   if (newVal) {
     // Show banner when dialog opens
     showBanner.value = true;
+    // Always reset local reactive state first to avoid stale values between edits.
+    resetForm();
     
     if ((props.isEdit || props.isCopy) && props.editData) {
-      // Reset step to first
-      currentStep.value = 0;
-      
       // Populate form with edit data
       form.name = props.isCopy ? `${props.editData.name} - Copy` : (props.editData.name || '');
       form.project_id = props.editData.project_id;
