@@ -1,7 +1,7 @@
 # OpsMonitor Service Monitoring System — User Manual
 
-> **Version**: 2.1.0
-> **Updated**: 2026-03-04
+> **Version**: 2.2.0
+> **Updated**: 2026-03-11
 > **Scope**: OpsMonitor Service Monitoring System (Frontend port: 5173, Backend port: 3000)
 
 ---
@@ -48,6 +48,7 @@ OpsMonitor is a full-stack service monitoring system designed for teams and smal
 | 📈 **Grafana Integration** | Embed external Grafana dashboards for unified display |
 | 🔐 **Security Management** | Expiration monitoring & reminders for AccessKeys, SSL certificates, and passwords |
 | 🔄 **Dynamic Scheduling** | Flexible scheduled check configuration with time range restrictions |
+| 🌍 **Multi-Language Support** | One-click Chinese/English UI switching with automatic notification language sync |
 
 ### 1.2 System Architecture
 
@@ -91,7 +92,7 @@ The system provides two user roles:
 
 | Layer | Technologies |
 |-------|-------------|
-| **Frontend** | Vue 3 · TypeScript · Element Plus · ECharts · Pinia · Axios |
+| **Frontend** | Vue 3 · TypeScript · Element Plus · ECharts · Pinia · Axios · vue-i18n |
 | **Backend** | Node.js · Express · TypeScript · JWT · node-cron |
 | **Database** | SQLite (embedded, no separate deployment needed) |
 | **Remote Communication** | ssh2 (SSH connection pool) |
@@ -278,6 +279,24 @@ After logging in, click the **user avatar/username in the top-right corner** to 
 ### 4.5 Logout
 
 Click the user menu in the top-right corner → **Logout** to safely sign out. The system will clear local tokens and redirect to the login page.
+
+### 4.6 Language Switching
+
+The system supports **Chinese (Simplified)** and **English** interface languages, switchable at any time.
+
+**How to switch**:
+
+1. Click the language switch button in the top-right corner of the page (displays “中文” or “EN”)
+2. Select the target language from the dropdown menu
+3. The interface will immediately switch to the selected language
+
+**Language preference rules**:
+
+| Scenario | Behavior |
+|----------|----------|
+| First visit | Automatically detects browser language; Chinese browsers default to Chinese, others default to English |
+| After manual switch | Language preference is saved to local storage and automatically applied on next visit |
+| Alert notifications | Language preference syncs to the backend; Email and Teams alert notifications will be sent in the same language |
 
 ---
 
@@ -1315,28 +1334,36 @@ The connection pool isolation unit is the **credential combination** (`host:port
 | GET | `/api/auth/me` | Get current logged-in user info |
 | GET/POST/PUT/DELETE | `/api/users` | User management (Admin only) |
 | GET/POST/PUT/DELETE | `/api/projects` | Project management |
+| GET | `/api/projects/:id/graph` | Get project dependency graph data |
 | GET/POST/PUT/DELETE | `/api/hosts` | Host management |
 | POST | `/api/hosts/:id/test-connection` | Test host SSH connection |
+| POST | `/api/hosts/test-all` | Batch test all host connections |
 | GET/POST/PUT/DELETE | `/api/services` | Service management |
 | GET | `/api/services/export` | Export all service configurations (JSON) |
 | POST | `/api/services/import` | Import service configurations |
 | PUT | `/api/services/:id/schedule` | Update service schedule configuration |
 | GET | `/api/checks/latest` | Get latest health check records |
+| GET | `/api/checks/events` | SSE real-time check result stream |
 | POST | `/api/checks/:id/run` | Manually trigger a health check |
 | GET | `/api/checks/:id/history` | Get check history records |
 | GET | `/api/checks/stats/summary` | Get check statistics summary |
 | GET/POST/PUT/DELETE | `/api/dependencies` | Dependency management |
+| GET | `/api/dependencies/cross-project` | Get cross-project dependencies |
 | GET/POST/PUT/DELETE | `/api/dependency-types` | Dependency type management |
 | GET | `/api/alerts` | Get alert history records |
+| GET | `/api/alerts/unacknowledged/count` | Get unacknowledged alert count |
 | GET/PUT | `/api/config/notifications` | Notification channel configuration |
+| PUT | `/api/config/notification-lang` | Set notification language preference |
 | POST | `/api/config/notifications/test` | Send test notification |
 | GET/POST/PUT/DELETE | `/api/security-configs` | Security configuration management |
-| POST | `/api/security-configs/check-expiry` | Manually trigger expiry check |
+| GET | `/api/security-configs/check/expiring` | Get expiring security configs |
 | GET/POST/PUT/DELETE | `/api/grafana-dashboards` | Grafana dashboard management |
 | GET | `/api/system-settings` | Get all system settings |
 | GET/PUT | `/api/system-settings/:key` | Get or update a specific system setting |
 | GET | `/api/ssh/pool-stats` | SSH connection pool status |
 | GET | `/api/schedule/templates` | Get schedule template list |
+| POST | `/api/schedule/preview` | Preview schedule execution times |
+| POST | `/api/schedule/validate` | Validate schedule configuration |
 
 ---
 
@@ -1348,7 +1375,3 @@ The connection pool isolation unit is the **credential combination** (`host:port
 | `Ctrl + R` | Refresh current page data |
 
 ---
-
-**Document Version**: 2.1.0
-**Updated**: 2026-03-04
-**Maintained by**: OpsMonitor Team

@@ -22,6 +22,7 @@
 - 🔐 **安全管理**: AccessKey、SSL 证书、密码过期监控与提醒
 - 🌐 **跨项目依赖**: 追踪和管理多个项目之间的复杂依赖关系
 - 🔄 **动态调度**: 灵活的定时任务配置
+- 🌍 **多语言支持**: 中英文界面一键切换，告警通知语言同步
 
 ## 🤖 AI 开发说明
 
@@ -70,13 +71,14 @@ OpsMonitor/
 │   │   │   ├── users.ts              # 用户管理
 │   │   │   ├── config.ts             # 通用配置接口
 │   │   │   └── ssh-pool.ts           # SSH 连接池管理
-│   │   ├── services/        # 业务逻辑 (9 个服务)
+│   │   ├── services/        # 业务逻辑 (10 个服务)
 │   │   │   ├── health-checker.ts     # 健康检查服务
 │   │   │   ├── ssh-service.ts        # SSH 连接服务
 │   │   │   ├── ssh-checker.ts        # SSH 检查服务
 │   │   │   ├── ssh-connection-pool.ts # SSH 连接池
 │   │   │   ├── scheduler.ts          # 定时任务调度器
 │   │   │   ├── dynamic-scheduler.ts  # 动态调度器
+│   │   │   ├── check-event-bus.ts    # 检查结果事件总线 (SSE)
 │   │   │   ├── alert-service.ts      # 告警服务
 │   │   │   ├── notification-service.ts # 通知服务 (Email/Teams)
 │   │   │   └── auth-service.ts       # 认证服务
@@ -88,6 +90,7 @@ OpsMonitor/
 │   │   │   └── validation.ts         # 请求验证中间件
 │   │   ├── utils/           # 工具函数
 │   │   │   ├── logger.ts             # 日志工具
+│   │   │   ├── notification-i18n.ts  # 通知多语言支持
 │   │   │   └── schedule-validator.ts # 调度验证工具
 │   │   ├── types/           # TypeScript 类型定义
 │   │   └── app.ts           # Express 应用入口
@@ -114,8 +117,9 @@ OpsMonitor/
 │   │   │   ├── ConnectionsView.vue   # SSH 连接管理
 │   │   │   ├── SettingsView.vue      # 系统设置
 │   │   │   └── UserManagementView.vue # 用户管理
-│   │   ├── components/      # 可复用组件 (13 个)
+│   │   ├── components/      # 可复用组件 (14 个)
 │   │   │   ├── AddServiceWizard.vue  # 添加服务向导
+│   │   │   ├── LangSwitch.vue        # 语言切换组件
 │   │   │   ├── ProjectSelector.vue   # 项目选择器
 │   │   │   ├── StatusBadge.vue       # 服务状态徽章
 │   │   │   ├── ResponseChart.vue     # 响应时间图表
@@ -129,6 +133,7 @@ OpsMonitor/
 │   │   │   ├── ServiceIcon.vue       # 服务图标
 │   │   │   └── HelloWorld.vue        # 示例组件
 │   │   ├── api/             # API 调用封装
+│   │   ├── i18n/            # 国际化 (中英文)
 │   │   ├── router/          # Vue Router 路由配置
 │   │   ├── types/           # TypeScript 类型定义
 │   │   ├── utils/           # 工具函数
@@ -229,30 +234,47 @@ JWT_SECRET=your-secret-key-here   # 默认已内置，生产环境建议替换
 
 ## API 接口
 
+> 以下为主要 API 端点速查，完整 CRUD 接口请参考用户手册。
+
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `POST` | `/api/auth/login` | 用户认证 |
+| `POST` | `/api/auth/register` | 用户注册 |
+| `GET` | `/api/auth/me` | 获取当前用户信息 |
 | `GET` | `/api/users` | 获取用户列表 |
 | `GET` | `/api/projects` | 获取项目列表 |
+| `GET` | `/api/projects/:id/graph` | 获取项目依赖图数据 |
 | `GET` | `/api/hosts` | 获取主机列表 |
+| `POST` | `/api/hosts/:id/test` | 测试主机连接 |
 | `GET` | `/api/services` | 获取服务列表 |
+| `GET` | `/api/services/export` | 导出服务配置 |
+| `POST` | `/api/services/import` | 导入服务配置 |
+| `PUT` | `/api/services/:id/schedule` | 更新服务调度配置 |
 | `GET` | `/api/checks/latest` | 获取最新健康检查记录 |
+| `GET` | `/api/checks/events` | SSE 实时检查结果推送 |
 | `POST` | `/api/checks/:id/run` | 手动触发健康检查 |
+| `GET` | `/api/checks/stats/summary` | 获取健康状态统计摘要 |
 | `GET` | `/api/dependencies` | 获取依赖关系 |
+| `GET` | `/api/dependencies/cross-project` | 获取跨项目依赖 |
 | `GET` | `/api/dependency-types` | 获取依赖类型 |
 | `GET` | `/api/alerts` | 获取告警配置 |
+| `GET` | `/api/alerts/unacknowledged/count` | 获取未确认告警数量 |
 | `GET` | `/api/security-configs` | 获取安全配置 |
+| `GET` | `/api/security-configs/check/expiring` | 获取即将过期的安全配置 |
 | `GET` | `/api/grafana-dashboards` | 获取 Grafana 仪表板 |
 | `GET` | `/api/system-settings` | 获取系统设置 |
 | `GET` | `/api/config/general` | 获取通用配置 |
-| `PUT` | `/api/services/:id/schedule` | 更新服务调度配置 |
+| `GET` | `/api/config/notifications` | 获取通知配置 |
+| `PUT` | `/api/config/notification-lang` | 设置通知语言偏好 |
+| `POST` | `/api/config/notifications/test` | 发送测试通知 |
+| `GET` | `/api/schedule/templates` | 获取调度模板 |
 | `GET` | `/api/ssh/pool-stats` | SSH 连接池状态 |
 
 完整文档请参考 [用户手册（中文）](docs/USER_MANUAL_CN.md) | [User Manual (English)](docs/USER_MANUAL_EN.md)。
 
 ## 技术栈
 
-**前端:** Vue 3 + TypeScript · Element Plus · ECharts & G6 · Pinia · Axios
+**前端:** Vue 3 + TypeScript · Element Plus · ECharts & G6 · Pinia · Axios · vue-i18n
 
 **后端:** Node.js + Express · SQLite · JWT · node-cron · ssh2
 
@@ -275,9 +297,10 @@ A service monitoring system designed for teams and small-to-medium projects, bui
 - 📊 **Visual Dependency Graph**: Interactive service topology with impact analysis and dependency tracking
 - 🔔 **Smart Alert Notifications**: Email (SMTP) and Teams webhook with configurable rules and thresholds
 - 📈 **Grafana Integration**: Seamlessly embed external monitoring dashboards
-- 🔐 **Security Management**: Monitor AccessKey, SSL certificates，password expiration
+- 🔐 **Security Management**: Monitor AccessKey, SSL certificates, password expiration
 - 🌐 **Cross-Project Dependencies**: Track and manage complex dependencies across multiple projects
 - 🔄 **Dynamic Scheduling**: Flexible scheduled task configuration
+- 🌍 **Multi-Language Support**: One-click Chinese/English UI switching with notification language sync
 
 ## 🤖 AI Development Notes
 
@@ -311,10 +334,10 @@ OpsMonitor/
 ├── backend/                    # Node.js + Express API server
 │   ├── src/
 │   │   ├── routes/          # API routes (15 modules)
-│   │   ├── services/        # Business logic (9 services)
+│   │   ├── services/        # Business logic (10 services)
 │   │   ├── db/              # Database config & schema
 │   │   ├── middleware/      # JWT auth & validation
-│   │   ├── utils/           # Logger & schedule validator
+│   │   ├── utils/           # Logger, schedule validator & notification i18n
 │   │   ├── types/           # TypeScript type definitions
 │   │   └── app.ts           # Express entry point
 │   ├── scripts/             # Maintenance scripts (3)
@@ -324,8 +347,9 @@ OpsMonitor/
 ├── frontend/                   # Vue 3 + TypeScript SPA
 │   ├── src/
 │   │   ├── views/           # Page components (13)
-│   │   ├── components/      # Reusable components (13)
+│   │   ├── components/      # Reusable components (14)
 │   │   ├── api/             # API call wrappers
+│   │   ├── i18n/            # Internationalization (zh-CN / en-US)
 │   │   ├── router/          # Vue Router configuration
 │   │   ├── types/           # TypeScript type definitions
 │   │   └── utils/           # Utilities
@@ -418,30 +442,47 @@ JWT_SECRET=your-secret-key-here   # Built-in default exists; recommended to over
 
 ## API Endpoints
 
+> Key API endpoints listed below. See the user manual for full CRUD details.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/auth/login` | User authentication |
+| `POST` | `/api/auth/register` | User registration |
+| `GET` | `/api/auth/me` | Get current user info |
 | `GET` | `/api/users` | List all users |
 | `GET` | `/api/projects` | List all projects |
+| `GET` | `/api/projects/:id/graph` | Get project dependency graph data |
 | `GET` | `/api/hosts` | List all hosts |
+| `POST` | `/api/hosts/:id/test` | Test host connection |
 | `GET` | `/api/services` | List all services |
+| `GET` | `/api/services/export` | Export service configurations |
+| `POST` | `/api/services/import` | Import service configurations |
+| `PUT` | `/api/services/:id/schedule` | Update service schedule |
 | `GET` | `/api/checks/latest` | Get latest health check records |
+| `GET` | `/api/checks/events` | SSE real-time check result stream |
 | `POST` | `/api/checks/:id/run` | Trigger health check manually |
+| `GET` | `/api/checks/stats/summary` | Get health stats summary |
 | `GET` | `/api/dependencies` | Get service dependencies |
+| `GET` | `/api/dependencies/cross-project` | Get cross-project dependencies |
 | `GET` | `/api/dependency-types` | Get dependency types |
 | `GET` | `/api/alerts` | Get alert configurations |
+| `GET` | `/api/alerts/unacknowledged/count` | Get unacknowledged alert count |
 | `GET` | `/api/security-configs` | Get security configurations |
+| `GET` | `/api/security-configs/check/expiring` | Get expiring security configs |
 | `GET` | `/api/grafana-dashboards` | Get Grafana dashboards |
 | `GET` | `/api/system-settings` | Get system settings |
 | `GET` | `/api/config/general` | Get general configuration |
-| `PUT` | `/api/services/:id/schedule` | Update service schedule |
+| `GET` | `/api/config/notifications` | Get notification configurations |
+| `PUT` | `/api/config/notification-lang` | Set notification language preference |
+| `POST` | `/api/config/notifications/test` | Send test notification |
+| `GET` | `/api/schedule/templates` | Get schedule templates |
 | `GET` | `/api/ssh/pool-stats` | SSH connection pool status |
 
 Full documentation: [User Manual (English)](docs/USER_MANUAL_EN.md) | [用户手册（中文）](docs/USER_MANUAL_CN.md).
 
 ## Tech Stack
 
-**Frontend:** Vue 3 + TypeScript · Element Plus · ECharts & G6 · Pinia · Axios
+**Frontend:** Vue 3 + TypeScript · Element Plus · ECharts & G6 · Pinia · Axios · vue-i18n
 
 **Backend:** Node.js + Express · SQLite · JWT · node-cron · ssh2
 

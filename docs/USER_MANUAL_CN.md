@@ -1,7 +1,7 @@
 ﻿# OpsMonitor 服务监控系统 — 用户使用手册
 
-> **版本**: 2.1.0
-> **更新日期**: 2026-03-04
+> **版本**: 2.2.0
+> **更新日期**: 2026-03-11
 > **适用范围**: OpsMonitor 服务监控系统（前端端口: 5173，后端端口: 3000）
 
 ---
@@ -48,6 +48,7 @@ OpsMonitor 是一套面向团队和中小型项目的全栈服务监控系统，
 | 📈 **Grafana 集成** | 嵌入外部 Grafana 仪表板，统一展示 |
 | 🔐 **安全管理** | AccessKey、SSL 证书、密码的过期监控与提醒 |
 | 🔄 **动态调度** | 灵活的定时检查配置，支持时间范围限制 |
+| 🌍 **多语言支持** | 中英文界面一键切换，告警通知语言自动同步 |
 
 ### 1.2 系统架构
 
@@ -91,7 +92,7 @@ OpsMonitor 采用前后端分离架构，配合嵌入式数据库，实现开箱
 
 | 层次 | 技术组件 |
 |------|---------|
-| **前端** | Vue 3 · TypeScript · Element Plus · ECharts · Pinia · Axios |
+| **前端** | Vue 3 · TypeScript · Element Plus · ECharts · Pinia · Axios · vue-i18n |
 | **后端** | Node.js · Express · TypeScript · JWT · node-cron |
 | **数据库** | SQLite（嵌入式，无需独立部署） |
 | **远程通信** | ssh2（SSH 连接池） |
@@ -278,6 +279,24 @@ JWT_SECRET=your-secret-key-here
 ### 4.5 退出登录
 
 点击右上角用户菜单 → **Logout** 即可安全退出，系统会清除本地 Token 并跳转回登录页面。
+
+### 4.6 语言切换
+
+系统支持 **中文（简体）** 和 **English** 两种界面语言，可随时切换。
+
+**切换方式**：
+
+1. 点击页面右上角的语言切换按钮（显示为 “中文” 或 “EN”）
+2. 在下拉菜单中选择目标语言
+3. 界面将立即切换为所选语言
+
+**语言偏好规则**：
+
+| 场景 | 行为 |
+|------|------|
+| 首次访问 | 自动检测浏览器语言，中文浏览器默认为中文，其他默认为 English |
+| 手动切换后 | 将语言偏好保存至本地存储，下次访问自动应用 |
+| 告警通知 | 语言偏好会同步至后端，邮件和 Teams 告警通知将使用相同语言发送 |
 
 ---
 
@@ -1315,28 +1334,36 @@ kill -9 <PID>
 | GET | `/api/auth/me` | 获取当前登录用户信息 |
 | GET/POST/PUT/DELETE | `/api/users` | 用户管理（仅 Admin） |
 | GET/POST/PUT/DELETE | `/api/projects` | 项目管理 |
+| GET | `/api/projects/:id/graph` | 获取项目依赖图数据 |
 | GET/POST/PUT/DELETE | `/api/hosts` | 主机管理 |
 | POST | `/api/hosts/:id/test-connection` | 测试主机 SSH 连接 |
+| POST | `/api/hosts/test-all` | 批量测试所有主机连接 |
 | GET/POST/PUT/DELETE | `/api/services` | 服务管理 |
 | GET | `/api/services/export` | 导出所有服务配置（JSON） |
 | POST | `/api/services/import` | 导入服务配置 |
 | PUT | `/api/services/:id/schedule` | 更新服务调度配置 |
 | GET | `/api/checks/latest` | 获取最新健康检查记录 |
+| GET | `/api/checks/events` | SSE 实时检查结果推送 |
 | POST | `/api/checks/:id/run` | 手动触发健康检查 |
 | GET | `/api/checks/:id/history` | 获取检查历史记录 |
 | GET | `/api/checks/stats/summary` | 获取检查统计摘要 |
 | GET/POST/PUT/DELETE | `/api/dependencies` | 依赖关系管理 |
+| GET | `/api/dependencies/cross-project` | 获取跨项目依赖 |
 | GET/POST/PUT/DELETE | `/api/dependency-types` | 依赖类型管理 |
 | GET | `/api/alerts` | 获取告警历史记录 |
+| GET | `/api/alerts/unacknowledged/count` | 获取未确认告警数量 |
 | GET/PUT | `/api/config/notifications` | 通知渠道配置 |
+| PUT | `/api/config/notification-lang` | 设置通知语言偏好 |
 | POST | `/api/config/notifications/test` | 发送测试通知 |
 | GET/POST/PUT/DELETE | `/api/security-configs` | 安全配置管理 |
-| POST | `/api/security-configs/check-expiry` | 手动触发过期检查 |
+| GET | `/api/security-configs/check/expiring` | 获取即将过期的安全配置 |
 | GET/POST/PUT/DELETE | `/api/grafana-dashboards` | Grafana 仪表板管理 |
 | GET | `/api/system-settings` | 获取所有系统设置 |
 | GET/PUT | `/api/system-settings/:key` | 获取或更新指定系统设置 |
 | GET | `/api/ssh/pool-stats` | SSH 连接池状态 |
 | GET | `/api/schedule/templates` | 获取调度模板列表 |
+| POST | `/api/schedule/preview` | 预览调度执行时间 |
+| POST | `/api/schedule/validate` | 验证调度配置 |
 
 ---
 
@@ -1348,7 +1375,3 @@ kill -9 <PID>
 | `Ctrl + R` | 刷新当前页面数据 |
 
 ---
-
-**文档版本**：2.1.0
-**更新日期**：2026-03-04
-**维护团队**：OpsMonitor Team
