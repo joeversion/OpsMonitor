@@ -72,6 +72,7 @@ const messages: Record<Lang, Record<string, string>> = {
 
     // ── Fact Values ──
     'val.na': 'N/A',
+    'val.times': 'time(s)',
     'val.normal': 'Normal',
     'val.expired': 'EXPIRED',
     'val.expiresInDays': 'Expires in {days} day(s)',
@@ -194,6 +195,7 @@ const messages: Record<Lang, Record<string, string>> = {
 
     // ── 事实值 ──
     'val.na': '无',
+    'val.times': '次',
     'val.normal': '正常',
     'val.expired': '已过期',
     'val.expiresInDays': '{days} 天后过期',

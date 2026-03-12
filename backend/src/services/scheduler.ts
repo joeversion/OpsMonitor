@@ -9,6 +9,9 @@ import { checkEventBus } from './check-event-bus';
 
 export class Scheduler {
   private static intervals: Map<string, NodeJS.Timeout> = new Map();
+  // Generation counter per service: incremented on each scheduleService/stopService call.
+  // Prevents stale async check chains from spawning new timers after being superseded.
+  private static generationMap: Map<string, number> = new Map();
   private static securityCheckInterval: NodeJS.Timeout | null = null;
   private static cleanupInterval: NodeJS.Timeout | null = null;
 
@@ -85,6 +88,10 @@ export class Scheduler {
 
     if (!service.enabled) return;
 
+    // Increment generation to invalidate any in-flight check chain for this service
+    const myGeneration = (this.generationMap.get(service.id) ?? 0) + 1;
+    this.generationMap.set(service.id, myGeneration);
+
     // Parse schedule configuration
     const config: ScheduleConfig = service.schedule_config 
       ? JSON.parse(service.schedule_config)
@@ -93,6 +100,11 @@ export class Scheduler {
     // Recursive scheduling function
     const scheduleNext = () => {
       const performCheck = async () => {
+        // Check if this chain has been superseded by a newer scheduleService call
+        if (this.generationMap.get(service.id) !== myGeneration) {
+          logger.scheduler.debug(`Service ${service.name} generation mismatch (expected ${myGeneration}, current ${this.generationMap.get(service.id)}), stopping stale chain`);
+          return;
+        }
         logger.scheduler.debug(`Checking service: ${service.name}`);
         try {
           // Bug #013 Fix: Reload latest host configuration before each check
@@ -131,8 +143,9 @@ export class Scheduler {
             : { type: 'fixed', defaultInterval: latestService.check_interval || 60 };
           
           const result = await HealthChecker.check(latestService);
-          await HealthChecker.saveResult(latestService.id, result);
-          await AlertService.processCheckResult(latestService, result);
+          // processCheckResult applies warning/error thresholds and returns effective status
+          const effectiveResult = await AlertService.processCheckResult(latestService, result);
+          await HealthChecker.saveResult(latestService.id, effectiveResult);
           
           // Schedule next check with potentially updated config
           const intervalSeconds = DynamicScheduler.calculateNextInterval(latestConfig);
@@ -144,6 +157,12 @@ export class Scheduler {
             rangeName,
             nextRunTime: nextRunTime.toISOString()
           });
+
+          // Check generation again before scheduling — another call may have taken over
+          if (this.generationMap.get(service.id) !== myGeneration) {
+            logger.scheduler.debug(`Service ${service.name} superseded after check, discarding next schedule`);
+            return;
+          }
           
           const timeout = setTimeout(performCheck, intervalSeconds * 1000);
           this.intervals.set(latestService.id, timeout);
@@ -183,8 +202,10 @@ export class Scheduler {
     if (this.intervals.has(serviceId)) {
       clearTimeout(this.intervals.get(serviceId)!);
       this.intervals.delete(serviceId);
-      logger.scheduler.debug(`Stopped scheduling for service: ${serviceId}`);
     }
+    // Increment generation to invalidate any in-flight performCheck for this service
+    this.generationMap.set(serviceId, (this.generationMap.get(serviceId) ?? 0) + 1);
+    logger.scheduler.debug(`Stopped scheduling for service: ${serviceId}`);
   }
   
   static restartService(service: any) {

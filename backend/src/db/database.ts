@@ -1088,6 +1088,13 @@ function runMigrations() {
     console.log('Migration complete: current_failure_count added to services');
   }
 
+  const hasIsAlerted = servicesColumnsForStability.some(col => col.name === 'is_alerted');
+  if (!hasIsAlerted) {
+    console.log('Running migration: add is_alerted to services...');
+    db.exec('ALTER TABLE services ADD COLUMN is_alerted INTEGER DEFAULT 0');
+    console.log('Migration complete: is_alerted added to services');
+  }
+
   // === Fix risk_level constraint to include 'critical' ===
   // Check if services table has old constraint (without 'critical')
   const servicesTableSql = db.prepare(`
@@ -1144,6 +1151,7 @@ function runMigrations() {
         schedule_config TEXT,
         failure_threshold INTEGER DEFAULT 3,
         current_failure_count INTEGER DEFAULT 0,
+        is_alerted INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL,

@@ -244,6 +244,17 @@
           </template>
         </el-alert>
 
+        <!-- TCP Configuration -->
+        <template v-if="form.check_type === 'tcp'">
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item :label="$t('services.labelTimeout')">
+                <el-input-number v-model="tcpConfig.timeout" :min="1" :max="60" style="width: 100%;" controls-position="right" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
+
         <!-- HTTP Configuration -->
         <template v-if="form.check_type === 'http' || form.check_type === 'https'">
           <el-row :gutter="20">
@@ -261,7 +272,7 @@
             </el-col>
             <el-col :span="12">
               <el-form-item :label="$t('services.labelTimeout')">
-                <el-input-number v-model="httpConfig.timeout" :min="1000" :max="30000" :step="1000" style="width: 100%;" controls-position="right" />
+                <el-input-number v-model="httpConfig.timeout" :min="1" :max="60" style="width: 100%;" controls-position="right" />
               </el-form-item>
             </el-col>
           </el-row>
@@ -333,6 +344,13 @@
               </el-form-item>
             </el-col>
           </el-row>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item :label="$t('services.labelFileTimeout')">
+                <el-input-number v-model="fileCheckConfig.timeout_seconds" :min="5" :max="120" style="width: 100%;" controls-position="right" />
+              </el-form-item>
+            </el-col>
+          </el-row>
         </template>
 
       </div>
@@ -391,6 +409,22 @@
             <div class="threshold-hint">{{ $t('services.hintAlertTrigger') }}</div>
           </div>
         </div>
+
+        <!-- Threshold relationship hint -->
+        <el-alert
+          v-if="form.warning_threshold > form.error_threshold"
+          :title="$t('services.msgWarnLessThanError')"
+          type="error"
+          :closable="false"
+          style="margin-top: 12px;"
+        />
+        <el-alert
+          v-else-if="form.failure_threshold < form.warning_threshold || form.failure_threshold > form.error_threshold"
+          :title="$t('services.msgAlertTriggerRule')"
+          type="warning"
+          :closable="false"
+          style="margin-top: 12px;"
+        />
 
         <div class="section-title" style="margin-top: 24px;">
           <el-icon><Edit /></el-icon>
@@ -965,7 +999,7 @@ const httpConfig = reactive({
   protocol: 'https',
   path: '',
   expected_status: 200,
-  timeout: 5000
+  timeout: 5  // seconds, converted to ms on submit
 });
 
 // Script config
@@ -981,7 +1015,13 @@ const fileCheckConfig = reactive({
   mode: 'single',
   file_path: '',
   directory_path: '',
-  filename_pattern: ''
+  filename_pattern: '',
+  timeout_seconds: 20
+});
+
+// TCP config
+const tcpConfig = reactive({
+  timeout: 10  // seconds, converted to ms on submit
 });
 
 
@@ -1237,6 +1277,10 @@ const validateCurrentStep = (): boolean => {
     case 2: // Schedule
       return true;
     case 3: // Alerts
+      if (form.warning_threshold > form.error_threshold) {
+        ElMessage.warning(t('services.msgWarnLessThanError'));
+        return false;
+      }
       return true;
     case 4: // Confirm
       return true;
@@ -1292,9 +1336,14 @@ const handleSubmit = async () => {
       submitData.port = 0;
     }
 
-    // Add HTTP config if applicable
+    // Add HTTP config if applicable (timeout UI is in seconds, store as ms)
     if (form.check_type === 'http' || form.check_type === 'https') {
-      (submitData as any).http_config = httpConfig;
+      (submitData as any).http_config = { ...httpConfig, timeout: httpConfig.timeout * 1000 };
+    }
+
+    // Add TCP config if applicable (timeout UI is in seconds, store as ms)
+    if (form.check_type === 'tcp') {
+      (submitData as any).check_config = JSON.stringify({ timeout: tcpConfig.timeout * 1000 });
     }
 
     // Add script config if applicable
@@ -1346,7 +1395,7 @@ const resetForm = () => {
     protocol: 'https',
     path: '',
     expected_status: 200,
-    timeout: 5000
+    timeout: 5  // seconds
   });
   
   Object.assign(scriptCheckConfig, {
@@ -1360,7 +1409,12 @@ const resetForm = () => {
     mode: 'single',
     file_path: '',
     directory_path: '',
-    filename_pattern: ''
+    filename_pattern: '',
+    timeout_seconds: 20
+  });
+  
+  Object.assign(tcpConfig, {
+    timeout: 10  // seconds
   });
 };
 
@@ -1397,13 +1451,14 @@ watch(() => props.modelValue, async (newVal) => {
         'isCopy': props.isCopy
       });
       
-      // Parse HTTP config
+      // Parse HTTP config (timeout stored as ms, display in seconds)
       if (props.editData.http_config) {
         try {
           const config = typeof props.editData.http_config === 'string' 
             ? JSON.parse(props.editData.http_config) 
             : props.editData.http_config;
           Object.assign(httpConfig, config);
+          if (config.timeout) httpConfig.timeout = Math.round(config.timeout / 1000);
         } catch (e) {
           console.error('Failed to parse http_config:', e);
         }
@@ -1430,6 +1485,18 @@ watch(() => props.modelValue, async (newVal) => {
           Object.assign(fileCheckConfig, config);
         } catch (e) {
           console.error('Failed to parse file_config:', e);
+        }
+      }
+      
+      // Parse check_config (TCP timeout stored as ms, display in seconds)
+      if (props.editData.check_config) {
+        try {
+          const config = typeof props.editData.check_config === 'string'
+            ? JSON.parse(props.editData.check_config)
+            : props.editData.check_config;
+          if (config.timeout) tcpConfig.timeout = Math.round(config.timeout / 1000);
+        } catch (e) {
+          console.error('Failed to parse check_config:', e);
         }
       }
       

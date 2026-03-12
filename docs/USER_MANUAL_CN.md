@@ -634,6 +634,63 @@ USAGE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
 
 > 示例：Warning = 2，Error = 5，Alert Trigger = 3 → 连续失败 2 次进入警告，连续失败 5 次标记为 DOWN，连续失败 3 次后发送告警通知
 
+#### 告警阈值规则
+
+**三个字段的作用**:
+
+| 字段 | 作用 | 默认值 |
+|------|------|--------|
+| Warning Threshold | 连续失败达到此次数 → 显示状态变为 WARNING | 3 |
+| Error Threshold | 连续失败达到此次数 → 显示状态变为 DOWN | 5 |
+| Alert Trigger | 连续失败达到此次数 → 发送通知 | 3 |
+
+**约束关系**:
+
+```
+Warning Threshold ≤ Error Threshold（必须满足，否则无法保存）
+Alert Trigger 建议设置在 Warning ～ Error 之间
+```
+
+**通知触发逻辑**:
+
+| 通知类型 | 触发条件 |
+|---------|----------|
+| ✉️ WARNING 通知 | count = Alert Trigger，且此时状态为 WARNING |
+| ✉️ DOWN 通知 | count = Alert Trigger，且此时状态为 DOWN **或** count = Error Threshold（从 WARNING 升级为 DOWN 时补发）|
+| ✉️ RECOVERY 通知 | 服务恢复（状态变 UP），且之前曾发过告警 |
+
+> count 大于 Alert Trigger 但未恢复时：静默，不重复发送。
+
+**时间估算公式**:
+
+```
+WARNING 通知最快发出时间 = Alert Trigger × Check Interval
+DOWN    通知最快发出时间 = Error Threshold × Check Interval
+RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
+```
+
+**典型配置示例**（Check Interval = 30s）:
+
+*配置 A：Warning=1, Error=2, Alert Trigger=1（快速感知）*
+
+| 经过时间 | count | 显示状态 | 通知 |
+|---------|-------|---------|------|
+| T+30s | 1 | 🟡 WARNING | ✉️ WARNING 通知（= 1×30s）|
+| T+60s | 2 | 🔴 DOWN | ✉️ DOWN 通知（= 2×30s）|
+| 恢复后+30s | — | 🟢 UP | ✉️ RECOVERY 通知 |
+
+*配置 B（系统默认）：Warning=3, Error=5, Alert Trigger=3*
+
+| 经过时间 | count | 显示状态 | 通知 |
+|---------|-------|---------|------|
+| T+30s ~ T+60s | 1-2 | 🟢 UP（抑制）| 静默 |
+| T+90s | 3 | 🟡 WARNING | ✉️ WARNING 通知（= 3×30s）|
+| T+120s | 4 | 🟡 WARNING | 静默 |
+| T+150s | 5 | 🔴 DOWN | ✉️ DOWN 通知（= 5×30s）|
+| 恢复后+30s | — | 🟢 UP | ✉️ RECOVERY 通知 |
+
+> 当 Alert Trigger = Error Threshold 时，跳过 WARNING 阶段，直接发一次 DOWN 通知。
+
 ### 8.5 依赖配置
 
 在服务创建或编辑时，可在 **Dependencies** 区域添加服务间的依赖关系：

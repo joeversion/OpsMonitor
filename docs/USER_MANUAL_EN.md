@@ -634,6 +634,63 @@ The wizard's check type selector also displays upcoming database check types, cu
 
 > Example: Warning = 2, Error = 5, Alert Trigger = 3 → 2 consecutive failures trigger warning, 5 consecutive failures mark as DOWN, 3 consecutive failures send alert notification
 
+#### Alert Threshold Rules
+
+**Role of each field**:
+
+| Field | Role | Default |
+|-------|------|---------|
+| Warning Threshold | Consecutive failures reaching this count → display status changes to WARNING | 3 |
+| Error Threshold | Consecutive failures reaching this count → display status changes to DOWN | 5 |
+| Alert Trigger | Consecutive failures reaching this count → send notification | 3 |
+
+**Constraints**:
+
+```
+Warning Threshold ≤ Error Threshold (required, otherwise cannot be saved)
+Alert Trigger is recommended to be set between Warning and Error
+```
+
+**Notification trigger logic**:
+
+| Notification Type | Trigger Condition |
+|------------------|-------------------|
+| ✉️ WARNING notification | count = Alert Trigger, and current status is WARNING |
+| ✉️ DOWN notification | count = Alert Trigger and current status is DOWN **or** count = Error Threshold (escalation supplement from WARNING to DOWN) |
+| ✉️ RECOVERY notification | Service recovers (status changes to UP), and an alert was previously sent |
+
+> When count exceeds Alert Trigger but the service has not recovered: silent, no repeated notifications.
+
+**Time estimation formula**:
+
+```
+Earliest WARNING notification time = Alert Trigger × Check Interval
+Earliest DOWN notification time    = Error Threshold × Check Interval
+Earliest RECOVERY notification time = up to 1 × Check Interval after recovery
+```
+
+**Typical configuration examples** (Check Interval = 30s):
+
+*Config A: Warning=1, Error=2, Alert Trigger=1 (fast detection)*
+
+| Elapsed Time | count | Display Status | Notification |
+|-------------|-------|----------------|--------------|
+| T+30s | 1 | 🟡 WARNING | ✉️ WARNING notification (= 1×30s) |
+| T+60s | 2 | 🔴 DOWN | ✉️ DOWN notification (= 2×30s) |
+| Recovery+30s | — | 🟢 UP | ✉️ RECOVERY notification |
+
+*Config B (system default): Warning=3, Error=5, Alert Trigger=3*
+
+| Elapsed Time | count | Display Status | Notification |
+|-------------|-------|----------------|--------------|
+| T+30s ~ T+60s | 1-2 | 🟢 UP (suppressed) | Silent |
+| T+90s | 3 | 🟡 WARNING | ✉️ WARNING notification (= 3×30s) |
+| T+120s | 4 | 🟡 WARNING | Silent |
+| T+150s | 5 | 🔴 DOWN | ✉️ DOWN notification (= 5×30s) |
+| Recovery+30s | — | 🟢 UP | ✉️ RECOVERY notification |
+
+> When Alert Trigger = Error Threshold, the WARNING phase is skipped and a single DOWN notification is sent directly.
+
 ### 8.5 Dependency Configuration
 
 When creating or editing a service, you can add inter-service dependencies in the **Dependencies** section:

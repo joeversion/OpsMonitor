@@ -1,6 +1,7 @@
 import express from 'express';
 import db from '../db/database';
 import { HealthChecker } from '../services/health-checker';
+import { AlertService } from '../services/alert-service';
 import { checkEventBus } from '../services/check-event-bus';
 
 const router = express.Router();
@@ -100,8 +101,9 @@ router.post('/:id/run', async (req, res) => {
 
   try {
     const result = await HealthChecker.check(service);
-    await HealthChecker.saveResult(id, result);
-    res.json(result);
+    const effectiveResult = await AlertService.processCheckResult(service, result);
+    await HealthChecker.saveResult(id, effectiveResult);
+    res.json(effectiveResult);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

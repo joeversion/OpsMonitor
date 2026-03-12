@@ -19,6 +19,7 @@ interface Service {
   port: number;
   check_type: 'tcp' | 'http' | 'https' | 'script' | 'file' | 'log';
   http_config?: string; // JSON string
+  check_config?: string; // JSON string for check-specific configuration
   warning_threshold: number;
   error_threshold: number;
   script_config?: string; // JSON string
@@ -128,19 +129,9 @@ export class HealthChecker {
       // Override response time with actual measurement if not provided by check
       if (result.responseTime === 0) result.responseTime = responseTime;
 
-      // Determine status based on thresholds if it's UP
-      if (result.status === 'up') {
-        // Thresholds are stored in SECONDS in the database, convert to ms for comparison
-        const warningThresholdMs = service.warning_threshold * 1000;
-        const errorThresholdMs = service.error_threshold * 1000;
-        
-        if (result.responseTime >= errorThresholdMs) {
-          result.status = 'down';
-          result.errorMessage = `Response time ${result.responseTime}ms exceeds error threshold ${service.error_threshold}s`;
-        } else if (result.responseTime >= warningThresholdMs) {
-          result.status = 'warning';
-        }
-      }
+      // Note: warning_threshold and error_threshold are "consecutive failure counts",
+      // NOT response time thresholds. Response time limits are handled by each check
+      // type's own timeout setting (http_config.timeout, script_config.timeout, etc.)
 
       return result;
     } catch (error: any) {
@@ -232,7 +223,7 @@ export class HealthChecker {
     const protocol = config.protocol || 'http';
     const path = config.path || '/';
     const url = `${protocol}://${service.host}:${service.port}${path}`;
-    const timeout = config.timeout || 15000; // Increased from 5000ms to 15000ms for production network latency
+    const timeout = config.timeout || 5000;
     const expectedStatus = config.expected_status || 200;
 
     const start = Date.now();
@@ -682,11 +673,14 @@ exit 0
     }
 
     // Standard external TCP check
+    const config = service.check_config ? JSON.parse(service.check_config) : {};
+    const timeoutMs = config.timeout || 10000;
+
     return new Promise((resolve) => {
       const start = Date.now();
       const socket = new net.Socket();
       
-      socket.setTimeout(10000); // Increased from 5000ms to 10000ms for production network latency
+      socket.setTimeout(timeoutMs);
 
       socket.on('connect', () => {
         const duration = Date.now() - start;
@@ -727,7 +721,7 @@ exit 0
     const protocol = service.check_type; // 'http' or 'https'
     const path = config.path || '/';
     const expectedStatus = config.expected_status || 200;
-    const timeout = config.timeout || 15;
+    const timeout = config.timeout ? Math.ceil(config.timeout / 1000) : 5; // Convert ms to seconds for curl
 
     try {
       // Build SSH credentials
@@ -791,7 +785,8 @@ exit 0
       };
     }
 
-    const timeout = 5; // TCP connection timeout in seconds
+    const config = service.check_config ? JSON.parse(service.check_config) : {};
+    const timeout = config.timeout ? Math.ceil(config.timeout / 1000) : 5; // Convert ms to seconds
 
     try {
       // Build SSH credentials

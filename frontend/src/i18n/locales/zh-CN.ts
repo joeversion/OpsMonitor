@@ -329,7 +329,7 @@ export default {
     labelHealthPath: '健康检查路径',
     placeholderHealthPath: '/health 或 /api/health',
     labelExpectedStatus: '期望状态码',
-    labelTimeout: '超时时间 (ms)',
+    labelTimeout: '超时时间（秒）',
     // 脚本配置
     labelScriptType: '脚本类型',
     scriptBash: '🐚 Bash 脚本',
@@ -358,6 +358,8 @@ export default {
     hintRange1_30: '范围：1-30',
     hintRange1_50: '范围：1-50',
     hintAlertTrigger: '连续失败达到此次数后发送告警（范围：1-10）',
+    msgWarnLessThanError: '告警阈值 (Warning) 不能大于错误阈值 (Error)',
+    msgAlertTriggerRule: '告警触发次数建议设置在警告阈值与错误阈值之间',
     // 告警自定义
     sectionAlertCustomize: '告警自定义（可选）',
     labelImpactDesc: '服务影响描述',

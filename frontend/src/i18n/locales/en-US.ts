@@ -329,7 +329,7 @@ export default {
     labelHealthPath: 'Health Check Path',
     placeholderHealthPath: '/health or /api/health',
     labelExpectedStatus: 'Expected Status',
-    labelTimeout: 'Timeout (ms)',
+    labelTimeout: 'Timeout (sec)',
     // Script config
     labelScriptType: 'Script Type',
     scriptBash: '🐚 Bash Script',
@@ -358,6 +358,8 @@ export default {
     hintRange1_30: 'Range: 1-30',
     hintRange1_50: 'Range: 1-50',
     hintAlertTrigger: 'Send alert after this many failures (Range: 1-10)',
+    msgWarnLessThanError: 'Warning Threshold cannot be greater than Error Threshold',
+    msgAlertTriggerRule: 'Alert Trigger is recommended to be between Warning and Error thresholds',
     // Alert customize
     sectionAlertCustomize: 'Alert Customization (Optional)',
     labelImpactDesc: 'Service Impact Description',

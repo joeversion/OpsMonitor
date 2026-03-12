@@ -46,19 +46,19 @@ export class AlertService {
     });
   }
 
-  static async processCheckResult(service: Service, result: CheckResult) {
-    if (!service.alert_enabled) return;
+  static async processCheckResult(service: Service, result: CheckResult): Promise<CheckResult> {
+    if (!service.alert_enabled) return result;
 
-    const currentStatus = result.status;
+    const rawStatus = result.status;
     
-    // Get failure threshold (user configurable, default 3)
+    // Get thresholds
+    const warningThreshold = (service as any).warning_threshold ?? 3;
+    const errorThreshold = (service as any).error_threshold ?? 5;
     const failureThreshold = (service as any).failure_threshold ?? 3;
 
-    // Bug fix: Atomically read & update current_failure_count from DB to prevent
-    // duplicate alerts when two concurrent performCheck() calls race each other.
-    // Previously we read from the (potentially stale) service object passed in.
+    let effectiveResult = { ...result };
 
-    if (currentStatus === 'down' || currentStatus === 'warning') {
+    if (rawStatus === 'down' || rawStatus === 'warning') {
       // Atomically increment and return the new count
       const newCount = db.transaction(() => {
         const row = db.prepare('SELECT current_failure_count FROM services WHERE id = ?').get(service.id) as any;
@@ -67,33 +67,55 @@ export class AlertService {
         return count;
       })();
       
-      logger.alert.debug(`Service ${service.name} failure count: ${newCount}/${failureThreshold}`);
-      
-      // Only alert if threshold is reached exactly (prevents duplicate alerts)
-      if (newCount === failureThreshold) {
-        if (currentStatus === 'down') {
-          await this.createAlert(service, 'down', nt('alert.serviceDown', { name: service.name, count: newCount, error: result.error || 'Unknown error' }));
-        } else if (currentStatus === 'warning') {
-          await this.createAlert(service, 'warning', nt('alert.serviceWarning', { name: service.name, count: newCount, time: result.responseTime }));
-        }
-      } else if (newCount > failureThreshold) {
-        // Already alerted, don't spam
-        logger.alert.debug(`Service ${service.name} still down/warning, suppressing repeat alert`);
+      logger.alert.debug(`Service ${service.name} failure count: ${newCount} (warn:${warningThreshold} err:${errorThreshold} alert:${failureThreshold})`);
+
+      // Determine effective status based on consecutive failure counts
+      if (newCount < warningThreshold) {
+        // Below warning threshold: treat as UP (transient failure, suppress)
+        effectiveResult = { ...result, status: 'up', error: undefined };
+      } else if (newCount < errorThreshold) {
+        // Between warning and error threshold: WARNING
+        effectiveResult = { ...result, status: 'warning' };
+      } else {
+        // At or above error threshold: DOWN
+        effectiveResult = { ...result, status: rawStatus === 'warning' ? 'warning' : 'down' };
       }
-      // If count < threshold, no alert yet (transient failure)
-      
-    } else if (currentStatus === 'up') {
-      // Atomically read count and reset to prevent duplicate recovery alerts
-      const prevCount = db.transaction(() => {
-        const row = db.prepare('SELECT current_failure_count FROM services WHERE id = ?').get(service.id) as any;
-        const count = row?.current_failure_count ?? 0;
-        if (count > 0) {
-          db.prepare('UPDATE services SET current_failure_count = 0 WHERE id = ?').run(service.id);
+
+      // Read current is_alerted value
+      const currentIsAlerted = (db.prepare('SELECT is_alerted FROM services WHERE id = ?').get(service.id) as any)?.is_alerted ?? 0;
+
+      // Send alert notification when failure_threshold is reached exactly (first alert)
+      if (newCount === failureThreshold) {
+        if (effectiveResult.status === 'down') {
+          await this.createAlert(service, 'down', nt('alert.serviceDown', { name: service.name, count: newCount, error: result.error || 'Unknown error' }));
+          db.prepare('UPDATE services SET is_alerted = 1 WHERE id = ?').run(service.id);
+        } else if (effectiveResult.status === 'warning') {
+          await this.createAlert(service, 'warning', nt('alert.serviceWarning', { name: service.name, count: newCount, time: result.responseTime }));
+          db.prepare('UPDATE services SET is_alerted = 1 WHERE id = ?').run(service.id);
         }
-        return count;
+      } else if (newCount === errorThreshold && currentIsAlerted === 1 && effectiveResult.status === 'down') {
+        // alertTrigger < errorThreshold case: first alert fired as WARNING, but now service is DOWN.
+        // Send a DOWN escalation notification so the user knows the status has worsened.
+        await this.createAlert(service, 'down', nt('alert.serviceDown', { name: service.name, count: newCount, error: result.error || 'Unknown error' }));
+        db.prepare('UPDATE services SET is_alerted = 1 WHERE id = ?').run(service.id);
+        logger.alert.debug(`Service ${service.name} escalated from WARNING to DOWN alert at count=${newCount}`);
+      } else if (newCount > failureThreshold) {
+        // Already alerted, suppress until recovery
+        logger.alert.debug(`Service ${service.name} still down/warning, suppressing repeat alert (is_alerted=${currentIsAlerted})`);
+      }
+      // If count < failureThreshold, no alert yet (transient failure)
+      
+    } else if (rawStatus === 'up') {
+      // Atomically read is_alerted + count, then reset both
+      const { wasAlerted, prevCount } = db.transaction(() => {
+        const row = db.prepare('SELECT current_failure_count, is_alerted FROM services WHERE id = ?').get(service.id) as any;
+        const count = row?.current_failure_count ?? 0;
+        const alerted = (row?.is_alerted ?? 0) >= 1;
+        db.prepare('UPDATE services SET current_failure_count = 0, is_alerted = 0 WHERE id = ?').run(service.id);
+        return { wasAlerted: alerted, prevCount: count };
       })();
 
-      if (prevCount >= failureThreshold) {
+      if (wasAlerted) {
         // Was in alerted state, now recovered - send recovery
         await this.createAlert(service, 'recovery', nt('alert.serviceRecovery', { name: service.name, count: prevCount }));
         logger.alert.debug(`Service ${service.name} recovered, reset failure count`);
@@ -101,6 +123,8 @@ export class AlertService {
         logger.alert.debug(`Service ${service.name} recovered (below threshold), reset failure count`);
       }
     }
+
+    return effectiveResult;
   }
 
   static async processSecurityConfigExpiry(config: SecurityConfig, daysRemaining: number) {
@@ -506,7 +530,7 @@ export class AlertService {
     } else if (type === 'warning') {
       facts.push(
         { title: nt('fact.responseTime'), value: `${latestCheck?.response_time || nt('val.na')}ms` },
-        { title: nt('fact.warningThreshold'), value: `${service.warning_threshold}s` }
+        { title: nt('fact.warningThreshold'), value: `${service.warning_threshold} ${nt('val.times')}` }
       );
       timeline.push({
         icon: '⚠️',
