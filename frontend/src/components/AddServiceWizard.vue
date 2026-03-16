@@ -876,6 +876,7 @@ interface DefaultSettings {
   defaultInterval: number;
   warningThreshold: number;
   errorThreshold: number;
+  failureThreshold: number;
 }
 
 const props = defineProps<{
@@ -1380,7 +1381,7 @@ const resetForm = () => {
   form.check_interval = defaultInterval;
   form.warning_threshold = props.defaultSettings?.warningThreshold || 3;
   form.error_threshold = props.defaultSettings?.errorThreshold || 5;
-  form.failure_threshold = 3;
+  form.failure_threshold = props.defaultSettings?.failureThreshold || 3;
   form.enabled = 1;
   form.alert_enabled = 1;
   form.impact_description = '';

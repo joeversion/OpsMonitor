@@ -269,6 +269,8 @@ export default {
     colProject: 'Project',
     colResponse: 'Response',
     colLastCheck: 'Last Checked',
+    colCheckInterval: 'Check Interval',
+    colThresholdsTrigger: 'Thresholds & Trigger',
     colMonitoring: 'Monitoring',
     colAlerts: 'Alerts',
     colType: 'Type',
@@ -499,6 +501,7 @@ export default {
     tipCheckInterval: 'seconds (10-3600)',
     tipWarnThreshold: 'consecutive failures (1-30)',
     tipErrorThreshold: 'consecutive failures (1-50)',
+    tipAlertTrigger: 'consecutive failures (1-10)',
     // Tooltip
     tooltipPatternTitle: 'Pattern Matching:',
     tooltipPatternDesc: 'Glob first, then Regex',
@@ -1139,6 +1142,7 @@ export default {
     labelDefaultInterval: 'Default Check Interval',
     labelDefaultWarn: 'Default Warning Threshold',
     labelDefaultError: 'Default Error Threshold',
+    labelDefaultAlertTrigger: 'Default Alert Trigger',
     sectionData: 'Data Management',
     labelLogRetention: 'Log Retention',
     labelDataRetention: 'Data Retention',
@@ -1171,6 +1175,7 @@ export default {
     unitDefaultInterval: 'seconds (Used for new services in Fixed Interval mode)',
     unitWarnThreshold: 'consecutive failures (Range: 1-30)',
     unitErrorThreshold: 'consecutive failures (Range: 1-50)',
+    unitAlertTrigger: 'consecutive failures (Range: 1-10)',
     unitLogRetention: 'days (Number of days to keep backend logs)',
     unitDataRetention: 'days (Number of days to keep check records in database)',
     // Dependency type dialog extras

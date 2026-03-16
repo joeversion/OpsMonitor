@@ -269,6 +269,8 @@ export default {
     colProject: '项目',
     colResponse: '响应时间',
     colLastCheck: '最后检查',
+    colCheckInterval: '检查间隔',
+    colThresholdsTrigger: '阈值 & 触发',
     colMonitoring: '监控',
     colAlerts: '告警',
     colType: '类型',
@@ -499,6 +501,7 @@ export default {
     tipCheckInterval: '秒（10-3600）',
     tipWarnThreshold: '次连续失败（1-30）',
     tipErrorThreshold: '次连续失败（1-50）',
+    tipAlertTrigger: '次连续失败（1-10）',
     // 提示
     tooltipPatternTitle: '匹配模式：',
     tooltipPatternDesc: '先 Glob 后正则',
@@ -1139,6 +1142,7 @@ export default {
     labelDefaultInterval: '默认检查间隔',
     labelDefaultWarn: '默认警告阈值',
     labelDefaultError: '默认错误阈值',
+    labelDefaultAlertTrigger: '默认告警触发',
     sectionData: '数据管理',
     labelLogRetention: '日志保留',
     labelDataRetention: '数据保留',
@@ -1171,6 +1175,7 @@ export default {
     unitDefaultInterval: '秒（用于固定间隔模式的新服务）',
     unitWarnThreshold: '次连续失败（范围：1-30）',
     unitErrorThreshold: '次连续失败（范围：1-50）',
+    unitAlertTrigger: '次连续失败（范围：1-10）',
     unitLogRetention: '天（后端日志保留天数）',
     unitDataRetention: '天（数据库检查记录保留天数）',
     // 依赖类型对话框补充

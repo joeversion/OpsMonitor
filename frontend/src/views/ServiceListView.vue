@@ -20,7 +20,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-label">{{ $t('services.healthy') }}</div>
-            <div class="stat-value" style="color: #67C23A">{{ services.filter(s => s.latestStatus === 'up').length }}</div>
+            <div class="stat-value" style="color: #67C23A">{{ services.filter(s => getLiveStatus(s) === 'up').length }}</div>
           </div>
         </div>
       </el-col>
@@ -31,7 +31,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-label">{{ $t('services.warning') }}</div>
-            <div class="stat-value" style="color: #E6A23C">{{ services.filter(s => s.latestStatus === 'warning').length }}</div>
+            <div class="stat-value" style="color: #E6A23C">{{ services.filter(s => getLiveStatus(s) === 'warning').length }}</div>
           </div>
         </div>
       </el-col>
@@ -42,7 +42,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-label">{{ $t('services.downUnknown') }}</div>
-            <div class="stat-value" style="color: #F56C6C">{{ services.filter(s => s.latestStatus === 'down' || s.latestStatus === 'unknown' || !s.latestStatus).length }}</div>
+            <div class="stat-value" style="color: #F56C6C">{{ services.filter(s => getLiveStatus(s) === 'down' || getLiveStatus(s) === 'unknown').length }}</div>
           </div>
         </div>
       </el-col>
@@ -121,8 +121,11 @@
       </div>
 
       <el-table 
+        ref="serviceTableRef"
         :data="paginatedServices" 
+        row-key="id"
         style="width: 100%" 
+        :max-height="tableMaxHeight"
         v-loading="loading"
         @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" v-if="isAdmin" />
@@ -143,7 +146,7 @@
             </div>
           </template>
           <template #default="scope">
-            <StatusBadge :status="scope.row.latestStatus || 'unknown'" />
+            <StatusBadge :status="getLiveStatus(scope.row)" />
           </template>
         </el-table-column>
         <el-table-column :label="$t('services.colName')" min-width="200">
@@ -184,16 +187,16 @@
         </el-table-column>
         <el-table-column :label="$t('services.colResponse')" min-width="160">
           <template #default="scope">
-            <template v-if="scope.row.latestCheck">
+            <template v-if="getLiveCheck(scope.row)">
               <el-progress 
-                :percentage="Math.min(scope.row.latestCheck.response_time / 10, 100)" 
-                :status="getResponseStatus(scope.row.latestCheck.response_time)"
+                :percentage="Math.min(getLiveCheck(scope.row).response_time / 10, 100)" 
+                :status="getResponseStatus(getLiveCheck(scope.row).response_time)"
                 :show-text="false"
                 style="width: 50px; display: inline-block; margin-right: 8px;"
               />
-              <span>{{ scope.row.latestCheck.response_time }}ms</span>
+              <span>{{ getLiveCheck(scope.row).response_time }}ms</span>
               <el-button 
-                v-if="scope.row.latestCheck.output || scope.row.latestCheck.stdout || scope.row.latestCheck.stderr"
+                v-if="scope.row.latestCheck?.output || scope.row.latestCheck?.stdout || scope.row.latestCheck?.stderr"
                 link 
                 type="primary" 
                 size="small" 
@@ -217,9 +220,30 @@
             </div>
           </template>
           <template #default="scope">
-            <span v-if="scope.row.latestCheck">
-              {{ formatTime(scope.row.latestCheck.checked_at) }}
+            <span v-if="getLiveCheck(scope.row)">
+              {{ formatTime(getLiveCheck(scope.row).checked_at) }}
             </span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('services.colCheckInterval')" min-width="100" align="center">
+          <template #default="scope">
+            <span class="interval-badge">⏱ {{ scope.row.check_interval }}s</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('services.colThresholdsTrigger')" min-width="110">
+          <template #default="scope">
+            <div class="threshold-cell" v-if="scope.row.warning_threshold != null">
+              <div class="thr-row thr-warn">
+                <span class="thr-lbl">W</span><span>{{ scope.row.warning_threshold }} {{ $t('services.unitFailures') }}</span>
+              </div>
+              <div class="thr-row thr-error">
+                <span class="thr-lbl">E</span><span>{{ scope.row.error_threshold }} {{ $t('services.unitFailures') }}</span>
+              </div>
+              <div class="thr-row thr-trigger">
+                <span class="thr-lbl thr-lbl-t">T</span><span>{{ scope.row.failure_threshold }} {{ $t('services.unitFailures') }}</span>
+              </div>
+            </div>
             <span v-else>-</span>
           </template>
         </el-table-column>
@@ -1121,7 +1145,7 @@
         show-icon
         style="margin-bottom: 20px">
         <template #title>
-          <span style="font-size: 13px;">{{ $t('services.batchEditInfo', { n: selectedServices.length }) }}</span>
+          <span style="font-size: 13px;">{{ $t('services.batchEditInfo', { n: batchServiceIds.length }) }}</span>
         </template>
       </el-alert>
 
@@ -1165,6 +1189,17 @@
           <div class="form-tip">{{ $t('services.tipErrorThreshold') }}</div>
         </el-form-item>
 
+        <el-form-item :label="$t('services.labelAlertTrigger')">
+          <el-input-number 
+            v-model="batchEditForm.failure_threshold" 
+            :min="1" 
+            :max="10"
+            :placeholder="$t('services.placeholderKeepCurrent')"
+            clearable
+            style="width: 100%;" />
+          <div class="form-tip">{{ $t('services.tipAlertTrigger') }}</div>
+        </el-form-item>
+
         <el-form-item :label="$t('services.labelRiskLevel')">
           <el-select 
             v-model="batchEditForm.risk_level" 
@@ -1203,7 +1238,7 @@
 
       <template #footer>
         <el-button @click="batchEditDialogVisible = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="submitBatchEdit">{{ $t('services.btnUpdateN', { n: selectedServices.length }) }}</el-button>
+        <el-button type="primary" @click="submitBatchEdit">{{ $t('services.btnUpdateN', { n: batchServiceIds.length }) }}</el-button>
       </template>
     </el-dialog>
 
@@ -1266,7 +1301,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, reactive, computed, inject, watch, type Ref } from 'vue';
+import { ref, onMounted, onUnmounted, reactive, computed, inject, watch, nextTick, toRaw, type Ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getServices, getAllServices, createService, updateService, deleteService } from '../api/services';
 import { getProjects, type ProjectWithStats } from '../api/projects';
@@ -1324,6 +1359,7 @@ onUnmounted(() => {
     sseSource.close();
     sseSource = null;
   }
+  window.removeEventListener('resize', _onWindowResize);
 });
 
 async function handleRunCheck(service: any) {
@@ -1335,8 +1371,14 @@ async function handleRunCheck(service: any) {
     const msgType = (statusMap[result.status] || 'info') as 'success' | 'error' | 'warning' | 'info';
     const statusLabel = t(`statusLabels.${result.status}`) || result.status.toUpperCase();
     ElMessage[msgType](`${service.name}: ${statusLabel}${ result.response_time ? ` (${result.response_time}ms)` : '' }`);
-    // Refresh service list to show updated status
-    await fetchServices();
+    // Update only this service in-place — no full page reload
+    const svc = services.value.find(s => s.id === service.id);
+    if (svc) {
+      const raw = toRaw(svc);
+      raw.latestStatus = result.status;
+      raw.latestCheck = result;
+      liveStatus.set(service.id, { latestStatus: result.status, latestCheck: result });
+    }
   } catch (e: any) {
     ElMessage.error(t('services.msgCheckFailed', { error: e.response?.data?.error || e.message }));
   } finally {
@@ -1420,6 +1462,20 @@ interface ServiceWithStatus extends Service {
 }
 
 const services = ref<ServiceWithStatus[]>([]);
+
+// Separate reactive store for SSE live status data.
+// toRaw() is used when mutating these from SSE, bypassing Vue's deep reactivity
+// so el-table's internal deep watcher is NOT triggered → selection never cleared.
+const liveStatus = reactive(new Map<string, { latestStatus: string; latestCheck: any }>());
+const getLiveStatus = (row: ServiceWithStatus): string =>
+  liveStatus.get(row.id)?.latestStatus ?? row.latestStatus ?? 'unknown';
+const getLiveCheck = (row: ServiceWithStatus) => {
+  const live = liveStatus.get(row.id);
+  if (!live) return row.latestCheck ?? null;
+  return row.latestCheck
+    ? { ...row.latestCheck, ...live.latestCheck }
+    : live.latestCheck;
+};
 const allServices = ref<ServiceWithStatus[]>([]);  // All services for cross-project dependency selection
 const projects = ref<ProjectWithStats[]>([]);
 const loading = ref(false);
@@ -1453,14 +1509,21 @@ const sortOrder = ref<'asc' | 'desc' | ''>(''); // 排序方向
 // Batch operations
 const selectedServices = ref<ServiceWithStatus[]>([]);
 const batchEditDialogVisible = ref(false);
+const batchServiceIds = ref<string[]>([]); // IDs captured at dialog open, decoupled from live selection
+const serviceTableRef = ref<any>(null);
 const batchEditForm = ref({
   check_interval: null as number | null,
   warning_threshold: null as number | null,
   error_threshold: null as number | null,
+  failure_threshold: null as number | null,
   risk_level: null as string | null,
   enabled: null as boolean | null,
   alert_enabled: null as boolean | null
 });
+
+// Table max-height: keeps horizontal scrollbar within viewport
+const tableMaxHeight = ref(Math.max(window.innerHeight - 500, 300));
+const _onWindowResize = () => { tableMaxHeight.value = Math.max(window.innerHeight - 500, 300); };
 
 // Check Details Dialog
 const checkDetailsVisible = ref(false);
@@ -1879,6 +1942,8 @@ const paginatedServices = computed(() => {
 
 const fetchServices = async () => {
   loading.value = true;
+  // preserve current selection IDs so we can restore after data reload
+  const prevSelectedIds = new Set(selectedServices.value.map((s: any) => s.id));
   try {
     const projectId = currentProjectId?.value;
     const hostId = props.filterHostId;
@@ -1899,6 +1964,15 @@ const fetchServices = async () => {
       }
     }));
     services.value = servicesWithStatus;
+    // restore selection: re-select rows whose IDs were previously selected
+    if (prevSelectedIds.size > 0 && serviceTableRef.value) {
+      await nextTick();
+      servicesWithStatus.forEach((row: any) => {
+        if (prevSelectedIds.has(row.id)) {
+          serviceTableRef.value.toggleRowSelection(row, true);
+        }
+      });
+    }
   } catch (error) {
     ElMessage.error(t('services.msgOperationFailed'));
   } finally {
@@ -2597,11 +2671,14 @@ const clearSelection = () => {
 };
 
 const handleBatchEdit = () => {
+  // Snapshot selected IDs at dialog open time — decoupled from live table selection
+  batchServiceIds.value = selectedServices.value.map((s: any) => s.id);
   // Reset form
   batchEditForm.value = {
     check_interval: null,
     warning_threshold: null,
     error_threshold: null,
+    failure_threshold: null,
     risk_level: null,
     enabled: null,
     alert_enabled: null
@@ -2724,6 +2801,7 @@ const submitBatchEdit = async () => {
     if (batchEditForm.value.check_interval !== null) updates.check_interval = batchEditForm.value.check_interval;
     if (batchEditForm.value.warning_threshold !== null) updates.warning_threshold = batchEditForm.value.warning_threshold;
     if (batchEditForm.value.error_threshold !== null) updates.error_threshold = batchEditForm.value.error_threshold;
+    if (batchEditForm.value.failure_threshold !== null) updates.failure_threshold = batchEditForm.value.failure_threshold;
     if (batchEditForm.value.risk_level !== null) updates.risk_level = batchEditForm.value.risk_level;
     if (batchEditForm.value.enabled !== null) updates.enabled = batchEditForm.value.enabled ? 1 : 0;
     if (batchEditForm.value.alert_enabled !== null) updates.alert_enabled = batchEditForm.value.alert_enabled ? 1 : 0;
@@ -2733,7 +2811,7 @@ const submitBatchEdit = async () => {
       return;
     }
     
-    const serviceIds = selectedServices.value.map(s => s.id);
+    const serviceIds = batchServiceIds.value;
     const response = await api.patch('/services/batch', { serviceIds, updates });
     
     ElMessage.success(t('services.msgUpdated'));
@@ -3047,12 +3125,14 @@ const loadGeneralSettings = async () => {
     form.check_interval = response.data.defaultInterval;
     form.warning_threshold = response.data.warningThreshold;
     form.error_threshold = response.data.errorThreshold;
+    form.failure_threshold = response.data.failureThreshold ?? 3;
   } catch (error) {
     console.error('Failed to load general settings:', error);
   }
 };
 
 onMounted(() => {
+  window.addEventListener('resize', _onWindowResize);
   loadGeneralSettings();
   fetchServices();
   fetchProjects();
@@ -3075,20 +3155,28 @@ onMounted(() => {
       };
       const svc = services.value.find(s => s.id === event.serviceId);
       if (svc) {
-        svc.latestStatus = event.status;
-        if (svc.latestCheck) {
-          svc.latestCheck.status = event.status;
-          svc.latestCheck.response_time = event.responseTime;
-          svc.latestCheck.error_message = event.errorMessage;
-          svc.latestCheck.checked_at = event.checkedAt;
-        } else {
-          svc.latestCheck = {
+        const liveData = {
+          latestStatus: event.status,
+          latestCheck: {
             status: event.status,
             response_time: event.responseTime,
             error_message: event.errorMessage,
             checked_at: event.checkedAt,
-          };
+          },
+        };
+        // Use toRaw to bypass Vue reactivity → el-table deep watcher NOT triggered → selection preserved
+        const raw = toRaw(svc);
+        raw.latestStatus = event.status;
+        if (raw.latestCheck) {
+          raw.latestCheck.status = event.status;
+          raw.latestCheck.response_time = event.responseTime;
+          raw.latestCheck.error_message = event.errorMessage;
+          raw.latestCheck.checked_at = event.checkedAt;
+        } else {
+          raw.latestCheck = liveData.latestCheck;
         }
+        // Update liveStatus map (reactive) → triggers only the affected row cells to re-render
+        liveStatus.set(event.serviceId, liveData);
         // 若对话框正在显示该服务，重新拉取完整 check 数据（含 stdout/details 等）
         if (checkDetailsVisible.value && currentDetailsServiceId.value === event.serviceId) {
           getLatestCheck(event.serviceId).then(full => {
@@ -3633,6 +3721,49 @@ watch(() => currentProjectId?.value, () => {
 }
 
 /* Sortable header styles */
+.interval-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #ecf5ff;
+  color: #409eff;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.threshold-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.4;
+}
+
+.thr-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.thr-warn { color: #e6a23c; }
+.thr-error { color: #f56c6c; }
+.thr-trigger {
+  color: #409eff;
+  padding-top: 3px;
+  border-top: 1px dashed #e8ecef;
+  margin-top: 2px;
+}
+
+.thr-lbl {
+  color: #909399;
+  font-size: 10px;
+  min-width: 12px;
+}
+
+.thr-lbl-t { color: #409eff; }
+
 .sortable-header {
   display: inline-flex;
   align-items: center;

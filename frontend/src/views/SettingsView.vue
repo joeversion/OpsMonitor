@@ -154,6 +154,10 @@
           <el-input-number v-model="settings.errorThreshold" :min="1" :max="50" :disabled="!isAdmin" />
           <span class="unit-text">{{ $t('settings.unitErrorThreshold') }}</span>
         </el-form-item>
+        <el-form-item :label="$t('settings.labelDefaultAlertTrigger')">
+          <el-input-number v-model="settings.failureThreshold" :min="1" :max="10" :disabled="!isAdmin" />
+          <span class="unit-text">{{ $t('settings.unitAlertTrigger') }}</span>
+        </el-form-item>
         
         <!-- Data Management -->
         <el-divider content-position="left">
@@ -327,6 +331,7 @@ const settings = ref({
   defaultInterval: 60,
   warningThreshold: 3,
   errorThreshold: 5,
+  failureThreshold: 3,
   dataRetentionDays: 30
 });
 
@@ -400,6 +405,7 @@ const saveSettings = async () => {
       defaultInterval: settings.value.defaultInterval,
       warningThreshold: settings.value.warningThreshold,
       errorThreshold: settings.value.errorThreshold,
+      failureThreshold: settings.value.failureThreshold,
       dataRetentionDays: settings.value.dataRetentionDays
     });
     

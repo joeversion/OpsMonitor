@@ -1,7 +1,7 @@
 # OpsMonitor Service Monitoring System — User Manual
 
 > **Version**: 2.2.0
-> **Updated**: 2026-03-11
+> **Updated**: 2026-03-16
 > **Scope**: OpsMonitor Service Monitoring System (Frontend port: 5173, Backend port: 3000)
 
 ---
@@ -534,7 +534,25 @@ Services are the smallest monitoring unit in OpsMonitor. Each service correspond
 
 ![Service List](images/ch05-services-list.png)
 
-### 8.1 Service Concepts
+### 8.1 Service List Columns
+
+The service list table shows the following columns:
+
+| Column | Description |
+|--------|-------------|
+| **Status** | Current health status badge: 🟢 UP / 🟡 WARNING / 🔴 DOWN / ⚪ UNKNOWN |
+| **Name** | Service display name and host:port |
+| **Project** | Associated project tag |
+| **Response** | Latest response time (ms) with progress bar indicator |
+| **Last Check** | Timestamp of the most recent health check |
+| **Check Interval** | ⏱ How often this service is checked, in seconds (e.g. `⏱ 30s`). Reflects the service's individual schedule setting. |
+| **Thresholds & Trigger** | Three inline indicators showing per-service thresholds: **W** = Warning threshold (failures), **E** = Error/Down threshold (failures), **T** = Alert Trigger threshold (failures) |
+| **Monitoring** | Toggle to enable/disable monitoring for the service |
+| **Alerts** | Toggle to enable/disable alert notifications |
+| **Type** | Health check type tag: TCP / HTTP / HTTPS / SCRIPT / FILE, etc. |
+| **Actions** | Run check ▶, Copy, Edit, Delete buttons |
+
+### 8.2 Service Concepts
 
 | Concept | Description |
 |---------|-------------|
@@ -543,7 +561,7 @@ Services are the smallest monitoring unit in OpsMonitor. Each service correspond
 | **Risk Level** | Marks the service's importance: Low / Medium / High / Critical |
 | **Schedule** | Defines check frequency and time range |
 
-### 8.2 Add a Service Using the Wizard
+### 8.3 Add a Service Using the Wizard
 
 Click the **Add Service** button to launch the add service wizard (multi-step guided configuration):
 
@@ -566,7 +584,7 @@ Click the **Add Service** button to launch the add service wizard (multi-step gu
 - Select an existing host from the dropdown, or click **+ New Host** to create one directly in the wizard
 - After selecting a check type, the page dynamically displays the corresponding configuration fields
 
-### 8.3 Health Check Type Configuration
+### 8.4 Health Check Type Configuration
 
 **TCP Check**:
 - Configuration fields: **Port** (required)
@@ -624,7 +642,7 @@ The wizard's check type selector also displays upcoming database check types, cu
 | 📮 Redis Check | Redis cache service check |
 | 🍃 MongoDB Check | MongoDB database connectivity check |
 
-### 8.4 Alert Threshold Configuration
+### 8.5 Alert Threshold Configuration
 
 | Field | Range | Description |
 |-------|-------|-------------|
@@ -691,7 +709,7 @@ Earliest RECOVERY notification time = up to 1 × Check Interval after recovery
 
 > When Alert Trigger = Error Threshold, the WARNING phase is skipped and a single DOWN notification is sent directly.
 
-### 8.5 Dependency Configuration
+### 8.6 Dependency Configuration
 
 When creating or editing a service, you can add inter-service dependencies in the **Dependencies** section:
 1. Click **Add Dependency**
@@ -699,7 +717,7 @@ When creating or editing a service, you can add inter-service dependencies in th
 3. Set the **dependency type** (customizable in system settings) and **risk level**
 4. Dependencies will be reflected in the [Dependency Topology Graph](#chapter-10-dependency-topology-graph)
 
-### 8.6 Edit a Service
+### 8.7 Edit a Service
 
 Click the **Edit** button in the service list to open the full service edit form:
 
@@ -712,7 +730,7 @@ The edit form provides more comprehensive configuration options than the add wiz
   - **Service Impact Description**: Describe the impact when the service fails
   - **Custom Alert Template**: Custom alert message template supporting variables: `{service_name}`, `{host}`, `{port}`, `{risk_level}`, `{down_time}`, `{impact_description}`
 
-### 8.7 Batch Operations
+### 8.8 Batch Operations
 
 On the service list page, selecting multiple services reveals a batch operation toolbar at the top:
 
@@ -722,7 +740,7 @@ On the service list page, selecting multiple services reveals a batch operation 
 | **Delete** | Batch delete selected services |
 | **Clear** | Clear current selection |
 
-### 8.8 Import / Export Service Configuration
+### 8.9 Import / Export Service Configuration
 
 The service list page provides configuration import/export functionality:
 
@@ -1047,6 +1065,7 @@ Global defaults used when creating new services, which can be overridden by serv
 | **Default Check Interval** | Default check interval (seconds), used for new services in fixed interval mode |
 | **Default Warning Threshold** | Default warning threshold (consecutive failures, range 1-30) |
 | **Default Error Threshold** | Default error threshold (consecutive failures, range 1-50) |
+| **Default Alert Trigger** | Default alert trigger threshold (consecutive failures, range 1-10). Notifications are only sent after this many consecutive failures, preventing false alarms from transient network issues |
 
 ### 14.3 Data Management
 

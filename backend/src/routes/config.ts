@@ -9,15 +9,16 @@ const router = express.Router();
 // Get General Settings
 router.get('/general', (req, res) => {
   try {
-    const keys = ['default_check_interval', 'default_warning_threshold', 'default_error_threshold', 'data_retention_days'];
+    const keys = ['default_check_interval', 'default_warning_threshold', 'default_error_threshold', 'default_failure_threshold', 'data_retention_days'];
     const configs = db.prepare(`
-      SELECT key, value FROM system_configs WHERE key IN (?, ?, ?, ?)
+      SELECT key, value FROM system_configs WHERE key IN (?, ?, ?, ?, ?)
     `).all(...keys) as { key: string; value: string }[];
     
     const settings: Record<string, number> = {
       defaultInterval: 60,
       warningThreshold: 3,
       errorThreshold: 5,
+      failureThreshold: 3,
       dataRetentionDays: 30
     };
     
@@ -32,6 +33,9 @@ router.get('/general', (req, res) => {
           break;
         case 'default_error_threshold':
           settings.errorThreshold = value;
+          break;
+        case 'default_failure_threshold':
+          settings.failureThreshold = value;
           break;
         case 'data_retention_days':
           settings.dataRetentionDays = value;
@@ -49,17 +53,20 @@ router.get('/general', (req, res) => {
 // Update General Settings
 router.put('/general', (req, res) => {
   try {
-    const { defaultInterval, warningThreshold, errorThreshold, dataRetentionDays } = req.body;
+    const { defaultInterval, warningThreshold, errorThreshold, failureThreshold, dataRetentionDays } = req.body;
     
     // Validation
     if (defaultInterval !== undefined && (defaultInterval < 10 || defaultInterval > 3600)) {
       return res.status(400).json({ error: 'Default interval must be between 10 and 3600 seconds' });
     }
-    if (warningThreshold !== undefined && (warningThreshold < 1 || warningThreshold > 10)) {
-      return res.status(400).json({ error: 'Warning threshold must be between 1 and 10' });
+    if (warningThreshold !== undefined && (warningThreshold < 1 || warningThreshold > 30)) {
+      return res.status(400).json({ error: 'Warning threshold must be between 1 and 30' });
     }
-    if (errorThreshold !== undefined && (errorThreshold < 1 || errorThreshold > 20)) {
-      return res.status(500).json({ error: 'Error threshold must be between 1 and 20' });
+    if (errorThreshold !== undefined && (errorThreshold < 1 || errorThreshold > 50)) {
+      return res.status(400).json({ error: 'Error threshold must be between 1 and 50' });
+    }
+    if (failureThreshold !== undefined && (failureThreshold < 1 || failureThreshold > 10)) {
+      return res.status(400).json({ error: 'Failure threshold must be between 1 and 10' });
     }
     if (dataRetentionDays !== undefined && (dataRetentionDays < 1 || dataRetentionDays > 365)) {
       return res.status(400).json({ error: 'Data retention must be between 1 and 365 days' });
@@ -80,6 +87,9 @@ router.put('/general', (req, res) => {
       }
       if (errorThreshold !== undefined) {
         stmt.run('default_error_threshold', String(errorThreshold));
+      }
+      if (failureThreshold !== undefined) {
+        stmt.run('default_failure_threshold', String(failureThreshold));
       }
       if (dataRetentionDays !== undefined) {
         stmt.run('data_retention_days', String(dataRetentionDays));

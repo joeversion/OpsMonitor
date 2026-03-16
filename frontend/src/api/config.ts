@@ -4,6 +4,7 @@ export interface GeneralSettings {
   defaultInterval: number;
   warningThreshold: number;
   errorThreshold: number;
+  failureThreshold: number;
   dataRetentionDays: number;
 }
 

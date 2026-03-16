@@ -544,7 +544,7 @@ router.patch('/batch', (req, res) => {
     }
     
     // Build dynamic UPDATE statement based on provided fields
-    const allowedFields = ['check_interval', 'warning_threshold', 'error_threshold', 'enabled', 'alert_enabled', 'risk_level'];
+    const allowedFields = ['check_interval', 'warning_threshold', 'error_threshold', 'failure_threshold', 'enabled', 'alert_enabled', 'risk_level'];
     const updateFields: string[] = [];
     const updateValues: any[] = [];
     
