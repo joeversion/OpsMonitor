@@ -430,9 +430,9 @@ function refreshProjects() {
 }
 
 // Notify all listeners that projects list has changed
+// 只递增 version，让各 watch 自行节流处理；CRUD 场景走 refreshProjects() 直接刷新
 function notifyProjectsUpdated() {
   projectsVersion.value++;
-  projectSelectorRef.value?.refresh();
 }
 
 // Trigger open Add Project dialog in ProjectsView

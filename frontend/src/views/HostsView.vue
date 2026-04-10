@@ -298,9 +298,6 @@
               <div class="connection-desc">{{ $t('hosts.cardLocalDesc') }}</div>
             </div>
           </div>
-          <div style="margin-top: 8px; font-size: 12px; color: #909399;">
-            {{ $t('hosts.hintSSHLocal') }}
-          </div>
         </el-form-item>
         
         <!-- SSH Configuration Section -->
@@ -438,7 +435,6 @@
           <el-button 
             @click="testConnectionDialog" 
             :loading="testing"
-            :disabled="hostForm.connection_type === 'ssh' && (!hostForm.ssh_host || !hostForm.ssh_username || (hostForm.ssh_auth_type === 'password' && !hostForm.ssh_password) || (hostForm.ssh_auth_type === 'private_key' && !hostForm.ssh_private_key))"
             style="width: 100%">
             <template v-if="hostForm.connection_type === 'ssh'">
               🔌 {{ $t('hosts.btnTestSSH') }}
@@ -461,7 +457,7 @@
       <template #footer>
         <div style="display: flex; justify-content: space-between; width: 100%;">
           <el-button @click="showDialog = false">{{ $t('common.close') }}</el-button>
-          <el-button type="primary" @click="handleSave" :loading="saving">
+          <el-button type="primary" @click="handleSave" :loading="saving" :disabled="isSaveDisabled">
             {{ isEditing ? $t('common.update') : $t('common.create') }}
           </el-button>
         </div>
@@ -710,6 +706,30 @@ const offlineHosts = computed(() =>
 const disabledHosts = computed(() => 
   allHosts.value.filter(h => h.enabled === 0).length
 );
+
+const isSaveDisabled = computed(() => {
+  if (!hostForm.value.name?.trim() || !hostForm.value.ip?.trim()) {
+    return true;
+  }
+
+  if (hostForm.value.connection_type !== 'ssh') {
+    return false;
+  }
+
+  if (!hostForm.value.ssh_username?.trim()) {
+    return true;
+  }
+
+  if (hostForm.value.ssh_auth_type === 'password') {
+    return !hostForm.value.ssh_password;
+  }
+
+  if (hostForm.value.ssh_auth_type === 'private_key') {
+    return !hostForm.value.ssh_private_key;
+  }
+
+  return false;
+});
 
 const totalServices = computed(() => 
   allHosts.value.reduce((sum, h) => sum + (h.service_count || 0), 0)
@@ -1035,7 +1055,7 @@ const testConnectionDialog = async () => {
   
   // For SSH type, check SSH configuration
   if (hostForm.value.connection_type === 'ssh') {
-    if (!hostForm.value.ssh_host || !hostForm.value.ssh_username) {
+    if (!(hostForm.value.ssh_host || hostForm.value.ip) || !hostForm.value.ssh_username) {
       ElMessage.warning(t('hosts.msgConfigSSH'));
       return;
     }
@@ -1185,6 +1205,10 @@ const handleSave = async () => {
         ssh_connection_timeout: hostForm.value.ssh_connection_timeout * 1000,
         ssh_command_timeout: hostForm.value.ssh_command_timeout * 1000,
       };
+
+      if (submitData.connection_type === 'ssh' && !submitData.ssh_host?.trim()) {
+        submitData.ssh_host = submitData.ip;
+      }
       
       // 如果选择 password 认证，清除 private key 相关字段
       if (submitData.ssh_auth_type === 'password') {

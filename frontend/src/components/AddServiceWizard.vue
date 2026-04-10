@@ -506,6 +506,7 @@
               :placeholder="$t('services.placeholderSelectService')"
               style="width: 100%;"
               filterable
+              clearable
             >
               <el-option-group
                 v-for="group in groupedServicesForDep"
@@ -1390,6 +1391,9 @@ const resetForm = () => {
   selectedHostData.value = null;
   scheduleConfig.value = { type: 'fixed', defaultInterval: defaultInterval, timeRanges: [] };
   serviceDependencies.value = [];
+  newDependency.target_service_id = '';
+  newDependency.dependency_type = 'depends';
+  newDependency.risk_level = 'medium';
   
   // Reset health check configurations
   Object.assign(httpConfig, {

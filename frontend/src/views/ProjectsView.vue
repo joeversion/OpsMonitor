@@ -371,14 +371,14 @@ function copyDescription(description: string | undefined) {
   });
 }
 
-async function loadProjects() {
-  loading.value = true;
+async function loadProjects(silent = false) {
+  if (!silent) loading.value = true;
   try {
     projects.value = await getProjects();
   } catch (error) {
-    ElMessage.error(t('projectsPage.loadFailed'));
+    if (!silent) ElMessage.error(t('projectsPage.loadFailed'));
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
   }
 }
 
@@ -456,8 +456,14 @@ async function confirmDelete(project: ProjectWithStats) {
 }
 
 // 当外部（如 ProjectSelector 快捷添加）创建项目时，自动刷新列表
+// 加前沿节流 30s，避免 SSE 频繁触发 projectsVersion 导致页面持续刷新
+let _projectsVersionThrottle: ReturnType<typeof setTimeout> | null = null;
 watch(projectsVersion!, () => {
-  loadProjects();
+  if (_projectsVersionThrottle) return;
+  loadProjects(true);  // 后台静默刷新，用户无感知
+  _projectsVersionThrottle = setTimeout(() => {
+    _projectsVersionThrottle = null;
+  }, 30000);
 });
 
 // 当侧边栏点击 New Project 时，自动打开新建对话框

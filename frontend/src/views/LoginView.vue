@@ -206,7 +206,7 @@
 
     <!-- Footer -->
     <div class="login-footer">
-      OpsMonitor v1.1.0_beta.1 © 2026
+      OpsMonitor v1.1.0 © 2026
     </div>
   </div>
 </template>

@@ -181,8 +181,14 @@ onMounted(() => {
   loadProjects();
 });
 
+// SSE 事件频繁触发 projectsVersion，加 30s 节流避免持续刷新
+let _selectorVersionThrottle: ReturnType<typeof setTimeout> | null = null;
 watch(projectsVersion!, () => {
+  if (_selectorVersionThrottle) return;
   loadProjects();
+  _selectorVersionThrottle = setTimeout(() => {
+    _selectorVersionThrottle = null;
+  }, 30000);
 });
 
 defineExpose({
