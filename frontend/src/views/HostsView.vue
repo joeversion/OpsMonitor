@@ -1206,7 +1206,8 @@ const handleSave = async () => {
         ssh_command_timeout: hostForm.value.ssh_command_timeout * 1000,
       };
 
-      if (submitData.connection_type === 'ssh' && !submitData.ssh_host?.trim()) {
+      // Bug #040: 始终将 ssh_host 同步为当前 ip（表单无独立 ssh_host 字段）
+      if (submitData.connection_type === 'ssh') {
         submitData.ssh_host = submitData.ip;
       }
       
@@ -1254,6 +1255,8 @@ const handleSave = async () => {
             ssh_retry_delay: (updatedHost.ssh_retry_delay || 2000) / 1000,
             ssh_connection_timeout: (updatedHost.ssh_connection_timeout || 10000) / 1000,
             ssh_command_timeout: (updatedHost.ssh_command_timeout || 30000) / 1000,
+            // Host check interval
+            check_interval: updatedHost.check_interval || 300,
             description: updatedHost.description || '',
             tags: updatedHost.tags || []
           };
