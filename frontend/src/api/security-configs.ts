@@ -67,12 +67,17 @@ export const updateSecurityConfig = async (id: string, data: UpdateSecurityConfi
   await api.put(`/security-configs/${id}`, data);
 };
 
-export const extendSecurityConfig = async (id: string, extend_days?: number): Promise<{ 
+export const extendSecurityConfig = async (id: string, options?: number | {
+  extend_days?: number;
+  expiry_date?: string;
+  last_reset_at?: string;
+}): Promise<{
   message: string; 
   new_expiry_date: string; 
   days_remaining: number 
 }> => {
-  const response = await api.post(`/security-configs/${id}/extend`, { extend_days });
+  const response = await api.post(`/security-configs/${id}/extend`,
+    typeof options === 'number' || options === undefined ? { extend_days: options } : options);
   return response.data;
 };
 
