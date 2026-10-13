@@ -500,12 +500,19 @@
                 </span>
               </div>
               <div class="security-card-type">{{ getSecurityTypeLabel(config.type) }}</div>
-              <div class="security-card-info">
+              <div class="security-card-info" v-if="config.status !== 'unverified'">
                 <span class="expiry-label">{{ $t('graph.expires') }}:</span>
                 <span class="expiry-date">{{ formatSecurityDate(config.expiry_date) }}</span>
                 <span class="days-remaining" :class="config.status">
                   ({{ config.days_remaining > 0 ? $t('graph.daysLeft', { count: config.days_remaining }) : $t('graph.expired') }})
                 </span>
+              </div>
+              <div class="security-card-info" v-else>
+                <span class="expiry-label">{{ $t('graph.expires') }}:</span>
+                <span class="expiry-date">{{ $t('security.sslExpiryUnavailable') }}</span>
+              </div>
+              <div class="security-card-info" v-if="config.status === 'unverified' && config.ssl_check_error">
+                {{ config.ssl_check_error }}
               </div>
               <div v-if="config.affected_services?.length" class="security-card-services">
                 <span class="affects-label">{{ $t('graph.affects') }}:</span>
@@ -774,6 +781,7 @@ const getSecurityStatusLabel = (status: string) => {
     case 'warning': return t('graph.securityWarning');
     case 'critical': return t('graph.securityCritical');
     case 'expired': return t('graph.securityExpired');
+    case 'unverified': return t('security.unverified');
     default: return status;
   }
 };

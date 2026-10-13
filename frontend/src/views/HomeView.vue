@@ -320,7 +320,7 @@ const hostStatusSummary = computed(() => {
 });
 
 const securityWarnings = computed(() => {
-  return securityConfigs.value.filter(c => c.status === 'warning' || c.status === 'critical' || c.status === 'expired').length;
+  return securityConfigs.value.filter(c => c.status === 'warning' || c.status === 'critical' || c.status === 'expired' || c.status === 'unverified').length;
 });
 
 const showSystemOverview = computed(() => {

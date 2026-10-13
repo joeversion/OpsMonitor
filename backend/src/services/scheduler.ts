@@ -1,6 +1,7 @@
 import db, { cleanupOldCheckRecords } from '../db/database';
 import { HealthChecker } from './health-checker';
 import { AlertService } from './alert-service';
+import { getSslCertificateInfo, TlsInspectionError } from './ssl-certificate-service';
 import { SSHService } from './ssh-service';
 import logger from '../utils/logger';
 import { DynamicScheduler } from './dynamic-scheduler';
@@ -233,6 +234,40 @@ export class Scheduler {
       const configs = db.prepare('SELECT * FROM security_configs').all() as any[];
       
       for (const config of configs) {
+        if (config.type === 'ssl' && config.ssl_domain) {
+          const checkedAt = new Date().toISOString();
+          try {
+            const certificate = await getSslCertificateInfo(config.ssl_domain);
+            config.expiry_date = certificate.expiryDate;
+            config.ssl_last_checked_at = certificate.checkedAt;
+            config.ssl_check_error = null;
+            db.prepare(`
+              UPDATE security_configs
+              SET expiry_date = ?, ssl_last_checked_at = ?, ssl_check_error = NULL, updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(certificate.expiryDate, certificate.checkedAt, config.id);
+          } catch (error: any) {
+            config.ssl_last_checked_at = checkedAt;
+            config.ssl_check_error = error.message || 'Failed to retrieve the SSL certificate.';
+            db.prepare(`
+              UPDATE security_configs
+              SET ssl_last_checked_at = ?, ssl_check_error = ?
+              WHERE id = ?
+            `).run(checkedAt, config.ssl_check_error, config.id);
+            logger.scheduler.warn(`SSL certificate check failed for ${config.ssl_domain}`, { error: config.ssl_check_error });
+            if (error instanceof TlsInspectionError) {
+              config.last_status = 'normal';
+              config.last_reminded_at = null;
+              db.prepare(`
+                UPDATE security_configs
+                SET last_status = 'normal', last_reminded_at = NULL
+                WHERE id = ?
+              `).run(config.id);
+              continue;
+            }
+          }
+        }
+
         const daysRemaining = this.calculateDaysRemaining(config.expiry_date);
         const reminderDays = config.reminder_days ? JSON.parse(config.reminder_days) : [7, 3, 1];
         

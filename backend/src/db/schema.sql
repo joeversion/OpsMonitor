@@ -127,6 +127,9 @@ CREATE TABLE IF NOT EXISTS security_configs (
   last_reminded_at DATETIME,
   last_status TEXT DEFAULT 'normal' CHECK(last_status IN ('normal', 'warning', 'critical', 'expired')), -- Track status for recovery alerts
   notes TEXT, -- User notes/comments
+  ssl_domain TEXT,
+  ssl_last_checked_at DATETIME,
+  ssl_check_error TEXT,
   -- SSH specific fields
   ssh_host TEXT,
   ssh_port INTEGER DEFAULT 22,
