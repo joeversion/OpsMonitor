@@ -124,13 +124,6 @@
         <el-table-column :label="$t('security.colDaysRemaining')" width="150">
           <template #default="scope">
             <div class="days-cell">
-              <el-progress v-if="scope.row.status !== 'unverified'"
-                :percentage="getDaysPercentage(scope.row)" 
-                :status="getProgressStatus(scope.row.status)"
-                :stroke-width="8"
-                :show-text="false"
-                style="width: 60px;"
-              />
               <span :class="['days-text', scope.row.status]">
                 {{ scope.row.status === 'unverified' ? $t('security.sslExpiryUnknown') : (scope.row.days_remaining !== null && scope.row.days_remaining > 0 ? $t('security.daysN', { n: scope.row.days_remaining }) : $t('security.expired')) }}
               </span>
@@ -144,7 +137,7 @@
         </el-table-column>
         <el-table-column :label="$t('security.colActions')" width="180" align="right" v-if="isAdmin">
           <template #default="scope">
-            <el-button link type="success" size="small" @click="handleExtend(scope.row)">
+            <el-button v-if="scope.row.type !== 'ssl'" link type="success" size="small" @click="handleExtend(scope.row)">
               <el-icon><Promotion /></el-icon> {{ $t('security.btnExtend') }}
             </el-button>
             <el-button link type="primary" size="small" @click="handleEdit(scope.row)">{{ $t('security.btnEdit') }}</el-button>
@@ -166,7 +159,7 @@
     </el-card>
 
     <!-- Add/Edit Dialog -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? $t('security.titleEdit') : $t('security.titleAdd')" width="550px">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? $t('security.titleEdit') : $t('security.titleAdd')" width="min(550px, 94vw)">
       <el-form :model="form" label-width="120px">
         <el-form-item :label="$t('security.labelName')" required v-if="form.type !== 'ssl'">
           <el-input v-model="form.name" :placeholder="$t('security.placeholderName')" />
@@ -181,18 +174,28 @@
         <el-form-item :label="$t('security.labelDomain')" required v-if="form.type === 'ssl'">
           <el-input v-model="form.ssl_domain" :placeholder="$t('security.placeholderDomain')" />
         </el-form-item>
-        <el-form-item :label="$t('security.labelValidity')" v-if="form.type !== 'ssl'">
-          <el-input-number v-model="form.validity_days" :min="1" :max="365" /> {{ $t('common.days') }}
-          <span style="color: #909399; margin-left: 10px;">{{ $t('security.defaultValidity', { n: 60 }) }}</span>
+        <el-form-item :label="$t('security.labelExpiryMode')" v-if="form.type !== 'ssl'">
+          <el-radio-group v-model="expiryMode" @change="changeExpiryMode">
+            <el-radio-button value="date">{{ $t('security.expiryModeDate') }}</el-radio-button>
+            <el-radio-button value="period">{{ $t('security.expiryModePeriod') }}</el-radio-button>
+          </el-radio-group>
         </el-form-item>
-        <el-form-item :label="$t('security.labelExpiry')" v-if="form.type !== 'ssl'">
+        <el-form-item :label="$t('security.labelResetDate')" required v-if="form.type !== 'ssl' && expiryMode === 'period'">
+          <el-date-picker v-model="form.last_reset_at" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item :label="$t('security.labelValidity')" required v-if="form.type !== 'ssl' && expiryMode === 'period'">
+          <el-input-number v-model="form.validity_days" :min="1" :max="365" /> {{ $t('common.days') }}
+        </el-form-item>
+        <el-form-item :label="$t('security.labelExpiry')" required v-if="form.type !== 'ssl'">
           <el-date-picker 
+            v-if="expiryMode === 'date'"
             v-model="form.expiry_date" 
             type="date" 
             :placeholder="$t('security.placeholderExpiry')"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
           />
+          <span v-else>{{ resolvedExpiryDate || '-' }}</span>
         </el-form-item>
         <el-form-item :label="$t('security.labelReminder')">
           <el-checkbox-group v-model="form.reminder_days">
@@ -242,14 +245,29 @@
     </el-dialog>
 
     <!-- Extend Dialog -->
-    <el-dialog v-model="extendDialogVisible" :title="$t('security.titleExtend')" width="400px">
+    <el-dialog v-model="extendDialogVisible" :title="$t('security.titleExtend')" width="min(550px, 94vw)">
       <div style="margin-bottom: 20px;">
         <p>{{ $t('security.labelCurrentConfig') }} <strong>{{ currentConfig?.name }}</strong></p>
         <p>{{ $t('security.labelDaysRemaining') }} <strong :class="currentConfig?.status">{{ $t('security.daysN', { n: currentConfig?.days_remaining }) }}</strong></p>
       </div>
-      <el-form-item :label="$t('security.labelExtendDays')">
-        <el-input-number v-model="extendDays" :min="1" :max="365" style="width: 150px;" /> {{ $t('common.days') }}
-      </el-form-item>
+      <el-form label-width="120px">
+        <el-form-item :label="$t('security.labelExpiryMode')">
+          <el-radio-group v-model="renewalMode" @change="changeRenewalMode">
+            <el-radio-button value="date">{{ $t('security.expiryModeDate') }}</el-radio-button>
+            <el-radio-button value="period">{{ $t('security.expiryModePeriod') }}</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item :label="$t('security.labelResetDate')" required v-if="renewalMode === 'period'">
+          <el-date-picker v-model="renewalResetDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item :label="$t('security.labelValidity')" required v-if="renewalMode === 'period'">
+          <el-input-number v-model="extendDays" :min="1" :max="365" /> {{ $t('common.days') }}
+        </el-form-item>
+        <el-form-item :label="$t('security.labelExpiry')" required>
+          <el-date-picker v-if="renewalMode === 'date'" v-model="renewalExpiryDate" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DD" />
+          <span v-else>{{ resolvedRenewalExpiryDate || '-' }}</span>
+        </el-form-item>
+      </el-form>
       <template #footer>
         <el-button @click="extendDialogVisible = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="confirmExtend" :loading="extending">{{ $t('security.btnConfirmExtend') }}</el-button>
@@ -299,6 +317,23 @@ const extendDialogVisible = ref(false);
 const isEdit = ref(false);
 const currentConfig = ref<SecurityConfig | null>(null);
 const extendDays = ref(60);
+const expiryMode = ref<'date' | 'period'>('date');
+const renewalMode = ref<'date' | 'period'>('date');
+const renewalExpiryDate = ref('');
+const renewalResetDate = ref('');
+
+const todayDate = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+};
+
+const offsetDate = (dateString: string, days: number): string => {
+  if (!dateString || !Number.isInteger(days)) return '';
+  const date = new Date(`${dateString}T00:00:00.000Z`);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== dateString) return '';
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+};
 
 const form = ref({
   id: '',
@@ -306,11 +341,40 @@ const form = ref({
   type: 'accesskey' as 'accesskey' | 'ftp' | 'ssl',
   ssl_domain: '',
   validity_days: 60,
+  last_reset_at: todayDate(),
   expiry_date: '',
   reminder_days: [7, 3, 1] as number[],
   affected_services: [] as string[],
   notes: ''
 });
+
+const resolvedExpiryDate = computed(() => expiryMode.value === 'date'
+  ? form.value.expiry_date
+  : offsetDate(form.value.last_reset_at, form.value.validity_days));
+const resolvedRenewalExpiryDate = computed(() => renewalMode.value === 'date'
+  ? renewalExpiryDate.value
+  : offsetDate(renewalResetDate.value, extendDays.value));
+
+const changeExpiryMode = () => {
+  if (expiryMode.value === 'date') {
+    form.value.expiry_date = offsetDate(form.value.last_reset_at, form.value.validity_days);
+  } else if (form.value.expiry_date) {
+    form.value.last_reset_at = offsetDate(form.value.expiry_date, -form.value.validity_days);
+  }
+};
+
+const changeRenewalMode = () => {
+  if (renewalMode.value === 'date') {
+    renewalExpiryDate.value = offsetDate(renewalResetDate.value, extendDays.value);
+  } else if (renewalExpiryDate.value) {
+    const days = Math.round((Date.parse(renewalExpiryDate.value) - Date.parse(renewalResetDate.value)) / 86400000);
+    if (days >= 1 && days <= 365) {
+      extendDays.value = days;
+    } else {
+      renewalResetDate.value = offsetDate(renewalExpiryDate.value, -extendDays.value);
+    }
+  }
+};
 
 // Pagination
 const pageSize = ref(15);
@@ -388,12 +452,14 @@ const loadData = async () => {
 
 const handleAdd = () => {
   isEdit.value = false;
+  expiryMode.value = 'date';
   form.value = {
     id: '',
     name: '',
     type: 'accesskey',
     ssl_domain: '',
     validity_days: 60,
+    last_reset_at: todayDate(),
     expiry_date: '',
     reminder_days: [7, 3, 1],
     affected_services: [],
@@ -404,12 +470,14 @@ const handleAdd = () => {
 
 const handleEdit = (row: SecurityConfig) => {
   isEdit.value = true;
+  expiryMode.value = 'date';
   form.value = {
     id: row.id,
     name: row.name,
     type: row.type,
     ssl_domain: row.ssl_domain || '',
     validity_days: row.validity_days || 60,
+    last_reset_at: row.last_reset_at?.split('T')[0] || todayDate(),
     expiry_date: row.expiry_date?.split('T')[0] || '',
     reminder_days: row.reminder_days || [7, 3, 1],
     affected_services: row.affected_services || [],
@@ -427,6 +495,11 @@ const handleSubmit = async () => {
     ElMessage.warning(t('security.msgEnterName'));
     return;
   }
+  if (form.value.type !== 'ssl' && (!offsetDate(resolvedExpiryDate.value, 0)
+    || (expiryMode.value === 'period' && (form.value.validity_days < 1 || form.value.validity_days > 365)))) {
+    ElMessage.warning(t('security.msgValidExpiry'));
+    return;
+  }
   
   submitting.value = true;
   try {
@@ -434,8 +507,9 @@ const handleSubmit = async () => {
       name: form.value.type === 'ssl' ? form.value.ssl_domain.trim() : form.value.name,
       type: form.value.type,
       ssl_domain: form.value.type === 'ssl' ? form.value.ssl_domain.trim() : undefined,
-      validity_days: form.value.type === 'ssl' ? undefined : form.value.validity_days,
-      expiry_date: form.value.type === 'ssl' ? undefined : (form.value.expiry_date || undefined),
+      validity_days: form.value.type !== 'ssl' && expiryMode.value === 'period' ? form.value.validity_days : undefined,
+      last_reset_at: form.value.type === 'ssl' ? undefined : form.value.last_reset_at,
+      expiry_date: form.value.type === 'ssl' ? undefined : resolvedExpiryDate.value,
       reminder_days: form.value.reminder_days,
       affected_services: form.value.affected_services,
       notes: form.value.notes || undefined
@@ -475,20 +549,32 @@ const handleDelete = async (row: SecurityConfig) => {
 const handleExtend = (row: SecurityConfig) => {
   currentConfig.value = row;
   extendDays.value = row.validity_days || 60;
+  renewalMode.value = 'date';
+  renewalResetDate.value = todayDate();
+  renewalExpiryDate.value = '';
   extendDialogVisible.value = true;
 };
 
 const confirmExtend = async () => {
   if (!currentConfig.value) return;
+  const expiryDate = resolvedRenewalExpiryDate.value;
+  if (!offsetDate(expiryDate, 0) || expiryDate <= todayDate()
+    || (renewalMode.value === 'period' && (!offsetDate(renewalResetDate.value, 0)
+      || expiryDate <= renewalResetDate.value || extendDays.value < 1 || extendDays.value > 365))) {
+    ElMessage.warning(t('security.msgFutureExpiry'));
+    return;
+  }
   
   extending.value = true;
   try {
-    const result = await extendSecurityConfig(currentConfig.value.id, extendDays.value);
-    ElMessage.success(t('security.msgExtended', { n: extendDays.value, date: formatDate(result.new_expiry_date) }));
+    const result = await extendSecurityConfig(currentConfig.value.id, renewalMode.value === 'period'
+      ? { extend_days: extendDays.value, last_reset_at: renewalResetDate.value }
+      : { expiry_date: expiryDate });
+    ElMessage.success(t('security.msgExtended', { date: formatDate(result.new_expiry_date) }));
     extendDialogVisible.value = false;
     loadData();
   } catch (error: any) {
-    ElMessage.error(t('security.msgExtendFailed') + ': ' + error.message);
+    ElMessage.error(t('security.msgExtendFailed') + ': ' + (error.response?.data?.error || error.message));
   } finally {
     extending.value = false;
   }
@@ -523,23 +609,6 @@ const getTypeLabel = (type: string) => {
     case 'ssl': return t('security.typeSSL');
     default: return type;
   }
-};
-
-const getProgressStatus = (status: string) => {
-  switch (status) {
-    case 'normal': return 'success';
-    case 'warning': return 'warning';
-    case 'critical': 
-    case 'expired': return 'exception';
-    default: return '';
-  }
-};
-
-const getDaysPercentage = (row: SecurityConfig) => {
-  if (row.status === 'unverified' || row.days_remaining === null) return 0;
-  if (row.days_remaining <= 0) return 100;
-  const total = row.validity_days || 60;
-  return Math.min(((total - row.days_remaining) / total) * 100, 100);
 };
 
 const formatDate = (dateStr: string) => {

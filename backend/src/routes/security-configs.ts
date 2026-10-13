@@ -306,8 +306,8 @@ router.put('/:id', optionalAuth, async (req, res) => {
 // Extend (renew) security config
 router.post('/:id/extend', async (req, res) => {
   try {
-    const { extend_days } = req.body;
-    const daysToExtend = extend_days || 60; // Default 60 days
+    const { extend_days, expiry_date, last_reset_at } = req.body;
+    const daysToExtend = extend_days ?? 60;
 
     // Get current config
     const getStmt = db.prepare('SELECT * FROM security_configs WHERE id = ?');
@@ -317,19 +317,42 @@ router.post('/:id/extend', async (req, res) => {
       return res.status(404).json({ error: 'Security config not found' });
     }
 
+    if (config.type === 'ssl') {
+      return res.status(400).json({ error: 'SSL expiry dates are retrieved from the certificate.' });
+    }
+
+    const parseDate = (value: unknown): Date | null => {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+      const date = new Date(`${value}T00:00:00.000Z`);
+      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
+    };
+    const newResetAt = last_reset_at === undefined ? new Date() : parseDate(last_reset_at);
+    if (!newResetAt) {
+      return res.status(400).json({ error: 'A valid reset date is required.' });
+    }
+    let newExpiryDate: Date | null;
+    if (expiry_date !== undefined) {
+      newExpiryDate = parseDate(expiry_date);
+    } else {
+      if (!Number.isInteger(daysToExtend) || daysToExtend < 1 || daysToExtend > 365) {
+        return res.status(400).json({ error: 'Validity must be between 1 and 365 days.' });
+      }
+      newExpiryDate = new Date(newResetAt);
+      newExpiryDate.setUTCDate(newExpiryDate.getUTCDate() + daysToExtend);
+    }
+    if (!newExpiryDate || newExpiryDate <= newResetAt || newExpiryDate <= new Date()) {
+      return res.status(400).json({ error: 'The new expiry date must be after the reset date and in the future.' });
+    }
+
     // Store old status before update
     const oldStatus = config.last_status;
     const wasExpired = oldStatus && oldStatus !== 'normal';
-
-    // Calculate new expiry date from today
-    const newResetAt = new Date();
-    const newExpiryDate = new Date();
-    newExpiryDate.setDate(newExpiryDate.getDate() + daysToExtend);
 
     const updateStmt = db.prepare(`
       UPDATE security_configs SET
         last_reset_at = ?,
         expiry_date = ?,
+        validity_days = ?,
         last_status = 'normal',
         last_reminded_at = NULL,
         updated_at = CURRENT_TIMESTAMP
@@ -339,6 +362,7 @@ router.post('/:id/extend', async (req, res) => {
     updateStmt.run(
       newResetAt.toISOString(),
       newExpiryDate.toISOString(),
+      expiry_date === undefined ? daysToExtend : null,
       req.params.id
     );
 
@@ -350,9 +374,9 @@ router.post('/:id/extend', async (req, res) => {
     }
 
     res.json({ 
-      message: `Extended by ${daysToExtend} days`,
+      message: 'Expiry date updated',
       new_expiry_date: newExpiryDate.toISOString(),
-      days_remaining: daysToExtend
+      days_remaining: calculateDaysRemaining(newExpiryDate.toISOString())
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
