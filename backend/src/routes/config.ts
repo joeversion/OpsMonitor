@@ -3,6 +3,7 @@ import db from '../db/database';
 import { NotificationService } from '../services/notification-service';
 import { Scheduler } from '../services/scheduler';
 import logger from '../utils/logger';
+import { authenticate, requireAdmin } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -186,7 +187,7 @@ router.put('/notification-lang', (req, res) => {
 });
 
 // Manually trigger security config expiry check
-router.post('/security-check/trigger', async (req, res) => {
+router.post('/security-check/trigger', authenticate, requireAdmin, async (req, res) => {
   try {
     await Scheduler.triggerSecurityConfigCheck();
     res.json({ success: true, message: 'Security config expiry check triggered successfully' });

@@ -1044,6 +1044,9 @@ export default {
     warning: '告警',
     critical: '严重',
     expired: '已过期',
+    unverified: '无法验证',
+    sslExpiryUnknown: '未知',
+    sslExpiryUnavailable: '无法读取源站到期日',
     // 页面
     title: '安全配置',
     btnCheckExpiry: '立即检查过期',
@@ -1053,6 +1056,10 @@ export default {
     typeAccessKey: 'AccessKey',
     typeFtpPassword: 'FTP 密码',
     typeSSL: 'SSL 证书',
+    labelDomain: '域名',
+    placeholderDomain: '例如 example.com',
+    sslLastChecked: '证书最近检查时间',
+    sslCheckFailed: '证书检查失败',
     allStatus: '全部状态',
     // 表格
     colNo: '序号',
@@ -1101,6 +1108,7 @@ export default {
     msgLoadFailed: '加载数据失败',
     msgCheckFailed: '触发过期检查失败',
     msgEnterName: '请输入名称',
+    msgEnterDomain: '请输入域名',
     msgOperationFailed: '操作失败',
     confirmDeleteMsg: '确定要删除 "{name}" 吗？',
     confirmDeleteTitle: '确认删除',

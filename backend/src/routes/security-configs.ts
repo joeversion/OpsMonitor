@@ -2,6 +2,8 @@ import { Router } from 'express';
 import db from '../db/database';
 import { v4 as uuidv4 } from 'uuid';
 import { SSHService } from '../services/ssh-service';
+import { optionalAuth } from '../middleware/auth';
+import { getSslCertificateInfo, isTlsInspectionErrorMessage, type SslCertificateInfo } from '../services/ssl-certificate-service';
 
 const router = Router();
 
@@ -16,8 +18,8 @@ router.get('/', (req, res) => {
       affected_services: c.affected_services ? JSON.parse(c.affected_services) : [],
       reminder_days: c.reminder_days ? JSON.parse(c.reminder_days) : [7, 3, 1],
       notes: c.notes || '',
-      days_remaining: calculateDaysRemaining(c.expiry_date),
-      status: getExpiryStatus(c.expiry_date)
+      days_remaining: isTlsInspectionErrorMessage(c.ssl_check_error) ? null : calculateDaysRemaining(c.expiry_date),
+      status: isTlsInspectionErrorMessage(c.ssl_check_error) ? 'unverified' : getExpiryStatus(c.expiry_date)
     }));
     
     res.json(parsedConfigs);
@@ -37,10 +39,15 @@ router.get('/stats', (req, res) => {
       normal: 0,
       warning: 0,
       critical: 0,
-      expired: 0
+      expired: 0,
+      unverified: 0
     };
     
     configs.forEach((c: any) => {
+      if (isTlsInspectionErrorMessage(c.ssl_check_error)) {
+        stats.unverified++;
+        return;
+      }
       const status = getExpiryStatus(c.expiry_date);
       if (status === 'normal') stats.normal++;
       else if (status === 'warning') stats.warning++;
@@ -69,8 +76,8 @@ router.get('/:id', (req, res) => {
       affected_services: config.affected_services ? JSON.parse(config.affected_services) : [],
       reminder_days: config.reminder_days ? JSON.parse(config.reminder_days) : [7, 3, 1],
       notes: config.notes || '',
-      days_remaining: calculateDaysRemaining(config.expiry_date),
-      status: getExpiryStatus(config.expiry_date)
+      days_remaining: isTlsInspectionErrorMessage(config.ssl_check_error) ? null : calculateDaysRemaining(config.expiry_date),
+      status: isTlsInspectionErrorMessage(config.ssl_check_error) ? 'unverified' : getExpiryStatus(config.expiry_date)
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -78,11 +85,12 @@ router.get('/:id', (req, res) => {
 });
 
 // Create security config
-router.post('/', (req, res) => {
+router.post('/', optionalAuth, async (req, res) => {
   try {
     const {
       name,
       type,
+      ssl_domain,
       affected_services,
       validity_days,
       last_reset_at,
@@ -101,15 +109,31 @@ router.post('/', (req, res) => {
       ssh_proxy_username
     } = req.body;
 
+    let sslInfo: SslCertificateInfo | null = null;
+    if (type === 'ssl') {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required to monitor SSL certificates.' });
+      }
+      if (typeof ssl_domain !== 'string' || !ssl_domain.trim()) {
+        return res.status(400).json({ error: 'A domain name is required for SSL certificate monitoring.' });
+      }
+
+      try {
+        sslInfo = await getSslCertificateInfo(ssl_domain);
+      } catch (error: any) {
+        return res.status(422).json({ error: error.message || 'Failed to retrieve the SSL certificate.' });
+      }
+    }
+
     const id = uuidv4();
     
     // Calculate expiry_date if not provided
-    let finalExpiryDate = expiry_date;
-    if (!finalExpiryDate && validity_days && last_reset_at) {
+    let finalExpiryDate = sslInfo?.expiryDate || expiry_date;
+    if (!sslInfo && !finalExpiryDate && validity_days && last_reset_at) {
       const resetDate = new Date(last_reset_at);
       resetDate.setDate(resetDate.getDate() + validity_days);
       finalExpiryDate = resetDate.toISOString();
-    } else if (!finalExpiryDate && validity_days) {
+    } else if (!sslInfo && !finalExpiryDate && validity_days) {
       const now = new Date();
       now.setDate(now.getDate() + validity_days);
       finalExpiryDate = now.toISOString();
@@ -119,14 +143,15 @@ router.post('/', (req, res) => {
       INSERT INTO security_configs (
         id, name, type, affected_services, validity_days,
         last_reset_at, expiry_date, reminder_days, notes,
+        ssl_domain, ssl_last_checked_at, ssl_check_error,
         ssh_host, ssh_port, ssh_username, ssh_auth_type,
         ssh_credential, ssh_passphrase, ssh_proxy_host, ssh_proxy_port, ssh_proxy_username
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       id,
-      name,
+      sslInfo?.hostname || name,
       type,
       affected_services ? JSON.stringify(affected_services) : '[]',
       validity_days || null,
@@ -134,6 +159,9 @@ router.post('/', (req, res) => {
       finalExpiryDate,
       reminder_days ? JSON.stringify(reminder_days) : '[7, 3, 1]',
       notes || null,
+      sslInfo?.hostname || null,
+      sslInfo?.checkedAt || null,
+      null,
       ssh_host || null,
       ssh_port || 22,
       ssh_username || null,
@@ -152,11 +180,17 @@ router.post('/', (req, res) => {
 });
 
 // Update security config
-router.put('/:id', (req, res) => {
+router.put('/:id', optionalAuth, async (req, res) => {
   try {
+    const existing = db.prepare('SELECT * FROM security_configs WHERE id = ?').get(req.params.id) as any;
+    if (!existing) {
+      return res.status(404).json({ error: 'Security config not found' });
+    }
+
     const {
       name,
       type,
+      ssl_domain,
       affected_services,
       validity_days,
       last_reset_at,
@@ -175,6 +209,25 @@ router.put('/:id', (req, res) => {
       ssh_proxy_username
     } = req.body;
 
+    if ((type === 'ssl' || existing.type === 'ssl') && req.user?.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required to manage SSL certificates.' });
+    }
+
+    let sslInfo: SslCertificateInfo | null = null;
+    if (type === 'ssl') {
+      const domain = typeof ssl_domain === 'string' && ssl_domain.trim()
+        ? ssl_domain
+        : existing.ssl_domain;
+      if (!domain) {
+        return res.status(400).json({ error: 'A domain name is required for SSL certificate monitoring.' });
+      }
+      try {
+        sslInfo = await getSslCertificateInfo(domain);
+      } catch (error: any) {
+        return res.status(422).json({ error: error.message || 'Failed to retrieve the SSL certificate.' });
+      }
+    }
+
     // Build update query dynamically to handle optional SSH credential updates
     let updateFields = [
       'name = ?',
@@ -185,6 +238,9 @@ router.put('/:id', (req, res) => {
       'expiry_date = ?',
       'reminder_days = ?',
       'notes = ?',
+      'ssl_domain = ?',
+      'ssl_last_checked_at = ?',
+      'ssl_check_error = ?',
       'ssh_host = ?',
       'ssh_port = ?',
       'ssh_username = ?',
@@ -193,14 +249,17 @@ router.put('/:id', (req, res) => {
     ];
     
     let params: any[] = [
-      name,
+      sslInfo?.hostname || name || (type === 'ssl' ? existing.name : null),
       type,
       affected_services ? JSON.stringify(affected_services) : '[]',
       validity_days || null,
       last_reset_at,
-      expiry_date,
+      sslInfo?.expiryDate || expiry_date,
       reminder_days ? JSON.stringify(reminder_days) : '[7, 3, 1]',
       notes || null,
+      sslInfo?.hostname || null,
+      sslInfo?.checkedAt || null,
+      null,
       ssh_host || null,
       ssh_port || 22,
       ssh_username || null,

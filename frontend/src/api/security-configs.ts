@@ -4,6 +4,9 @@ export interface SecurityConfig {
   id: string;
   name: string;
   type: 'accesskey' | 'ftp' | 'ssl';
+  ssl_domain?: string;
+  ssl_last_checked_at?: string | null;
+  ssl_check_error?: string | null;
   affected_services: string[];
   validity_days?: number;
   last_reset_at?: string;
@@ -13,8 +16,8 @@ export interface SecurityConfig {
   notes?: string;
   created_at: string;
   updated_at: string;
-  days_remaining: number;
-  status: 'normal' | 'warning' | 'critical' | 'expired';
+  days_remaining: number | null;
+  status: 'normal' | 'warning' | 'critical' | 'expired' | 'unverified';
 }
 
 export interface SecurityConfigStats {
@@ -23,11 +26,13 @@ export interface SecurityConfigStats {
   warning: number;
   critical: number;
   expired: number;
+  unverified: number;
 }
 
 export interface CreateSecurityConfigDto {
   name: string;
   type: 'accesskey' | 'ftp' | 'ssl';
+  ssl_domain?: string;
   affected_services?: string[];
   validity_days?: number;
   last_reset_at?: string;

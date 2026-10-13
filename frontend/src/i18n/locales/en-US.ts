@@ -1044,6 +1044,9 @@ export default {
     warning: 'Warning',
     critical: 'Critical',
     expired: 'Expired',
+    unverified: 'Unverified',
+    sslExpiryUnknown: 'Unknown',
+    sslExpiryUnavailable: 'Origin expiry unavailable',
     // Page
     title: 'Security Configs',
     btnCheckExpiry: 'Check Expiry Now',
@@ -1053,6 +1056,10 @@ export default {
     typeAccessKey: 'AccessKey',
     typeFtpPassword: 'FTP Password',
     typeSSL: 'SSL Certificate',
+    labelDomain: 'Domain',
+    placeholderDomain: 'example.com',
+    sslLastChecked: 'Certificate checked',
+    sslCheckFailed: 'Certificate check failed',
     allStatus: 'All Status',
     // Table
     colNo: 'No.',
@@ -1101,6 +1108,7 @@ export default {
     msgLoadFailed: 'Failed to load data',
     msgCheckFailed: 'Failed to trigger expiry check',
     msgEnterName: 'Please enter a name',
+    msgEnterDomain: 'Please enter a domain name',
     msgOperationFailed: 'Operation failed',
     confirmDeleteMsg: 'Are you sure to delete "{name}"?',
     confirmDeleteTitle: 'Confirm Delete',

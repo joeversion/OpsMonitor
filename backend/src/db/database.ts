@@ -882,6 +882,14 @@ function runMigrations() {
         console.log(`Migration complete: ${colName} added to security_configs`);
       }
     }
+
+    const sslColumns = ['ssl_domain', 'ssl_last_checked_at', 'ssl_check_error'];
+    for (const colName of sslColumns) {
+      if (!secConfigColNames.includes(colName)) {
+        db.exec(`ALTER TABLE security_configs ADD COLUMN ${colName} TEXT`);
+        console.log(`Migration complete: ${colName} added to security_configs`);
+      }
+    }
   }
 
   // 检查 users 表是否存在

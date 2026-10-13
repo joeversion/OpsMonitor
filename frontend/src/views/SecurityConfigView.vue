@@ -54,7 +54,10 @@
         <div class="card-header">
           <span class="card-title">🔐 {{ $t('security.title') }}</span>
           <div class="actions">
-            <el-button @click="triggerExpiryCheck" :loading="checking">
+            <el-tag v-if="stats.unverified > 0" type="info" effect="plain">
+              {{ stats.unverified }} {{ $t('security.unverified') }}
+            </el-tag>
+            <el-button @click="triggerExpiryCheck" :loading="checking" v-if="isAdmin">
               <el-icon><Bell /></el-icon> {{ $t('security.btnCheckExpiry') }}
             </el-button>
             <el-button @click="loadData">
@@ -82,6 +85,7 @@
           <el-option :label="$t('security.warning')" value="warning" />
           <el-option :label="$t('security.critical')" value="critical" />
           <el-option :label="$t('security.expired')" value="expired" />
+          <el-option :label="$t('security.unverified')" value="unverified" />
         </el-select>
       </div>
 
@@ -101,6 +105,12 @@
         <el-table-column :label="$t('security.colName')" min-width="200">
           <template #default="scope">
             <div class="config-name">{{ scope.row.name }}</div>
+            <div class="config-services" v-if="scope.row.type === 'ssl' && scope.row.ssl_last_checked_at">
+              {{ $t('security.sslLastChecked') }}: {{ formatDate(scope.row.ssl_last_checked_at) }}
+            </div>
+            <div class="config-services" style="color: #F56C6C;" v-if="scope.row.type === 'ssl' && scope.row.ssl_check_error">
+              {{ $t('security.sslCheckFailed') }}: {{ scope.row.ssl_check_error }}
+            </div>
             <div class="config-services" v-if="scope.row.affected_services?.length">
               {{ $t('security.affectsN', { n: scope.row.affected_services.length }) }}
             </div>
@@ -114,7 +124,7 @@
         <el-table-column :label="$t('security.colDaysRemaining')" width="150">
           <template #default="scope">
             <div class="days-cell">
-              <el-progress 
+              <el-progress v-if="scope.row.status !== 'unverified'"
                 :percentage="getDaysPercentage(scope.row)" 
                 :status="getProgressStatus(scope.row.status)"
                 :stroke-width="8"
@@ -122,14 +132,14 @@
                 style="width: 60px;"
               />
               <span :class="['days-text', scope.row.status]">
-                {{ scope.row.days_remaining > 0 ? $t('security.daysN', { n: scope.row.days_remaining }) : $t('security.expired') }}
+                {{ scope.row.status === 'unverified' ? $t('security.sslExpiryUnknown') : (scope.row.days_remaining !== null && scope.row.days_remaining > 0 ? $t('security.daysN', { n: scope.row.days_remaining }) : $t('security.expired')) }}
               </span>
             </div>
           </template>
         </el-table-column>
         <el-table-column :label="$t('security.colExpiryDate')" width="130">
           <template #default="scope">
-            {{ formatDate(scope.row.expiry_date) }}
+            {{ scope.row.status === 'unverified' ? $t('security.sslExpiryUnavailable') : formatDate(scope.row.expiry_date) }}
           </template>
         </el-table-column>
         <el-table-column :label="$t('security.colActions')" width="180" align="right" v-if="isAdmin">
@@ -158,7 +168,7 @@
     <!-- Add/Edit Dialog -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? $t('security.titleEdit') : $t('security.titleAdd')" width="550px">
       <el-form :model="form" label-width="120px">
-        <el-form-item :label="$t('security.labelName')" required>
+        <el-form-item :label="$t('security.labelName')" required v-if="form.type !== 'ssl'">
           <el-input v-model="form.name" :placeholder="$t('security.placeholderName')" />
         </el-form-item>
         <el-form-item :label="$t('security.labelType')" required>
@@ -168,11 +178,14 @@
             <el-radio value="ssl">{{ $t('security.typeSSL') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item :label="$t('security.labelValidity')">
+        <el-form-item :label="$t('security.labelDomain')" required v-if="form.type === 'ssl'">
+          <el-input v-model="form.ssl_domain" :placeholder="$t('security.placeholderDomain')" />
+        </el-form-item>
+        <el-form-item :label="$t('security.labelValidity')" v-if="form.type !== 'ssl'">
           <el-input-number v-model="form.validity_days" :min="1" :max="365" /> {{ $t('common.days') }}
           <span style="color: #909399; margin-left: 10px;">{{ $t('security.defaultValidity', { n: 60 }) }}</span>
         </el-form-item>
-        <el-form-item :label="$t('security.labelExpiry')">
+        <el-form-item :label="$t('security.labelExpiry')" v-if="form.type !== 'ssl'">
           <el-date-picker 
             v-model="form.expiry_date" 
             type="date" 
@@ -256,7 +269,7 @@ import {
 import { 
   getSecurityConfigs, getSecurityConfigStats, createSecurityConfig, 
   updateSecurityConfig, deleteSecurityConfig, extendSecurityConfig,
-  type SecurityConfig, type SecurityConfigStats 
+  type CreateSecurityConfigDto, type SecurityConfig, type SecurityConfigStats
 } from '../api/security-configs';
 import { getServices, type Service } from '../api/services';
 import { getProjects, type ProjectWithStats } from '../api/projects';
@@ -275,7 +288,7 @@ const checking = ref(false);
 const configs = ref<SecurityConfig[]>([]);
 const services = ref<Service[]>([]);
 const projects = ref<ProjectWithStats[]>([]);
-const stats = ref<SecurityConfigStats>({ total: 0, normal: 0, warning: 0, critical: 0, expired: 0 });
+const stats = ref<SecurityConfigStats>({ total: 0, normal: 0, warning: 0, critical: 0, expired: 0, unverified: 0 });
 
 const searchQuery = ref('');
 const filterType = ref('');
@@ -291,6 +304,7 @@ const form = ref({
   id: '',
   name: '',
   type: 'accesskey' as 'accesskey' | 'ftp' | 'ssl',
+  ssl_domain: '',
   validity_days: 60,
   expiry_date: '',
   reminder_days: [7, 3, 1] as number[],
@@ -378,6 +392,7 @@ const handleAdd = () => {
     id: '',
     name: '',
     type: 'accesskey',
+    ssl_domain: '',
     validity_days: 60,
     expiry_date: '',
     reminder_days: [7, 3, 1],
@@ -393,6 +408,7 @@ const handleEdit = (row: SecurityConfig) => {
     id: row.id,
     name: row.name,
     type: row.type,
+    ssl_domain: row.ssl_domain || '',
     validity_days: row.validity_days || 60,
     expiry_date: row.expiry_date?.split('T')[0] || '',
     reminder_days: row.reminder_days || [7, 3, 1],
@@ -403,18 +419,23 @@ const handleEdit = (row: SecurityConfig) => {
 };
 
 const handleSubmit = async () => {
-  if (!form.value.name) {
+  if (form.value.type === 'ssl' && !form.value.ssl_domain.trim()) {
+    ElMessage.warning(t('security.msgEnterDomain'));
+    return;
+  }
+  if (form.value.type !== 'ssl' && !form.value.name) {
     ElMessage.warning(t('security.msgEnterName'));
     return;
   }
   
   submitting.value = true;
   try {
-    const data: Record<string, any> = {
-      name: form.value.name,
+    const data: CreateSecurityConfigDto = {
+      name: form.value.type === 'ssl' ? form.value.ssl_domain.trim() : form.value.name,
       type: form.value.type,
-      validity_days: form.value.validity_days,
-      expiry_date: form.value.expiry_date || undefined,
+      ssl_domain: form.value.type === 'ssl' ? form.value.ssl_domain.trim() : undefined,
+      validity_days: form.value.type === 'ssl' ? undefined : form.value.validity_days,
+      expiry_date: form.value.type === 'ssl' ? undefined : (form.value.expiry_date || undefined),
       reminder_days: form.value.reminder_days,
       affected_services: form.value.affected_services,
       notes: form.value.notes || undefined
@@ -430,7 +451,7 @@ const handleSubmit = async () => {
     dialogVisible.value = false;
     loadData();
   } catch (error: any) {
-    ElMessage.error(t('security.msgOperationFailed') + ': ' + error.message);
+    ElMessage.error(t('security.msgOperationFailed') + ': ' + (error.response?.data?.error || error.message));
   } finally {
     submitting.value = false;
   }
@@ -490,6 +511,7 @@ const getStatusLabel = (status: string) => {
     case 'warning': return t('security.warning');
     case 'critical': return t('security.critical');
     case 'expired': return t('security.expired');
+    case 'unverified': return t('security.unverified');
     default: return status;
   }
 };
@@ -514,6 +536,7 @@ const getProgressStatus = (status: string) => {
 };
 
 const getDaysPercentage = (row: SecurityConfig) => {
+  if (row.status === 'unverified' || row.days_remaining === null) return 0;
   if (row.days_remaining <= 0) return 100;
   const total = row.validity_days || 60;
   return Math.min(((total - row.days_remaining) / total) * 100, 100);
