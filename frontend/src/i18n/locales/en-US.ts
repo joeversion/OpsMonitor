@@ -1,4 +1,18 @@
 export default {
+  serviceDetails: {
+    title: 'Service Details', overview: 'Overview', history: 'Checks', dependencies: 'Dependencies', configuration: 'Configuration',
+    paused: 'Monitoring paused', hostPaused: 'Host monitoring paused', stale: 'Older check result', lastCheck: 'Last Check',
+    description: 'Description', project: 'Project', target: 'Target', host: 'Host', checkType: 'Check Type', connection: 'Connection',
+    risk: 'Risk', layer: 'Layer', impact: 'Failure Impact', latestResult: 'Latest Result', duration: 'Duration',
+    noChecks: 'No checks recorded', output: 'Check Output', noOutput: 'No output recorded', stdout: 'Standard Output', stderr: 'Standard Error',
+    createdAt: 'Created', updatedAt: 'Updated', id: 'Service ID', message: 'Message', recentChecks: 'Latest {count} checks', recordCount: 'Records shown',
+    dependsOn: 'Depends On', dependedBy: 'Depended On By', noDependencies: 'No dependencies', resourceExpiry: 'Resource Expiry', unverified: 'Unverified',
+    monitoring: 'Monitoring', alerts: 'Alerts', schedule: 'Schedule', timeRange: 'Time ranges', fixed: 'Fixed interval', interval: 'Default Interval',
+    warningThreshold: 'Warning - Consecutive Failures', errorThreshold: 'Error - Consecutive Failures', triggerThreshold: 'Alert Trigger - Failures', failureCount: 'Current Consecutive Failures',
+    enabled: 'Enabled', disabled: 'Disabled', notFound: 'This service no longer exists.', loadFailed: 'Service details could not be loaded.', checkCompleted: 'Check completed', checkFailed: 'Check failed',
+    groups: { http: 'HTTP', check: 'Check Parameters', ssh: 'SSH Check', script: 'Script', file: 'File', schedule: 'Schedule Rules' },
+    fields: { protocol: 'Protocol', path: 'Path', expected_status: 'Expected HTTP Status', timeout: 'Timeout', pattern: 'Pattern', max_age_seconds: 'Maximum Age (seconds)', container_name: 'Container', script_type: 'Script Type', expected_exit_code: 'Expected Exit Code', working_dir: 'Working Directory', mode: 'Mode', file_path: 'File Path', directory_path: 'Directory', filename_pattern: 'Filename Pattern', use_latest: 'Use Latest File', freshness_days: 'Freshness (days)', max_age_minutes: 'Maximum Age (minutes)', check_type: 'Check Method', expected_size_delta: 'Minimum Size Change (KB)', timeout_seconds: 'Timeout (seconds)', type: 'Schedule Type', defaultInterval: 'Default Interval (seconds)', timeRanges: 'Time Ranges' }
+  },
   // ==================== Common ====================
   common: {
     confirm: 'Confirm',

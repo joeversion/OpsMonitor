@@ -281,6 +281,7 @@
 
           :readonly="!isAdmin"
           @select-node="handleNodeSelect"
+          @view-service="openServiceDetails"
           @add-link="handleAddLink"
           @update-link="handleUpdateLink"
           @delete-link="handleDeleteLink"
@@ -349,112 +350,10 @@
           </button>
         </div>
         
-        <!-- Node Detail Panel -->
-        <transition name="slide">
-          <div v-if="selectedNode" class="detail-panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <span 
-                  class="status-dot" 
-                  :class="selectedNode.status"
-                ></span>
-                <span>{{ selectedNode.name }}</span>
-              </div>
-              <el-button :icon="Close" circle size="small" @click="selectedNode = null" />
-            </div>
-            <div class="panel-body">
-              <div class="detail-row">
-                <span class="label">{{ $t('graph.status') }}</span>
-                <el-tag :type="getStatusType(selectedNode.status)" size="small">
-                  {{ selectedNode.status?.toUpperCase() || $t('graph.statusUnknown') }}
-                </el-tag>
-              </div>
-              <div class="detail-row">
-                <span class="label">{{ $t('graph.host') }}</span>
-                <span class="value">{{ selectedNode.host }}:{{ selectedNode.port }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">{{ $t('graph.responseTime') }}</span>
-                <span class="value" :class="{ 'warning-text': isSlowResponse(selectedNode.responseTime) }">
-                  {{ formatResponseTime(selectedNode.responseTime) }}
-                </span>
-              </div>
-              <div class="detail-row">
-                <span class="label">{{ $t('graph.lastCheck') }}</span>
-                <span class="value">{{ formatLastCheck(selectedNode.lastCheck) }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">{{ $t('graph.riskLevel') }}</span>
-                <el-tag :type="getRiskType(selectedNode.riskLevel)" size="small">
-                  {{ selectedNode.riskLevel?.toUpperCase() }}
-                </el-tag>
-              </div>
-              
-              <!-- Error Message for Down/Warning -->
-              <div v-if="selectedNode.status === 'down' || selectedNode.status === 'warning'" class="error-section">
-                <div class="error-label">
-                  <el-icon v-if="selectedNode.status === 'down'" color="#f04438"><CircleClose /></el-icon>
-                  <el-icon v-else color="#f79009"><Warning /></el-icon>
-                  <span>{{ selectedNode.status === 'down' ? $t('graph.error') : $t('graph.warningNode') }}</span>
-                </div>
-                <div class="error-message">{{ selectedNode.errorMessage || $t('graph.connectionFailed') }}</div>
-              </div>
-              
-              <!-- Impact Analysis for Down Services -->
-              <div v-if="selectedNode.status === 'down' && impactedServices.length > 0" class="impact-section">
-                <div class="section-title">
-                  <span>⚠️ {{ $t('graph.impactAnalysis') }}</span>
-                  <el-tag type="danger" size="small">{{ $t('graph.affected', { count: impactedServices.length }) }}</el-tag>
-                </div>
-                <div class="impact-description">
-                  {{ $t('graph.dependencyImpactDesc') }}
-                </div>
-                <div 
-                  v-for="service in impactedServices" 
-                  :key="service.id" 
-                  class="dep-item impact"
-                  @click="selectNodeById(service.id)"
-                >
-                  <span class="status-dot small" :class="service.status"></span>
-                  <span class="dep-name">{{ service.name }}</span>
-                  <el-tag :type="service.impactLevel === 'critical' ? 'danger' : 'warning'" size="small">
-                    {{ service.impactLevel?.toUpperCase() }}
-                  </el-tag>
-                </div>
-              </div>
-              
-              <!-- Dependencies -->
-              <div class="dependency-section" v-if="nodeDependencies.length > 0">
-                <div class="section-title">⬇️ {{ $t('graph.dependsOn') }} ({{ nodeDependencies.length }})</div>
-                <div 
-                  v-for="dep in nodeDependencies" 
-                  :key="dep.id" 
-                  class="dep-item"
-                  @click="selectNodeById(dep.id)"
-                >
-                  <span class="status-dot small" :class="dep.status"></span>
-                  <span class="dep-name">{{ dep.name }}</span>
-                  <el-tag v-if="dep.status === 'down'" type="danger" size="small">DOWN</el-tag>
-                </div>
-              </div>
-              
-              <!-- Dependents -->
-              <div class="dependency-section" v-if="nodeDependents.length > 0">
-                <div class="section-title">⬆️ {{ $t('graph.dependedBy') }} ({{ nodeDependents.length }})</div>
-                <div 
-                  v-for="dep in nodeDependents" 
-                  :key="dep.id" 
-                  class="dep-item"
-                  @click="selectNodeById(dep.id)"
-                >
-                  <span class="status-dot small" :class="dep.status"></span>
-                  <span class="dep-name">{{ dep.name }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </transition>
       </LayeredGraphCanvas>
+
+      <ServiceDetailsDrawer v-model="serviceDetailsVisible" :service-id="detailsServiceId"
+        @edit="editServiceFromDetails" @checked="updateServiceFromDetails" />
       
       <!-- Security Configs Panel - Inside graph area -->
       <transition name="slide-right">
@@ -548,13 +447,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import { Graph } from '@antv/g6';
 import { ElMessage } from 'element-plus';
 import { createDependency, updateDependency, deleteDependency, migrateDependencies as migrateDeps } from '../api/dependencies';
 import { getSecurityConfigs, type SecurityConfig } from '../api/security-configs';
-import { Refresh, Close, CircleClose, Warning, Upload, Check } from '@element-plus/icons-vue';
+import { Refresh, Upload, Check } from '@element-plus/icons-vue';
 import LayeredGraphCanvas from '../components/LayeredGraphCanvas.vue';
 import InteractiveGraphCanvas from '../components/InteractiveGraphCanvas.vue';
+import ServiceDetailsDrawer from '../components/ServiceDetailsDrawer.vue';
+import type { CheckResult } from '../api/checks';
 import api from '../api';
 import authUtils from '../utils/auth';
 import {
@@ -562,17 +464,13 @@ import {
   layerColors,
   layerOrder,
   getServiceLayer,
-  getServiceIcon,
-  formatResponseTime as formatRT,
-  isSlowResponse as isSlow,
-  formatLastCheck as formatCheck,
-  getStatusType as getStatusT,
-  getRiskType as getRiskT
+  getServiceIcon
 } from '../utils/graphUtils';
 
 // Permission check
 const isAdmin = computed(() => authUtils.isAdmin());
 const { t } = useI18n();
+const router = useRouter();
 
 interface ServiceWithStatus {
   id: string;
@@ -623,6 +521,8 @@ interface ServiceAlert {
 const canvasRef = ref<any>(null);
 const container = computed(() => canvasRef.value?.graphContainer);
 const selectedNode = ref<ServiceWithStatus | null>(null);
+const serviceDetailsVisible = ref(false);
+const detailsServiceId = ref<string | null>(null);
 const allServices = ref<ServiceWithStatus[]>([]);
 const showImpactAnalysis = ref(true);
 const useInteractiveGraph = ref(true);
@@ -1099,33 +999,6 @@ const getAffectedServicesEnhanced = (
   return affected;
 };
 
-// Impact analysis for currently selected node
-const impactedServices = computed((): ImpactedService[] => {
-  if (!selectedNode.value || selectedNode.value.status !== 'down') return [];
-  return getAffectedServicesEnhanced(selectedNode.value.id, selectedNode.value.name);
-});
-
-const nodeDependencies = computed(() => {
-  if (!selectedNode.value || !selectedNode.value.dependencies) return [];
-  return selectedNode.value.dependencies
-    .map(depId => allServices.value.find(s => s.id === depId))
-    .filter(Boolean) as ServiceWithStatus[];
-});
-
-const nodeDependents = computed(() => {
-  if (!selectedNode.value) return [];
-  return allServices.value.filter(s => 
-    s.dependencies?.includes(selectedNode.value!.id)
-  );
-});
-
-// Use shared utility functions
-const getStatusType = getStatusT;
-const getRiskType = getRiskT;
-const formatResponseTime = formatRT;
-const isSlowResponse = isSlow;
-const formatLastCheck = formatCheck;
-
 const toggleEditMode = async () => {
   if (isEditMode.value) {
     // Exiting edit mode - do NOT auto save, user must click Save button explicitly
@@ -1293,6 +1166,31 @@ const handleNodeSelect = (node: any) => {
   }
 };
 
+const openServiceDetails = (id: string) => {
+  if (isEditMode.value || !allServices.value.some(service => service.id === id)) return;
+  selectNodeById(id);
+  detailsServiceId.value = id;
+  serviceDetailsVisible.value = true;
+};
+
+const editServiceFromDetails = (id: string) => {
+  serviceDetailsVisible.value = false;
+  router.push({ path: '/services', query: { edit: id } });
+};
+
+const updateServiceFromDetails = (id: string, result: CheckResult) => {
+  const update = {
+    status: result.status,
+    responseTime: result.response_time,
+    errorMessage: result.error_message || undefined,
+    lastCheck: result.checked_at
+  };
+  const service = allServices.value.find(item => item.id === id);
+  if (service) Object.assign(service, update);
+  const node = graphNodes.value.find(item => item.id === id);
+  if (node) Object.assign(node, update);
+};
+
 const initGraph = async (data: any) => {
   if (!container.value) {
     console.warn('Container not ready, retrying...');
@@ -1454,7 +1352,8 @@ const initGraph = async (data: any) => {
     if (nodeId) {
       const service = allServices.value.find(s => s.id === nodeId);
       if (service) {
-        selectedNode.value = service;
+        selectNodeById(service.id);
+        openServiceDetails(service.id);
       }
     }
   });
@@ -1873,7 +1772,7 @@ const handleContextMenuAction = async (action: string) => {
   
   switch (action) {
     case 'view':
-      selectedNode.value = node;
+      openServiceDetails(node.id);
       break;
     case 'focus':
       // Focus on this node
@@ -1882,7 +1781,7 @@ const handleContextMenuAction = async (action: string) => {
       }
       break;
     case 'dependencies':
-      selectedNode.value = node;
+      openServiceDetails(node.id);
       break;
     case 'check':
       // Manual health check

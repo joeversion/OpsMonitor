@@ -1,6 +1,35 @@
 import api from './index';
 import type { Service, CreateServiceDto, UpdateServiceDto } from '../types/service';
+import type { CheckResult } from './checks';
+import type { ServiceDependency } from './dependencies';
 export type { Service };
+
+export interface ServiceDetails {
+  service: Omit<Service, 'check_type' | 'enabled' | 'alert_enabled'> & {
+    check_type: string;
+    enabled: boolean | number;
+    alert_enabled: boolean | number;
+    project_name?: string;
+    host_name?: string;
+    host_connection_type?: string;
+    host_enabled?: number | null;
+    current_failure_count?: number;
+  };
+  configuration: Record<string, Record<string, unknown>>;
+  latest: CheckResult | null;
+  history: CheckResult[];
+  dependencies: {
+    dependsOn: (ServiceDependency & { resource_expiry_date?: string; resource_check_error?: string })[];
+    dependedBy: ServiceDependency[];
+  };
+  output_available: boolean;
+  fetched_at: string;
+}
+
+export const getServiceDetails = async (id: string, signal?: AbortSignal): Promise<ServiceDetails> => {
+  const response = await api.get<ServiceDetails>(`/services/${encodeURIComponent(id)}/details`, { signal });
+  return response.data;
+};
 
 export const getServices = async (projectId?: number | null, hostId?: string | null): Promise<Service[]> => {
   const params: any = {};

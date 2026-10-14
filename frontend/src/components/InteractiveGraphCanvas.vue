@@ -312,8 +312,8 @@
         }
       ]"
       :style="{ top: (node.y || 100) + 'px', left: (node.x || 100) + 'px' }"
-      @mousedown.stop="startDragNode($event, node)"
-      @click.stop="selectNode(node, $event)"
+      @mousedown.stop="startNodeInteraction($event, node)"
+      @click.stop="handleNodeClick(node, $event)"
     >
       <!-- Cross-project badge with project name -->
       <div v-if="node.isCrossProjectService" class="cross-project-node-badge">{{ node.project_name || $t('graphCanvas.badgeExternal') }}</div>
@@ -487,6 +487,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits([
   'select-node', 
+  'view-service',
   'update:nodes', 
   'add-link', 
   'update-link',
@@ -1505,6 +1506,24 @@ const closeLinkContextMenu = () => {
     y: 0,
     link: null
   };
+};
+
+let nodePointerStart: { x: number; y: number } | null = null;
+
+const startNodeInteraction = (event: MouseEvent, node: Node) => {
+  nodePointerStart = { x: event.clientX, y: event.clientY };
+  startDragNode(event, node);
+};
+
+const handleNodeClick = (node: Node, event: MouseEvent) => {
+  const moved = nodePointerStart && Math.hypot(event.clientX - nodePointerStart.x, event.clientY - nodePointerStart.y) > 5;
+  nodePointerStart = null;
+  if (moved) return;
+  const viewing = !props.isEditMode && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+  if (!viewing || selectedNodeIds.value.size !== 1 || !selectedNodeIds.value.has(node.id)) {
+    selectNode(node, event);
+  }
+  if (viewing) emit('view-service', node.id);
 };
 
 const selectNode = (node: Node, event?: MouseEvent) => {

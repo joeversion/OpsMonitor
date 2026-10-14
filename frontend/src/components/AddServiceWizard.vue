@@ -452,12 +452,12 @@
 
         <!-- Dependencies Table -->
         <div v-if="serviceDependencies.length > 0" class="dependencies-table">
-          <el-table :data="serviceDependencies" size="small" style="margin-bottom: 15px;">
+          <el-table :data="serviceDependencies" size="small" style="margin-bottom: 15px;" :row-key="(row: ServiceDepItem) => row.id || row.target_service_id">
             <el-table-column :label="$t('services.colTargetService')" min-width="180">
               <template #default="scope">
                 <div style="display: flex; align-items: center; gap: 6px;">
                   <el-tag 
-                    v-if="isCrossProjectDependency(scope.row.target_service_id)" 
+                    v-if="isCrossProjectDependency(scope.row.target_service_id)"
                     size="small" 
                     type="warning"
                     effect="plain"
@@ -1037,6 +1037,7 @@ const scheduleConfig = ref<ScheduleConfig>({
 
 // Dependencies
 interface ServiceDepItem {
+  id?: string;
   target_service_id: string;
   dependency_type: string;
   risk_level: string;
@@ -1551,7 +1552,7 @@ watch(() => props.modelValue, async (newVal) => {
       if (props.isEdit && props.editData.id) {
         try {
           const deps = await getServiceDependencies(props.editData.id);
-          serviceDependencies.value = deps.dependsOn.map((d: any) => ({
+          serviceDependencies.value = deps.dependsOn.filter((d: any) => d.target_service_id && !d.target_resource_id).map((d: any) => ({
             id: d.id,
             target_service_id: d.target_service_id,
             dependency_type: d.dependency_type,

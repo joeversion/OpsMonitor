@@ -161,7 +161,7 @@
             </div>
           </template>
           <template #default="scope">
-            <div style="font-weight: 500;">{{ scope.row.name }}</div>
+            <el-button link type="primary" style="font-weight: 500; white-space: normal; text-align: left; height: auto;" @click.stop="showServiceDetails(scope.row.id)">{{ scope.row.name }}</el-button>
             <div style="font-size: 12px; color: #909399;">
               {{ scope.row.host }}<template v-if="scope.row.port && !['script', 'file', 'log'].includes(scope.row.check_type)">:{{ scope.row.port }}</template>
             </div>
@@ -983,7 +983,7 @@
         
         <!-- Existing Dependencies Table -->
         <div v-if="serviceDependencies.length > 0" class="dependencies-table">
-          <el-table :data="serviceDependencies" size="small" style="margin-bottom: 15px;" row-key="target_service_id">
+          <el-table :data="serviceDependencies" size="small" style="margin-bottom: 15px;" :row-key="(row: ServiceDepItem) => row.id || row.target_service_id">
             <el-table-column type="expand">
               <template #default="scope">
                 <div style="padding: 12px 20px; background: #fafafa;">
@@ -1017,7 +1017,7 @@
               <template #default="scope">
                 <div style="display: flex; align-items: center; gap: 6px;">
                   <el-tag 
-                    v-if="isCrossProjectDependency(scope.row.target_service_id)" 
+                    v-if="isCrossProjectDependency(scope.row.target_service_id)"
                     size="small" 
                     type="warning"
                     effect="plain"
@@ -1282,6 +1282,9 @@
       </div>
     </el-dialog>
 
+    <ServiceDetailsDrawer v-model="serviceDetailsVisible" :service-id="detailsServiceId"
+      @edit="editFromDetails" @checked="updateFromDetails" />
+
     <!-- Add Service Wizard -->
     <AddServiceWizard
       v-model="wizardDialogVisible"
@@ -1314,6 +1317,7 @@ import { Search, Plus, Download, Upload, Delete, Bell, BellFilled as BellSlash, 
 import StatusBadge from '../components/StatusBadge.vue';
 import ScheduleConfigPanel from '../components/ScheduleConfigPanel.vue';
 import AddServiceWizard from '../components/AddServiceWizard.vue';
+import ServiceDetailsDrawer from '../components/ServiceDetailsDrawer.vue';
 import IconSelector from '../components/IconSelector.vue';
 import axios from 'axios';
 import api from '../api';
@@ -1390,6 +1394,27 @@ async function handleRunCheck(service: any) {
 
 // Permission check
 const isAdmin = computed(() => authUtils.isAdmin());
+const serviceDetailsVisible = ref(false);
+const detailsServiceId = ref<string | null>(null);
+const showServiceDetails = (id: string) => {
+  detailsServiceId.value = id;
+  serviceDetailsVisible.value = true;
+};
+const editFromDetails = (id: string) => {
+  const service = services.value.find(item => item.id === id);
+  if (service && isAdmin.value) {
+    serviceDetailsVisible.value = false;
+    handleEdit(service);
+  }
+};
+const updateFromDetails = (id: string, result: any) => {
+  const service = services.value.find(item => item.id === id);
+  if (service) {
+    service.latestStatus = result.status;
+    service.latestCheck = result;
+    liveStatus.set(id, { latestStatus: result.status, latestCheck: result });
+  }
+};
 
 // Script placeholder based on script type
 const scriptPlaceholder = computed(() => {
@@ -1820,7 +1845,7 @@ const fetchDependencyTypes = async () => {
 const loadServiceDependencies = async (serviceId: string) => {
   try {
     const deps = await getServiceDependencies(serviceId);
-    serviceDependencies.value = deps.dependsOn.map((d: any) => ({
+    serviceDependencies.value = deps.dependsOn.filter((d: any) => d.target_service_id && !d.target_resource_id).map((d: any) => ({
       id: d.id,
       target_service_id: d.target_service_id,
       dependency_type: d.dependency_type,
@@ -2895,7 +2920,7 @@ const handleSubmit = async () => {
       
       // Delete removed dependencies
       for (const existingDep of existingDeps.dependsOn) {
-        if (!currentIds.includes(existingDep.id)) {
+        if (existingDep.target_service_id && !existingDep.target_resource_id && !currentIds.includes(existingDep.id)) {
           await deleteDependency(existingDep.id);
         }
       }
@@ -3018,7 +3043,7 @@ const handleWizardSubmit = async (submitData: any, dependencies: any[]) => {
       
       // Get current dependencies from DB to find which ones to delete
       const currentDeps = await getServiceDependencies(serviceId);
-      const currentDepIds = currentDeps.dependsOn.map((d: any) => d.id);
+      const currentDepIds = currentDeps.dependsOn.filter((d: any) => d.target_service_id && !d.target_resource_id).map((d: any) => d.id);
       
       // Delete dependencies that are no longer in the list
       for (const depId of currentDepIds) {

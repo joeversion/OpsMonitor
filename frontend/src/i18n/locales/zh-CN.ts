@@ -1,4 +1,18 @@
 export default {
+  serviceDetails: {
+    title: '服务详情', overview: '概览', history: '检查记录', dependencies: '依赖关系', configuration: '监控配置',
+    paused: '监控已暂停', hostPaused: '主机监控已暂停', stale: '检查结果已过时', lastCheck: '最近检查',
+    description: '描述', project: '所属项目', target: '监控目标', host: '所属主机', checkType: '检查类型', connection: '连接方式',
+    risk: '风险', layer: '架构层级', impact: '故障影响', latestResult: '最近检查结果', duration: '检查耗时',
+    noChecks: '暂无检查记录', output: '检查输出', noOutput: '暂无输出', stdout: '标准输出', stderr: '错误输出',
+    createdAt: '创建时间', updatedAt: '更新时间', id: '服务 ID', message: '信息', recentChecks: '最近 {count} 次检查', recordCount: '显示条数',
+    dependsOn: '当前服务依赖的', dependedBy: '依赖当前服务的', noDependencies: '暂无依赖关系', resourceExpiry: '资源到期日', unverified: '未验证',
+    monitoring: '监控', alerts: '告警', schedule: '调度方式', timeRange: '时间段调度', fixed: '固定间隔', interval: '默认检查间隔',
+    warningThreshold: '警告阈值（连续失败）', errorThreshold: '错误阈值（连续失败）', triggerThreshold: '告警触发阈值（失败次数）', failureCount: '当前连续失败次数',
+    enabled: '已启用', disabled: '已停用', notFound: '该服务已不存在。', loadFailed: '无法加载服务详情。', checkCompleted: '检查已完成', checkFailed: '检查失败',
+    groups: { http: 'HTTP', check: '检查参数', ssh: 'SSH 检查', script: '脚本', file: '文件', schedule: '调度规则' },
+    fields: { protocol: '协议', path: '路径', expected_status: '预期 HTTP 状态码', timeout: '超时', pattern: '匹配规则', max_age_seconds: '最大时效（秒）', container_name: '容器', script_type: '脚本类型', expected_exit_code: '预期退出码', working_dir: '工作目录', mode: '模式', file_path: '文件路径', directory_path: '目录', filename_pattern: '文件名规则', use_latest: '选择最新文件', freshness_days: '有效时效（天）', max_age_minutes: '最大时效（分钟）', check_type: '检查方式', expected_size_delta: '最小大小变化（KB）', timeout_seconds: '超时（秒）', type: '调度类型', defaultInterval: '默认间隔（秒）', timeRanges: '时间段规则' }
+  },
   // ==================== 通用 ====================
   common: {
     confirm: '确认',

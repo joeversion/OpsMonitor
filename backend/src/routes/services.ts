@@ -3,6 +3,7 @@ import db from '../db/database';
 import { v4 as uuidv4 } from 'uuid';
 import { Scheduler } from '../services/scheduler';
 import logger from '../utils/logger';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
@@ -284,6 +285,90 @@ router.get('/', (req, res) => {
     res.json(parsedServices);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/:id/details', authenticate, (req, res) => {
+  try {
+    const service = db.prepare(`
+      SELECT s.*, p.name AS project_name, h.name AS host_name,
+        h.connection_type AS host_connection_type, h.enabled AS host_enabled
+      FROM services s LEFT JOIN projects p ON s.project_id = p.id
+      LEFT JOIN hosts h ON s.host_id = h.id WHERE s.id = ?
+    `).get(req.params.id) as any;
+    if (!service) return res.status(404).json({ error: 'Service not found' });
+    const parseConfig = (value: any): any => {
+      try { return typeof value === 'string' ? JSON.parse(value) : value || {}; }
+      catch (_) { return {}; }
+    };
+    const secrets: string[] = [];
+    const sensitiveKey = /password|passwd|passphrase|private.?key|secret|token|credential|authorization|api.?key/i;
+    const collectSecrets = (value: any) => {
+      if (!value || typeof value !== 'object') return;
+      for (const [key, entry] of Object.entries(value)) {
+        if (sensitiveKey.test(key) && typeof entry === 'string' && entry) secrets.push(entry);
+        else if (entry && typeof entry === 'object') collectSecrets(entry);
+      }
+    };
+    for (const key of Object.keys(service).filter(key => key.endsWith('_config'))) collectSecrets(parseConfig(service[key]));
+    if (service.host_id) collectSecrets(db.prepare('SELECT * FROM hosts WHERE id = ?').get(service.host_id));
+    const sanitize = (value: any): any => {
+      if (typeof value === 'string') {
+        let text = value;
+        for (const secret of secrets) text = text.split(secret).join('[REDACTED]');
+        return text.replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g, '[REDACTED]')
+          .replace(/(\w+:\/\/)[^\s/@]+:[^\s/@]+@/g, '$1[REDACTED]@')
+          .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, 'Bearer [REDACTED]')
+          .replace(/((?:password|passwd|passphrase|secret|token|api[_-]?key|authorization)\s*["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s&,;]+)/gi, '$1[REDACTED]');
+      }
+      if (Array.isArray(value)) return value.map(sanitize);
+      if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, sensitiveKey.test(key) ? '[REDACTED]' : sanitize(entry)]));
+      return value;
+    };
+    const pick = (value: any, keys: string[]) => Object.fromEntries(keys.filter(key => value?.[key] !== undefined).map(key => [key, sanitize(value[key])]));
+    const configuration = {
+      http: pick(parseConfig(service.http_config), ['protocol', 'path', 'expected_status', 'timeout']),
+      check: pick(parseConfig(service.check_config), ['path', 'pattern', 'max_age_seconds', 'container_name', 'timeout', 'expected_status', 'protocol']),
+      ssh: pick(parseConfig(service.ssh_check_config), ['path', 'pattern', 'max_age_seconds', 'container_name']),
+      script: pick(parseConfig(service.script_config), ['script_type', 'expected_exit_code', 'timeout', 'working_dir']),
+      file: pick(parseConfig(service.file_config), ['mode', 'file_path', 'directory_path', 'filename_pattern', 'use_latest', 'freshness_days', 'max_age_minutes', 'check_type', 'expected_size_delta', 'timeout_seconds']),
+      schedule: pick(parseConfig(service.schedule_config), ['type', 'defaultInterval', 'timeRanges'])
+    };
+    const history = (db.prepare('SELECT * FROM check_records WHERE service_id = ? ORDER BY checked_at DESC, rowid DESC LIMIT 50').all(service.id) as any[]).map(record => {
+      const result = pick(record, ['id', 'service_id', 'status', 'response_time', 'error_message', 'checked_at']);
+      if (req.user?.role === 'admin') {
+        Object.assign(result, pick(record, ['output', 'stdout', 'stderr']));
+        result.details = sanitize(parseConfig(record.details));
+      }
+      return result;
+    });
+    const dependencies = db.prepare(`
+      SELECT d.id, d.dependency_type, d.risk_level, d.description,
+        d.source_service_id, d.target_service_id, d.target_resource_id,
+        ss.name AS source_service_name, sp.name AS source_project_name,
+        ts.name AS target_service_name, tp.name AS target_project_name,
+        sc.name AS target_resource_name, sc.type AS target_resource_type,
+        sc.expiry_date AS resource_expiry_date, sc.ssl_check_error AS resource_check_error
+      FROM service_dependencies d
+      LEFT JOIN services ss ON d.source_service_id = ss.id
+      LEFT JOIN projects sp ON ss.project_id = sp.id
+      LEFT JOIN services ts ON d.target_service_id = ts.id
+      LEFT JOIN projects tp ON ts.project_id = tp.id
+      LEFT JOIN security_configs sc ON d.target_resource_id = sc.id
+      WHERE d.source_service_id = ? OR d.target_service_id = ?
+    `).all(service.id, service.id) as any[];
+    res.json({
+      service: pick(service, ['id', 'name', 'description', 'project_id', 'project_name', 'host_id', 'host_name', 'host', 'port', 'host_connection_type', 'host_enabled', 'check_type', 'service_type', 'ssh_check_type', 'risk_level', 'layer', 'enabled', 'alert_enabled', 'check_interval', 'warning_threshold', 'error_threshold', 'failure_threshold', 'current_failure_count', 'impact_description', 'created_at', 'updated_at', 'schedule_type']),
+      configuration, latest: history[0] || null, history,
+      dependencies: {
+        dependsOn: sanitize(dependencies.filter(item => item.source_service_id === service.id)),
+        dependedBy: sanitize(dependencies.filter(item => item.target_service_id === service.id))
+      },
+      output_available: req.user?.role === 'admin', fetched_at: new Date().toISOString()
+    });
+  } catch (error: any) {
+    logger.error('ServiceDetails', 'Failed to retrieve service details', { error: error.message });
+    res.status(500).json({ error: 'Failed to retrieve service details' });
   }
 });
 
