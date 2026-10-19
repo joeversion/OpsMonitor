@@ -4,6 +4,10 @@
  * Supports configurable timezone from system settings
  */
 
+import { captureBackendConsole } from './log-storage';
+
+captureBackendConsole();
+
 enum LogLevel {
   DEBUG = 'DEBUG',
   INFO = 'INFO',

@@ -428,7 +428,7 @@
               </div>
               <div v-if="config.notes" class="security-card-notes">
                 <span class="notes-icon">📝</span>
-                <span class="notes-text">{{ config.notes }}</span>
+                <span class="notes-text" tabindex="0">{{ config.notes }}</span>
               </div>
             </div>
             
@@ -3107,6 +3107,7 @@ const handleResize = () => {
 }
 
 .security-panel-header {
+  flex-shrink: 0;
   padding: 12px 14px;
   border-bottom: 1px solid #e4e7ec;
   background: #f8f9fa;
@@ -3187,6 +3188,7 @@ const handleResize = () => {
 
 .security-cards-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 10px;
   display: flex;
@@ -3195,6 +3197,7 @@ const handleResize = () => {
 }
 
 .security-card {
+  flex-shrink: 0;
   padding: 12px;
   border: 1px solid #e9ecef;
   border-radius: 10px;
@@ -3329,7 +3332,16 @@ const handleResize = () => {
 }
 
 .security-card-notes .notes-text {
+  flex: 1;
+  min-width: 0;
+  height: 96px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
   line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 

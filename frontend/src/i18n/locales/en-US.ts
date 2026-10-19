@@ -1172,7 +1172,7 @@ export default {
     labelDefaultError: 'Default Error Threshold',
     labelDefaultAlertTrigger: 'Default Alert Trigger',
     sectionData: 'Data Management',
-    labelLogRetention: 'Log Retention',
+    labelLogRetention: 'Application Log Retention',
     labelDataRetention: 'Data Retention',
     btnSaveSettings: 'Save Settings',
     // Import/Export
@@ -1204,7 +1204,7 @@ export default {
     unitWarnThreshold: 'consecutive failures (Range: 1-30)',
     unitErrorThreshold: 'consecutive failures (Range: 1-50)',
     unitAlertTrigger: 'consecutive failures (Range: 1-10)',
-    unitLogRetention: 'days (Number of days to keep backend logs)',
+    unitLogRetention: 'days (Frontend / Backend)',
     unitDataRetention: 'days (Number of days to keep check records in database)',
     // Dependency type dialog extras
     placeholderDepName: 'e.g., monitors',

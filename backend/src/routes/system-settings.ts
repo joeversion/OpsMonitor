@@ -10,6 +10,7 @@ import db from '../db/database';
 import logger from '../utils/logger';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { SSHService } from '../services/ssh-service';
+import { cleanupApplicationLogs } from '../utils/log-storage';
 
 const router = express.Router();
 
@@ -78,11 +79,23 @@ router.put('/:key', authenticate, requireAdmin, (req: Request, res: Response) =>
     if (value === undefined || value === null) {
       return res.status(400).json({ error: 'Value is required' });
     }
+
+    if (key === 'log_retention_days' && (
+      !['string', 'number'].includes(typeof value) ||
+      !/^\d+$/.test(String(value)) ||
+      !Number.isInteger(Number(value)) || Number(value) < 1 || Number(value) > 365
+    )) {
+      return res.status(400).json({ error: 'Log retention must be an integer between 1 and 365 days' });
+    }
     
     // Check if setting exists
     const existing = db.prepare('SELECT key FROM system_settings WHERE key = ?').get(key);
     if (!existing) {
       return res.status(404).json({ error: 'Setting not found' });
+    }
+
+    if (key === 'log_retention_days') {
+      cleanupApplicationLogs(Number(value));
     }
 
     // Validate timezone if updating timezone setting
@@ -102,7 +115,7 @@ router.put('/:key', authenticate, requireAdmin, (req: Request, res: Response) =>
       UPDATE system_settings
       SET value = ?, updated_at = CURRENT_TIMESTAMP
       WHERE key = ?
-    `).run(value, key);
+    `).run(String(value), key);
 
     // If timezone was updated, clear logger cache BEFORE any log output
     if (key === 'timezone') {

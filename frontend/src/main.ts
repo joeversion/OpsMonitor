@@ -7,8 +7,10 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import en from 'element-plus/es/locale/lang/en'
 import 'element-plus/dist/index.css'
 import i18n, { getLocale } from './i18n'
+import { installFrontendLogging } from './utils/logger'
 
 const app = createApp(App)
+installFrontendLogging(app)
 
 app.use(router)
 app.use(i18n)

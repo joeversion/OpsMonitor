@@ -1172,7 +1172,7 @@ export default {
     labelDefaultError: '默认错误阈值',
     labelDefaultAlertTrigger: '默认告警触发',
     sectionData: '数据管理',
-    labelLogRetention: '日志保留',
+    labelLogRetention: '应用日志保留',
     labelDataRetention: '数据保留',
     btnSaveSettings: '保存设置',
     // 导入/导出
@@ -1204,7 +1204,7 @@ export default {
     unitWarnThreshold: '次连续失败（范围：1-30）',
     unitErrorThreshold: '次连续失败（范围：1-50）',
     unitAlertTrigger: '次连续失败（范围：1-10）',
-    unitLogRetention: '天（后端日志保留天数）',
+    unitLogRetention: '天（前端 / 后端）',
     unitDataRetention: '天（数据库检查记录保留天数）',
     // 依赖类型对话框补充
     placeholderDepName: '例如：monitors',

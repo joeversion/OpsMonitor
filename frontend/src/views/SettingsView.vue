@@ -164,7 +164,7 @@
           <span style="font-weight: 600; color: #303133;">{{ $t('settings.sectionData') }}</span>
         </el-divider>
 
-        <el-form-item :label="$t('settings.labelLogRetention')">
+        <el-form-item class="log-retention-item" :label="$t('settings.labelLogRetention')">
           <el-input-number v-model="settings.logRetentionDays" :min="1" :max="365" :disabled="!isAdmin" />
           <span class="unit-text">{{ $t('settings.unitLogRetention') }}</span>
         </el-form-item>
@@ -668,6 +668,48 @@ onUnmounted(() => {
   margin-left: 8px;
   color: #606266;
   font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  .log-retention-item {
+    display: block;
+  }
+
+  .log-retention-item :deep(.el-form-item__label) {
+    width: 100% !important;
+    height: auto;
+    justify-content: flex-start;
+    line-height: 20px;
+    margin-bottom: 8px;
+    overflow-wrap: anywhere;
+  }
+
+  .log-retention-item :deep(.el-form-item__content) {
+    margin-left: 0 !important;
+    min-width: 0;
+  }
+
+  .log-retention-item :deep(.el-input-number) {
+    width: 180px;
+    max-width: 100%;
+  }
+
+  .log-retention-item :deep(.el-input-number__decrease),
+  .log-retention-item :deep(.el-input-number__increase) {
+    width: 24px;
+  }
+
+  .log-retention-item :deep(.el-input__wrapper) {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .log-retention-item .unit-text {
+    margin-left: 0;
+    margin-top: 8px;
+    line-height: 20px;
+    overflow-wrap: anywhere;
+  }
 }
 
 .import-export-section {

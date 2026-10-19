@@ -1,8 +1,10 @@
 ﻿# OpsMonitor 服务监控系统 — 用户使用手册
 
 > **版本**: 2.2.0
-> **更新日期**: 2026-03-16
+> **更新日期**: 2026-10-19
 > **适用范围**: OpsMonitor 服务监控系统（前端端口: 5173，后端端口: 3000）
+
+> 本手册按当前源码修订；标注为限制或即将推出的功能不应视为已完成。现有截图仅供定位，新增操作以正文为准。
 
 ---
 
@@ -88,6 +90,8 @@ OpsMonitor 采用前后端分离架构，配合嵌入式数据库，实现开箱
 
 > 新注册账号默认角色为 **Viewer**，需由管理员手动升级为 Admin。
 
+> **当前安全限制**：部分写接口尚未强制校验管理员权限，界面隐藏或禁用按钮不等同于完整的 API 权限隔离。生产环境应限制网络访问，不能仅依赖 Viewer 角色保护配置。
+
 ### 1.4 技术栈概览
 
 | 层次 | 技术组件 |
@@ -106,7 +110,7 @@ OpsMonitor 采用前后端分离架构，配合嵌入式数据库，实现开箱
 
 | 组件 | 最低版本 | 说明 |
 |------|---------|------|
-| Node.js | 18.0+ | 本地开发必需 |
+| Node.js | 20.19+（20.x）或 22.12+ | Vite 7 要求；建议使用 Node.js 22.12+ 的受支持版本 |
 | npm | 随 Node.js | 包管理器 |
 | Docker | 20.10+ | 生产部署时使用 |
 | Docker Compose | v2.0+ | 生产部署时使用 |
@@ -157,25 +161,31 @@ Docker 将自动完成前后端构建与启动，**无需手动执行 `npm run b
 | 后端 | 3000 | Express API 服务 |
 | 数据库 | — | SQLite 文件，持久化到 `/opt/OpsMonitor/backend/data` |
 
+应用日志写入容器内 `/app/data/logs`，通过同一数据卷持久化到宿主机 `/opt/OpsMonitor/backend/data/logs`。确认运行后端的用户有目录写权限，并监控磁盘空间；日志按天保留，不代表设置了磁盘总容量上限。
+
+> 当前 Compose 使用 `network_mode: host`，上述端口直接由宿主机服务监听。部署前应确认 Docker 环境支持并启用了 host networking；Windows/macOS 上不能假定与 Linux 行为完全一致。
+
 ### 2.4 环境变量配置
 
-**所有部署方式均无需创建任何配置文件**，项目已内置全部默认值，开箱即用。
+本地启动使用进程环境变量。当前启动入口不会自动加载 `backend/.env`，仅创建该文件不会生效。例如，在启动后端的同一 PowerShell 终端中设置：
 
-仅当需要覆盖默认值时，可在 `backend/` 目录创建 `.env` 文件：
-
-```env
-NODE_ENV=development
-PORT=3000
-DB_PATH=./data/monitor.db
-JWT_SECRET=your-secret-key-here
+```powershell
+$env:NODE_ENV = 'development'
+$env:PORT = '3000'
+$env:DB_PATH = './data/monitor.db'
+$env:JWT_SECRET = '<替换为独立生成的高强度随机密钥>'
+npm run dev
 ```
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `NODE_ENV` | `production` | 运行模式 |
-| `PORT` | `3000` | 后端监听端口 |
-| `DB_PATH` | `/app/data/monitor.db` | SQLite 数据库文件路径 |
+| 变量 | 本地默认值 | Docker Compose 值 / 说明 |
+|------|------------|-------------------------|
+| `NODE_ENV` | 未设置，启动日志按 `development` 显示 | `production` |
+| `PORT` | `3000` | `3000`，后端监听端口 |
+| `DB_PATH` | 后端目录的 `monitor.db` | `/app/data/monitor.db`；自定义相对路径相对于进程工作目录 |
+| `LOG_DIR` | 后端目录下的 `logs` | `/app/data/logs`，前后端应用日志统一存储目录；自定义相对路径相对于进程工作目录 |
 | `JWT_SECRET` | `opsmonitor-secret-key-change-in-production` | JWT 签名密钥，**生产环境务必替换** |
+
+Docker 部署时，必须在 `docker-compose.yml` 的 backend `environment` 中显式传入 `JWT_SECRET`，例如 `JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET}`，再通过宿主环境或 Compose `.env` 提供密钥并重建容器。当前 Compose 未配置该变量，仅设置宿主环境或创建 `backend/.env` 不会自动传入容器。不要提交真实密钥；更换密钥后现有登录 Token 将失效。
 
 ### 2.5 访问地址
 
@@ -298,6 +308,8 @@ JWT_SECRET=your-secret-key-here
 | 手动切换后 | 将语言偏好保存至本地存储，下次访问自动应用 |
 | 告警通知 | 语言偏好会同步至后端，邮件和 Teams 告警通知将使用相同语言发送 |
 
+> 通知语言是后端全局配置，并非每个用户独立设置；其他浏览器切换语言也可能覆盖通知语言。
+
 ---
 
 ## 第五章：概览仪表盘
@@ -344,7 +356,7 @@ JWT_SECRET=your-secret-key-here
 
 ### 5.4 按项目筛选
 
-通过页面**左侧导航菜单顶部的项目选择器**，可切换查看特定项目的监控数据。选择项目后，仪表盘上的所有统计数据将自动过滤为该项目范围内的数据。
+通过页面**左侧导航菜单顶部的项目选择器**，可切换查看特定项目的监控数据。服务统计按项目过滤；系统概览区域仅在 All Projects 全局视图显示。
 
 ---
 
@@ -484,6 +496,8 @@ JWT_SECRET=your-secret-key-here
 |------|--------|------|
 | Host Check Interval | — | 主机连通性检查间隔（60-3600 秒），SSH 模式通过 SSH 连接检测，Local 模式通过 Ping 检测 |
 
+默认主机检查间隔为 **300 秒**。主机卡片和表格提供监控开关，用于控制主机连通性定时检查；它不会关闭关联服务的独立调度，需要暂停服务时应另行关闭各服务的 Monitoring 开关。
+
 **其他字段**：
 
 | 字段 | 说明 |
@@ -522,7 +536,9 @@ JWT_SECRET=your-secret-key-here
 - **编辑**：点击主机卡片的 **Edit** 按钮，或在表格视图中点击编辑图标
 - **删除**：点击 **Delete** 按钮，确认后删除
 
-> 删除主机前请确保该主机下无正在运行的监控服务，否则相关服务的检查将失败。
+> 主机关联了服务时，普通删除会被阻止，与服务是否正在运行无关。请先处理关联服务。后端 API 另支持 `reassign_to=<host_id>`（迁移服务）、`orphan=true`（解除关联）或 `force=true`（连同服务删除）；当前界面未提供这些选择。强制删除有数据丢失风险，不可撤销。
+
+编辑主机的 IP、SSH 或连接信息时，请阅读关联服务同步更新提示，保存后核对受影响服务的目标和连接参数。
 
 ---
 
@@ -595,8 +611,8 @@ JWT_SECRET=your-secret-key-here
 - 说明：发送 HTTP GET 请求，验证响应状态码
 
 **HTTPS 检查**：
-- 配置字段：同 HTTP，另支持 SSL 证书验证
-- 说明：通过 HTTPS 协议检查，可同时验证 SSL/TLS 证书有效性
+- 配置字段：同 HTTP
+- 说明：通过 HTTPS 检查响应状态，并可获取证书到期信息。当前实现关闭证书信任验证，检查成功不代表证书可信或未过期；独立的证书到期监控请使用安全配置中的 SSL Certificate
 
 **Script 脚本检查**：
 
@@ -677,14 +693,14 @@ Alert Trigger 建议设置在 Warning ～ Error 之间
 | ✉️ DOWN 通知 | count = Alert Trigger，且此时状态为 DOWN **或** count = Error Threshold（从 WARNING 升级为 DOWN 时补发）|
 | ✉️ RECOVERY 通知 | 服务恢复（状态变 UP），且之前曾发过告警 |
 
-> count 大于 Alert Trigger 但未恢复时：静默，不重复发送。
+> 首次告警后持续异常时不重复发送；已告警的 WARNING 升级为 DOWN 时仍可补发一次通知。
 
-**时间估算公式**:
+**固定间隔时间估算**（假设故障恰好发生在上次检查结束后，且忽略执行耗时）:
 
 ```
-WARNING 通知最快发出时间 = Alert Trigger × Check Interval
-DOWN    通知最快发出时间 = Error Threshold × Check Interval
-RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
+WARNING 首次通知预计时间 = Alert Trigger × Check Interval（触发时须为 WARNING）
+DOWN 升级通知预计时间 = Error Threshold × Check Interval（此前须已告警）
+RECOVERY 通知预计等待时间 = 恢复后约 0～1 × Check Interval（此前须已告警）
 ```
 
 **典型配置示例**（Check Interval = 30s）:
@@ -707,7 +723,9 @@ RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
 | T+150s | 5 | 🔴 DOWN | ✉️ DOWN 通知（= 5×30s）|
 | 恢复后+30s | — | 🟢 UP | ✉️ RECOVERY 通知 |
 
-> 当 Alert Trigger = Error Threshold 时，跳过 WARNING 阶段，直接发一次 DOWN 通知。
+> 当 Alert Trigger = Error Threshold 时，跳过 WARNING 通知，直接发一次 DOWN 通知；界面状态仍可先进入 WARNING。
+
+> 时间表仅估算固定间隔、持续失败且检查正常完成的场景，实际时间受调度与执行耗时影响；首次直接发送 DOWN 的时刻取决于 Alert Trigger。建议满足 `Warning ≤ Alert Trigger ≤ Error`；若 Alert Trigger 小于 Warning，首次触发时仍被抑制为 UP，可能无法发出预期告警。关闭 Alerts 时，当前实现也不执行这里的失败次数抑制逻辑，而是直接使用原始检查状态。
 
 ### 8.6 依赖配置
 
@@ -744,8 +762,10 @@ RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
 
 服务列表页面提供配置的导入导出功能：
 
-- **Export**：将当前所有服务配置导出为 JSON 文件，用于备份或环境迁移
-- **Import**：从 JSON 文件中批量导入服务配置
+- **Export**：将所有服务记录导出为 JSON 文件，不受当前项目筛选限制；不包含独立的项目、主机、安全配置、用户或历史记录
+- **Import**：从 JSON 数组导入服务记录，相同 ID 按更新处理
+
+> **当前限制**：导入实现存在 SQL 参数数量不匹配，且未完整恢复项目/主机关联、调度和脚本/文件等配置。不要将此功能作为可靠的环境迁移或完整备份恢复方案。重要操作前应按实际 `DB_PATH` 备份 SQLite 数据库，并验证备份可恢复；运行中的数据库应使用 SQLite 一致性备份方式，或停服后备份。
 
 ### 8.10 手动触发健康检查
 
@@ -759,6 +779,19 @@ RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
 | **WARNING** | 🟠 橙色 | 连续失败次数达到 Warning 阈值 |
 | **DOWN** | 🔴 红色 | 连续失败次数达到 Error 阈值 |
 | **UNKNOWN** | 灰色 | 尚未执行检查，或监控已禁用 |
+
+### 8.12 查看服务详情与历史
+
+点击服务列表中的**服务名称**打开详情抽屉，拓扑图也提供查看详情入口：
+
+| 页签 | 内容 |
+|------|------|
+| **概览** | 目标、项目、主机、检查方式、风险、最新结果与错误；有输出时可展开查看 |
+| **历史** | 最近 20 或 50 条检查记录，包含状态、耗时、错误；有权限和输出数据时可展开详情 |
+| **依赖** | 依赖哪些服务、被哪些服务依赖，以及依赖类型、风险和说明 |
+| **配置** | 监控/告警开关、调度、阈值、失败计数及检查参数摘要 |
+
+顶部可能显示服务暂停、主机暂停或数据陈旧提示。数据陈旧表示固定间隔服务的最新记录已超过 `max(2 × 检查间隔, 60 秒)`，不等同于最新一次检查失败。管理员可在抽屉底部立即检查或进入编辑；Viewer 可查看详情，抽屉不提供执行/编辑按钮。
 
 ---
 
@@ -819,6 +852,12 @@ RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
 | 服务编辑表单 → 调度配置面板 | 为单个服务独立配置调度 |
 | 系统设置 → Default Check Interval | 设定新服务的默认固定间隔 |
 
+### 9.4 默认间隔与规则范围
+
+- 时间规则模式中的 **Default Interval** 用于未匹配任何已启用规则的时段，不会因为处于规则之外而自动停止监控。
+- 可为规则命名、启用/禁用并指定星期；固定/默认间隔允许 10–86400 秒，规则内间隔允许 10–3600 秒。
+- 执行预览用于检查当前匹配规则及未来计划，不是精确执行时刻保证。预览接口的格式化时间当前使用 Asia/Shanghai，不随系统时区统一切换。
+
 ---
 
 ## 第十章：依赖拓扑图
@@ -835,11 +874,13 @@ RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
 
 | 操作 | 方式 |
 |------|------|
-| **拖拽节点** | 鼠标按住节点拖动，重新排布布局 |
+| **拖拽节点** | 管理员进入自定义布局模式后，按住节点拖动 |
 | **缩放画布** | 鼠标滚轮缩放，或使用控件按钮 |
 | **平移画布** | 鼠标按住空白区域拖动 |
-| **查看服务详情** | 点击节点，右侧面板展示服务状态和检查信息 |
-| **重置布局** | 点击 Reset Layout 按钮恢复自动布局 |
+| **查看服务详情** | 通过节点查看服务详情入口打开详情抽屉 |
+| **保存布局** | 管理员在 Customize Layout 模式调整后点击 Save Layout |
+
+管理员调整布局时，先进入 **Customize Layout（自定义布局）**，完成后点击 **Save Layout（保存布局）**，再退出自定义模式。支持框选、多选和批量移动；仅拖动而未保存不应视为已持久化。Viewer 不可编辑布局或依赖。交互画布还提供依赖连线的添加、修改和删除操作。
 
 ### 10.2 节点与连线含义
 
@@ -876,7 +917,15 @@ RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
 
 拓扑图右侧的**安全面板**展示：
 - 该项目关联的安全配置状态
-- 即将过期（30天内）的凭证提醒，方便运维人员及时处理
+- 安全配置状态及即将过期筛选；到期状态采用第十二章的 7/3 天阈值
+- SSL 未验证时显示检查失败原因，而非把未知到期日当作已过期
+
+安全配置的长备注可在备注区域独立滚动，并支持通过键盘聚焦阅读；备注滚动与整个安全面板列表滚动互不替代。
+
+### 10.5 其他导航入口的当前状态
+
+- **Connections（连接管理，`/connections`）**：当前仅操作前端内存中的示例数据，没有连接实体的后端保存接口；刷新或重新进入页面后改动不会保留。实际 SSH 连接仍应在主机配置中设置。
+- **Cross-Project Dependencies（跨项目依赖，`/cross-deps`）**：独立页面带有“即将推出”遮罩，不应作为正式的跨项目配置操作入口。项目拓扑中的跨项目关联不等同于该独立页面已完成。
 
 ---
 
@@ -922,11 +971,13 @@ RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
 
 | 事件 | 触发条件 | 通知内容 |
 |------|---------|---------|
-| **警告** | 连续失败次数 ≥ Warning Threshold | 服务进入 WARNING 状态通知 |
-| **故障** | 连续失败次数 ≥ Error Threshold | 服务进入 DOWN 状态通知 |
-| **恢复** | 服务从故障状态恢复为 UP | 恢复通知 |
+| **首次警告/故障** | 失败次数恰好达到 Alert Trigger，且有效状态为 WARNING/DOWN | 对应状态通知 |
+| **故障升级** | 已发过告警，失败次数达到 Error Threshold，且有效状态为 DOWN | WARNING 升级为 DOWN 的补充通知 |
+| **恢复** | 原始检查恢复为 UP，且此前已生成告警 | 恢复通知并重置失败计数 |
 
 > 服务级别的 **Alerts** 开关必须开启，该服务的告警通知才会发送。
+
+持续异常时抑制重复通知；完整阈值关系和边界见第 8.5 节。SMTP/Teams 配置及测试按钮仅向管理员开放；修改配置后应保存，再发送测试通知。
 
 ### 11.4 告警历史记录
 
@@ -936,9 +987,13 @@ RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
 |------|------|
 | Time | 告警发生时间 |
 | Service | 触发告警的服务名称 |
-| Type | 告警类型（warning / error / recovery） |
+| Type | 告警类型（warning / down / recovery / expiry）；expiry 为安全配置到期提醒 |
 | Message | 告警详细内容 |
 | Notified | 是否已成功发送通知 |
+
+### 11.5 顶部通知中心
+
+点击顶部铃铛可查看最近告警，角标显示未确认数量。打开列表会自动确认已有告警，也提供确认操作；确认仅表示已读，不表示故障恢复，也不保证通知渠道投递成功。当前确认状态是全局状态，并非每个用户单独维护。
 
 ---
 
@@ -960,16 +1015,15 @@ RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
 
 ### 12.2 添加安全配置
 
-1. 点击页面右上角 **Add** 按钮
-2. 填写配置信息：
-   - **Name**（必填）：配置的显示名称，如 `aws-prod-access-key`
-   - **Type**（必填）：选择配置类型（AccessKey / Password / SSL Certificate）
-   - **Validity Period**：有效期天数（默认 60 天）
-   - **Expiry Date**（必填）：过期日期
-   - **Reminder Rules**：提醒规则，可勾选提前 7 天 / 3 天 / 1 天提醒
-   - **Affected Services**：关联受影响的服务（按项目分组选择）
-   - **Notes**（选填）：备注说明
-3. 点击保存
+管理员点击页面右上角 **Add**，选择类型后填写对应字段。
+
+**AccessKey / Password**：填写名称，并选择一种到期方式：
+- **指定到期日期**：直接选择日期。
+- **重置日期 + 有效期**：选择重置日期、填写 1–365 天有效期（默认 60 天），系统计算到期日。
+
+**SSL Certificate**：填写域名，例如 `example.com`。名称和到期日由后端连接目标域名的 **443** 端口获取，不手工填写。只接受域名，不接受 IP、`localhost`、完整 URL 或端口；保存时会立即读取证书，失败时显示错误且不保存本次修改。
+
+两类配置均可选择提醒规则（7/3/1 天）、受影响服务和备注。保存前确认后端所在网络可解析域名并访问目标。SSL 操作要求管理员权限。
 
 ### 12.3 过期状态说明
 
@@ -977,25 +1031,30 @@ RECOVERY通知最快发出时间 = 恢复后最长 1 × Check Interval
 
 | 状态 | 颜色 | 触发条件 |
 |------|------|---------|
-| **Normal** | 🟢 绿色 | 距过期日期超过 30 天 |
-| **Warning** | 🟠 橙色 | 距过期日期 ≤ 30 天 |
-| **Critical** | 🔴 红色 | 距过期日期 ≤ 7 天 |
-| **Expired** | 灰色 | 已超过过期日期 |
+| **Normal** | 🟢 绿色 | 剩余天数 > 7 |
+| **Warning** | 🟠 橙色 | 3 < 剩余天数 ≤ 7 |
+| **Critical** | 🔴 红色 | 0 < 剩余天数 ≤ 3 |
+| **Expired** | 灰色 | 剩余天数 ≤ 0 |
+| **Unverified** | 以界面标识为准 | 检测到 TLS 检查代理，无法确认源站证书到期日 |
 
 页面顶部的四个统计卡片汇总各状态（Normal / Warning / Critical / Expired）的数量，便于快速全局评估。
 
+剩余天数按到期时间差向上取整。SSL 行还展示最近检查时间和失败原因；检测到 Zscaler 等 TLS 检查代理时，未知到期日不会计入已过期，应为目标域名配置绕过 TLS 检查后重试。其他网络错误会保留此前到期日，需结合错误提示判断数据是否仍可信。
+
 ### 12.4 手动触发过期检查
 
-点击页面右上角的 **Check Expiry Now** 按钮，系统将立即对所有安全配置执行一次过期检查，并向已配置的通知渠道发送即将过期的提醒消息。
+管理员点击 **Check Expiry Now** 可立即检查所有安全配置，并重新读取 SSL 证书。系统也会在后端启动时检查一次，此后每小时检查。
+
+提醒以勾选天数中的最大值作为提醒窗口：例如选中 7/3/1 天后，在剩余天数 ≤7 时每天最多提醒一次，而非只在第 7/3/1 天发送；过期后仍可按天提醒。手动检查也遵守当天去重，不保证每次点击都会发通知。配置从异常恢复为 Normal 后可发送恢复通知；SSL 未验证时跳过到期告警。
 
 ### 12.5 其他页面操作
 
 | 操作 | 说明 |
 |------|------|
 | **Type 筛选** | 按配置类型过滤列表（AccessKey / FTP Password / SSL Certificate） |
-| **Status 筛选** | 按到期状态过滤列表（Normal / Warning / Critical / Expired） |
+| **Status 筛选** | 按界面提供的到期状态过滤列表；SSL 未验证需结合行内提示排查 |
 | **搜索** | 按名称关键词搜索 |
-| **Extend（延期）** | 快速延长有效期：在弹出的 **Confirm Extension** 对话框中输入延期天数即可 |
+| **Extend（续期）** | 仅非 SSL 配置支持；可指定新的到期日期，或按重置日期 + 1–365 天有效期计算，日期须在未来 |
 | **Edit** | 修改配置详情 |
 | **Delete** | 删除配置记录 |
 
@@ -1014,17 +1073,21 @@ Grafana 集成功能允许将外部 Grafana 仪表板嵌入到 OpsMonitor 界面
 1. 点击 **Add Dashboard** 按钮
 2. 填写 Grafana 连接信息：
    - **Grafana URL**：Grafana 服务器地址，如 `http://grafana.company.com:3000`
-   - **API Key**（可选）：若 Grafana 仪表板需要认证，填入 API Key
+   - **API Key**（可选）：供后端查询 Grafana 仪表板和面板列表
 3. 点击 **Test Connection** 测试连通性
-4. 连接成功后，从下拉菜单中选择要嵌入的 Dashboard
+4. 连接成功后，从下拉菜单中选择要嵌入的 Dashboard；未获得列表时可手工填写 Dashboard UID
 5. 填写其他信息：
    - **Dashboard Name**：在 OpsMonitor 中的显示名称
-   - **Project**：关联的项目
+   - **Projects**：可关联多个项目
+   - **Service**（可选）：关联服务
    - **Panel ID**（可选）：指定嵌入特定面板而非整个 Dashboard
 6. **嵌入选项**：
    - 主题（Light / Dark）
    - 自动刷新间隔
    - 是否隐藏顶部导航栏
+   - 时间范围、显示顺序及启用状态
+
+> API Key 不会自动为浏览器内的 iframe 建立登录会话。Grafana 仍需允许嵌入，并配置适当的匿名访问或浏览器登录；同时检查浏览器的 HTTPS 混合内容和跨站 Cookie 限制。连接测试成功不代表嵌入访问一定成功。
 
 ### 13.2 查看 Grafana 仪表板
 
@@ -1051,10 +1114,12 @@ Grafana 集成功能允许将外部 Grafana 仪表板嵌入到 OpsMonitor 界面
 
 | 配置项 | 说明 |
 |--------|------|
-| **System Timezone** | 系统时区，影响后端日志时间戳和界面时间显示。支持常用时区，包括 UTC、Asia/Shanghai 等 |
-| **Date Format** | 日期时间的显示格式，默认 `YYYY-MM-DD HH:mm:ss` |
+| **System Timezone** | 用于统一日志工具及本页时间预览，支持 UTC、Asia/Shanghai 等；不保证所有页面和通知使用该时区 |
+| **Date Format** | 保存日期格式偏好，默认 `YYYY-MM-DD HH:mm:ss`；当前未统一应用到各页面 |
 
 修改时区后，页面会显示当前时区下的实时时间以供确认。
+
+应用日志文件的日期轮转和 JSON `timestamp` 使用 UTC，不随此设置改变；后端消息正文中的日志时间仍可使用系统时区。
 
 ### 14.2 服务默认配置
 
@@ -1071,10 +1136,26 @@ Grafana 集成功能允许将外部 Grafana 仪表板嵌入到 OpsMonitor 界面
 
 | 配置项 | 说明 |
 |--------|------|
-| **Log Retention Days** | 后端日志的保留天数，超期日志将自动清理 |
-| **Data Retention Days** | 健康检查记录在数据库中的保留天数，超期数据将自动清理以节省存储 |
-| **Export Config** | 导出所有服务配置为 JSON 文件（用于备份或环境迁移） |
-| **Import Config** | 从 JSON 文件批量导入服务配置 |
+| **应用日志保留 / Application Log Retention** | 前端上报日志与后端应用日志共用保留期；默认 30 天，允许 1–365 的整数，仅管理员可修改 |
+| **Data Retention Days** | 检查记录保留天数；后端启动时清理，此后每 24 小时清理一次，不是固定每天 02:00 |
+| **Export Config** | 导出服务记录 JSON，不是完整系统备份 |
+| **Import Config** | 服务记录导入入口；当前实现限制及备份建议见第 8.9 节 |
+
+**应用日志文件与清理规则**：
+
+- 在 `LOG_DIR` 中分别保存 `backend-YYYY-MM-DD.log` 与 `frontend-YYYY-MM-DD.log`，每行采用 JSON 格式。按 UTC 日期轮转，单文件约 20 MB 后分片，分片文件同样受保留期管理。
+- 后端启动时立即清理，此后每小时检查一次；保存应用日志保留天数时，也会立即按新值执行清理。
+- 保留期按 UTC 日期计算，包含当天；例如设为 1 天只保留当前 UTC 日期文件，不是精确滚动的 24 小时。
+- **缩短保留期可能立即删除旧日志，无法撤销**。需要留存时，应在保存设置之前备份对应日志文件。
+- 此设置只清理上述应用日志及其分片，不清理浏览器控制台、Docker/Nginx 日志，也不清理独立的 `health-check-debug.log`；这些日志需单独管理。
+
+**前端采集范围与限制**：
+
+- 采集 `console.warn`、`console.error`、Vue 错误、浏览器未处理异常/Promise 拒绝及资源加载错误；不采集普通 `console.log` 或 `console.info`。
+- 仅浏览器持有登录 Token 时尝试排队上报，后端仍会验证账号和 Token；未登录或认证失败时，不保证存在前端日志文件记录。
+- 前端约每 5 秒发送一次，每批最多 5 条；队列最多 20 条，每条消息截取前 2000 字符。离开页面时会尝试发送，但网络异常、限流和页面关闭都可能造成丢失，失败批次不会保证重试。
+- 上报日志为尽力而为的诊断数据，不是完整审计记录。文件写入会尝试脱敏部分常见敏感字段，但不能保证识别所有秘密；不要主动输出密码、密钥或个人敏感信息。
+- 当前没有应用内日志查询或下载页面；请通过有权限的文件系统访问读取日志。排查缺失记录的步骤见第十八章 Q9。
 
 ### 14.4 依赖类型管理
 
@@ -1084,9 +1165,9 @@ Grafana 集成功能允许将外部 Grafana 仪表板嵌入到 OpsMonitor 界面
 2. 点击 **Add Custom Type** 创建新的依赖类型，配置名称、图标和颜色
 3. **系统内置类型**（System）不可删除，自定义类型可编辑和删除
 
-### 14.5 通知配置（全局）
+### 14.5 通知配置入口
 
-全局通知配置用于设置系统级别的邮件 SMTP 和 Teams Webhook，与[告警配置页面](#第十一章告警配置)共享同一套通知渠道配置。
+系统设置页没有 SMTP/Teams 配置区。请进入[告警配置页面](#第十一章告警配置)配置和测试全局通知渠道。
 
 ---
 
@@ -1125,7 +1206,9 @@ Grafana 集成功能允许将外部 Grafana 仪表板嵌入到 OpsMonitor 界面
 1. 在用户列表中找到目标用户
 2. 点击 **Actions** 列的编辑按钮
 3. 在编辑对话框中修改角色（Admin / Viewer）或状态（Active / Inactive）
-4. 权限变更**立即生效**，该用户下次操作时将使用新权限
+4. 角色变更后，请让用户退出并重新登录，以刷新 Token 和界面中的角色；已有 Token 保留签发时的角色，最长有效期 24 小时。禁用或删除账号会在受认证保护的接口下次验证时拒绝访问，但不能替代尚未保护接口的权限校验
+
+> 最后一个管理员不可降级为 Viewer；请先建立并验证另一个管理员账号。
 
 ### 15.4 重置密码
 
@@ -1140,7 +1223,8 @@ Grafana 集成功能允许将外部 Grafana 仪表板嵌入到 OpsMonitor 界面
 
 > ⚠️ **限制**：
 > - 管理员无法删除自己的账号
-> - 删除操作不可撤销，账号下的历史数据将一并清除
+> - 不可删除最后一个管理员账号
+> - 删除不可撤销，但只删除用户账号，不会自动清除监控历史或服务记录
 
 ---
 
@@ -1148,14 +1232,14 @@ Grafana 集成功能允许将外部 Grafana 仪表板嵌入到 OpsMonitor 界面
 
 ### 16.1 本地检查类型
 
-以下检查类型从监控服务器直接发起，不经过 SSH：
+执行位置取决于主机连接模式，具体见下表。SSH 主机上的网络及脚本检查通过 SSH 执行，文件/日志检查要求 SSH。
 
 | 检查类型 | 适用主机 | 主要配置参数 | 说明 |
 |---------|---------|------------|------|
 | **TCP** | Local / SSH | 主机、端口 | 验证端口是否开放并可接受连接 |
 | **HTTP** | Local / SSH | 主机、端口、路径、期望状态码、超时 | 发送 HTTP GET 请求验证响应 |
-| **HTTPS** | Local / SSH | 同 HTTP，含 SSL 验证 | 支持 TLS/SSL 证书有效性检查 |
-| **Script** | Local / SSH | 脚本类型、脚本内容、期望退出码 | 在监控服务器本地执行自定义脚本 |
+| **HTTPS** | Local / SSH | 同 HTTP | HTTPS 响应检查；当前不校验证书信任，到期监控见第十二章 |
+| **Script** | Local / SSH | 脚本类型、脚本内容、期望退出码 | Local 主机在监控服务器执行，SSH 主机在远程目标执行 |
 | **File Monitor** | 需配置 SSH | 模式、路径、检查类型、最大年龄等 | 通过 SSH 在目标主机执行文件检查 |
 | **Log Monitor** | 需配置 SSH | 模式、路径、内容匹配模式 | 通过 SSH 监控日志文件内容变化 |
 
@@ -1221,7 +1305,7 @@ Grafana 集成功能允许将外部 Grafana 仪表板嵌入到 OpsMonitor 界面
    - Mode: Single File
    - File Path: `/var/data/job-output/result.csv`
    - Check Type（高级选项）: `modified`
-   - Max Age: `3600`（秒）
+   - Max Age: `60`，单位选择 **分钟**（或 `1` **小时**）
 
 若文件超过 1 小时未更新，服务状态将变为 WARNING/DOWN。
 
@@ -1255,7 +1339,7 @@ fi
 
 ### 场景五：跨环境服务依赖影响分析
 
-**目标**：微服务架构下，某服务故障时快速识别受影响的上游服务
+**目标**：微服务架构下，某服务故障时快速识别依赖它的下游服务
 
 **配置步骤**：
 1. 在各服务的编辑页面 **Dependencies** 区域，配置服务间的依赖关系
@@ -1364,8 +1448,8 @@ kill -9 <PID>
 
 **解决方案**：
 1. 确认 JSON 文件是由本系统 **Export** 功能导出的标准格式
-2. 在导入目标环境中提前创建所需的项目和主机
-3. 查看浏览器控制台或后端日志中的具体错误信息
+2. 当前导入存在参数绑定及字段恢复限制，提前创建项目和主机也不能保证成功，详见第 8.9 节
+3. 查看后端日志中的参数绑定/SQL 错误；修复并验证导入实现前，不要用于正式环境迁移
 
 ---
 
@@ -1401,6 +1485,16 @@ kill -9 <PID>
 
 ---
 
+### Q9：在哪里查看应用日志？为什么前端日志缺失？
+
+1. 先确认后端实际使用的 `LOG_DIR`。本地默认是 `backend/logs`；当前 Compose 部署的宿主机目录是 `/opt/OpsMonitor/backend/data/logs`。按 UTC 日期查找 `backend-*.log` 或 `frontend-*.log` 及分片。
+2. 没有文件时，检查目录写权限、磁盘空间和后端控制台中的 `Application log write failed`。应用日志保留规则不控制 Docker/Nginx 等独立日志，详见第 14.3 节。
+3. 前端仅上报警告和错误，普通日志、登录前的错误或已超出队列/截取范围的内容不会完整落盘。确认已登录，检查浏览器网络请求 `POST /api/logs/frontend` 是否发出。
+4. `204` 表示接口已接收请求，不保证日志文件已持久化；`400` 表示请求格式不合法，`401` 表示登录状态无效，`429` 表示触发用户限流。网络失败或页面退出也可能丢失记录，此时结合浏览器控制台和后端日志排查。
+5. 旧日志可能已经按 UTC 日期清理。先备份现有文件，再按需增加保留天数；增加天数无法恢复已删除日志。
+
+---
+
 ## 附录 A：API 接口速查表
 
 | 方法 | 接口路径 | 说明 |
@@ -1408,6 +1502,8 @@ kill -9 <PID>
 | POST | `/api/auth/login` | 用户登录，返回 JWT Token |
 | POST | `/api/auth/register` | 用户注册 |
 | GET | `/api/auth/me` | 获取当前登录用户信息 |
+| PUT | `/api/auth/profile` | 更新个人资料 |
+| PUT | `/api/auth/password` | 修改当前用户密码 |
 | GET/POST/PUT/DELETE | `/api/users` | 用户管理（仅 Admin） |
 | GET/POST/PUT/DELETE | `/api/projects` | 项目管理 |
 | GET | `/api/projects/:id/graph` | 获取项目依赖图数据 |
@@ -1415,6 +1511,9 @@ kill -9 <PID>
 | POST | `/api/hosts/:id/test-connection` | 测试主机 SSH 连接 |
 | POST | `/api/hosts/test-all` | 批量测试所有主机连接 |
 | GET/POST/PUT/DELETE | `/api/services` | 服务管理 |
+| GET | `/api/services/:id/details` | 服务详情、最近检查、历史和依赖（需登录） |
+| PATCH | `/api/services/batch` | 批量更新服务 |
+| POST | `/api/services/layout` | 保存服务拓扑布局 |
 | GET | `/api/services/export` | 导出所有服务配置（JSON） |
 | POST | `/api/services/import` | 导入服务配置 |
 | PUT | `/api/services/:id/schedule` | 更新服务调度配置 |
@@ -1428,18 +1527,27 @@ kill -9 <PID>
 | GET/POST/PUT/DELETE | `/api/dependency-types` | 依赖类型管理 |
 | GET | `/api/alerts` | 获取告警历史记录 |
 | GET | `/api/alerts/unacknowledged/count` | 获取未确认告警数量 |
+| POST | `/api/alerts/acknowledge` | 确认告警（全局已读状态） |
 | GET/PUT | `/api/config/notifications` | 通知渠道配置 |
 | PUT | `/api/config/notification-lang` | 设置通知语言偏好 |
 | POST | `/api/config/notifications/test` | 发送测试通知 |
 | GET/POST/PUT/DELETE | `/api/security-configs` | 安全配置管理 |
+| GET | `/api/security-configs/stats` | 安全配置状态统计 |
+| POST | `/api/security-configs/:id/extend` | 非 SSL 配置续期 |
+| POST | `/api/config/security-check/trigger` | 手动检查安全配置及 SSL 证书（仅 Admin） |
 | GET | `/api/security-configs/check/expiring` | 获取即将过期的安全配置 |
 | GET/POST/PUT/DELETE | `/api/grafana-dashboards` | Grafana 仪表板管理 |
 | GET | `/api/system-settings` | 获取所有系统设置 |
 | GET/PUT | `/api/system-settings/:key` | 获取或更新指定系统设置 |
+| POST | `/api/logs/frontend` | 前端诊断日志上报（需登录，非日志查询接口）；成功返回 204 |
 | GET | `/api/ssh/pool-stats` | SSH 连接池状态 |
 | GET | `/api/schedule/templates` | 获取调度模板列表 |
 | POST | `/api/schedule/preview` | 预览调度执行时间 |
 | POST | `/api/schedule/validate` | 验证调度配置 |
+
+> CRUD 为资源接口族的简写，更新/删除通常需追加 `/:id`。角色说明代表预期用途；当前并非所有接口均已实施认证与授权，请勿将本表作为安全保证。
+
+`POST /api/logs/frontend` 接受 `{ "entries": [{ "level": "error", "message": "example" }] }`。每批 1–20 条，仅支持 `warn`/`error`，每条消息 1–4096 字符；按用户 ID 限制每分钟 60 次请求，格式错误返回 400，认证失败返回 401，限流返回 429。前端实际发送的批次和消息上限更小，见第 14.3 节。
 
 ---
 
@@ -1447,7 +1555,10 @@ kill -9 <PID>
 
 | 快捷键 | 功能 |
 |--------|------|
-| `ESC` | 关闭当前弹窗或对话框 |
-| `Ctrl + R` | 刷新当前页面数据 |
+| `ESC` | 关闭可关闭的弹窗；拓扑自定义模式中清空选择 |
+| `Ctrl + R` | 浏览器重新加载整页，并非应用内局部刷新 |
+| `Shift + 拖动` | 拓扑自定义模式：框选节点 |
+| `Ctrl/Cmd + 点击` | 拓扑自定义模式：多选节点 |
+| `Ctrl/Cmd + A` | 拓扑自定义模式：全选节点 |
 
 ---

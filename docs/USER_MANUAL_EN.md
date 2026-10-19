@@ -1,8 +1,10 @@
 # OpsMonitor Service Monitoring System — User Manual
 
 > **Version**: 2.2.0
-> **Updated**: 2026-03-16
+> **Updated**: 2026-10-19
 > **Scope**: OpsMonitor Service Monitoring System (Frontend port: 5173, Backend port: 3000)
+
+> Revised against the current source code. Features marked as limited or coming soon are not complete. Existing screenshots are for orientation; follow the text for newly documented operations.
 
 ---
 
@@ -88,6 +90,8 @@ The system provides two user roles:
 
 > Newly registered accounts default to the **Viewer** role. An administrator must manually upgrade them to Admin.
 
+> **Current security limitation**: Some write endpoints do not enforce administrator authorization. Hidden or disabled UI buttons are not a complete API security boundary. Restrict production network access; do not rely on the Viewer role alone to protect configuration.
+
 ### 1.4 Technology Stack
 
 | Layer | Technologies |
@@ -106,7 +110,7 @@ The system provides two user roles:
 
 | Component | Minimum Version | Notes |
 |-----------|----------------|-------|
-| Node.js | 18.0+ | Required for local development |
+| Node.js | 20.19+ (20.x) or 22.12+ | Required by Vite 7; use a supported Node.js 22.12+ release |
 | npm | Bundled with Node.js | Package manager |
 | Docker | 20.10+ | For production deployment |
 | Docker Compose | v2.0+ | For production deployment |
@@ -157,25 +161,31 @@ Docker will automatically build and start both frontend and backend — **no nee
 | Backend | 3000 | Express API service |
 | Database | — | SQLite file, persisted to `/opt/OpsMonitor/backend/data` |
 
+Application logs are written to `/app/data/logs` in the container and persisted through the same data volume to `/opt/OpsMonitor/backend/data/logs` on the host. Ensure the backend user can write to the directory and monitor disk space: date-based retention is not a total disk-capacity limit.
+
+> The current Compose file uses `network_mode: host`: services listen directly on the host ports above. Confirm that your Docker environment supports and enables host networking; Windows/macOS behavior should not be assumed identical to Linux.
+
 ### 2.4 Environment Variables
 
-**No configuration files are required for any deployment mode.** All defaults are built into the project and work out of the box.
+Local startup reads process environment variables. The current entry point does not automatically load `backend/.env`; creating that file alone has no effect. For example, set variables in the same PowerShell terminal used to start the backend:
 
-Only create a `.env` file in the `backend/` directory when you need to override defaults:
-
-```env
-NODE_ENV=development
-PORT=3000
-DB_PATH=./data/monitor.db
-JWT_SECRET=your-secret-key-here
+```powershell
+$env:NODE_ENV = 'development'
+$env:PORT = '3000'
+$env:DB_PATH = './data/monitor.db'
+$env:JWT_SECRET = '<replace-with-an-independently-generated-strong-random-secret>'
+npm run dev
 ```
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NODE_ENV` | `production` | Runtime mode |
-| `PORT` | `3000` | Backend listen port |
-| `DB_PATH` | `/app/data/monitor.db` | SQLite database file path |
+| Variable | Local Default | Docker Compose Value / Notes |
+|----------|---------------|------------------------------|
+| `NODE_ENV` | Unset; startup logs fall back to `development` | `production` |
+| `PORT` | `3000` | `3000`, backend listen port |
+| `DB_PATH` | `monitor.db` in the backend directory | `/app/data/monitor.db`; custom relative paths resolve from the process working directory |
+| `LOG_DIR` | `logs` under the backend directory | `/app/data/logs`, shared storage for frontend and backend application logs; custom relative paths resolve from the process working directory |
 | `JWT_SECRET` | `opsmonitor-secret-key-change-in-production` | JWT signing key — **must be changed in production** |
+
+For Docker, explicitly add `JWT_SECRET` to the backend `environment` in `docker-compose.yml`, for example `JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET}`, provide the value through the host environment or Compose `.env`, and recreate the container. The current Compose file does not pass this variable through: setting it on the host or creating `backend/.env` alone is insufficient. Never commit real secrets. Rotating the key invalidates existing login tokens.
 
 ### 2.5 Access URLs
 
@@ -298,6 +308,8 @@ The system supports **Chinese (Simplified)** and **English** interface languages
 | After manual switch | Language preference is saved to local storage and automatically applied on next visit |
 | Alert notifications | Language preference syncs to the backend; Email and Teams alert notifications will be sent in the same language |
 
+> Notification language is a global backend setting, not a per-user preference. Changing language in another browser can overwrite it.
+
 ---
 
 ## Chapter 5: Overview Dashboard
@@ -344,7 +356,7 @@ Refresh controls are available in the top-right corner of the page:
 
 ### 5.4 Filter by Project
 
-Use the **project selector at the top of the left navigation menu** to switch between viewing specific project data. After selecting a project, all dashboard statistics automatically filter to show data within that project's scope.
+Use the **project selector at the top of the left navigation menu** to switch projects. Service statistics are filtered by project; System Overview appears only in the All Projects global view.
 
 ---
 
@@ -484,6 +496,8 @@ Choose **SSH** or **Local**:
 |-------|---------|-------------|
 | Host Check Interval | — | Host connectivity check interval (60-3600 seconds). SSH mode checks via SSH connection; Local mode checks via Ping |
 
+The default host check interval is **300 seconds**. Host cards and the table provide a monitoring toggle for scheduled host connectivity checks. It does not turn off associated services' independent schedules; pause each service separately when required.
+
 **Other Fields**:
 
 | Field | Description |
@@ -522,7 +536,9 @@ The add/edit host dialog provides a **Connection Test** feature:
 - **Edit**: Click the **Edit** button on the host card, or click the edit icon in table view
 - **Delete**: Click the **Delete** button and confirm
 
-> Before deleting a host, ensure there are no active monitoring services on it — otherwise, related service checks will fail.
+> Normal deletion is blocked whenever services are associated with the host, regardless of whether they are running. Resolve associations first. The backend API also supports `reassign_to=<host_id>` (move services), `orphan=true` (remove associations), or `force=true` (delete the host and its services); the current UI does not offer these choices. Forced deletion can cause irreversible data loss.
+
+When editing host IP, SSH, or connection details, review the associated-service synchronization warning and verify affected targets and connection settings after saving.
 
 ---
 
@@ -595,8 +611,8 @@ Click the **Add Service** button to launch the add service wizard (multi-step gu
 - Description: Sends an HTTP GET request and verifies the response status code
 
 **HTTPS Check**:
-- Configuration fields: Same as HTTP, with additional SSL certificate verification
-- Description: Checks via HTTPS protocol, also validates SSL/TLS certificate validity
+- Configuration fields: Same as HTTP
+- Description: Checks the HTTPS response status and can retrieve certificate expiry information. Certificate trust verification is currently disabled, so a successful check does not prove that a certificate is trusted or unexpired. Use SSL Certificate in Security Configuration for independent expiry monitoring
 
 **Script Check**:
 
@@ -677,14 +693,14 @@ Alert Trigger is recommended to be set between Warning and Error
 | ✉️ DOWN notification | count = Alert Trigger and current status is DOWN **or** count = Error Threshold (escalation supplement from WARNING to DOWN) |
 | ✉️ RECOVERY notification | Service recovers (status changes to UP), and an alert was previously sent |
 
-> When count exceeds Alert Trigger but the service has not recovered: silent, no repeated notifications.
+> Continuing failures do not repeat the first alert; an already-alerted WARNING can still generate one DOWN escalation notification.
 
-**Time estimation formula**:
+**Fixed-interval time estimates** (assuming failure begins immediately after the previous check and ignoring execution time):
 
 ```
-Earliest WARNING notification time = Alert Trigger × Check Interval
-Earliest DOWN notification time    = Error Threshold × Check Interval
-Earliest RECOVERY notification time = up to 1 × Check Interval after recovery
+Expected first WARNING = Alert Trigger x Check Interval (effective status must be WARNING)
+Expected DOWN escalation = Error Threshold x Check Interval (a prior alert is required)
+Expected RECOVERY wait = approximately 0-1 x Check Interval after recovery (prior alert required)
 ```
 
 **Typical configuration examples** (Check Interval = 30s):
@@ -707,7 +723,9 @@ Earliest RECOVERY notification time = up to 1 × Check Interval after recovery
 | T+150s | 5 | 🔴 DOWN | ✉️ DOWN notification (= 5×30s) |
 | Recovery+30s | — | 🟢 UP | ✉️ RECOVERY notification |
 
-> When Alert Trigger = Error Threshold, the WARNING phase is skipped and a single DOWN notification is sent directly.
+> When Alert Trigger = Error Threshold, the WARNING notification is skipped and a single DOWN notification is sent directly; the displayed status can still pass through WARNING.
+
+> Timelines estimate fixed-interval, continuously failing checks that complete normally; scheduling and execution time affect actual delivery. A first alert sent directly as DOWN depends on Alert Trigger. Use `Warning <= Alert Trigger <= Error`. If Alert Trigger is below Warning, the effective status at the first trigger is still suppressed to UP, so the expected alert may never be generated. With Alerts disabled, the current implementation also bypasses failure-count suppression and uses raw check status directly.
 
 ### 8.6 Dependency Configuration
 
@@ -744,14 +762,16 @@ On the service list page, selecting multiple services reveals a batch operation 
 
 The service list page provides configuration import/export functionality:
 
-- **Export**: Export all service configurations as a JSON file for backup or environment migration
-- **Import**: Batch import service configurations from a JSON file
+- **Export**: Export all service records as JSON, regardless of the current project filter; separate projects, hosts, security configurations, users, and history are not included
+- **Import**: Import a JSON array of service records; matching IDs are treated as updates
 
-### 8.9 Manually Trigger a Health Check
+> **Current limitation**: The import implementation has a SQL parameter-count mismatch and does not fully restore project/host associations, schedules, or script/file settings. Do not use it as a reliable migration or complete backup/restore mechanism. Back up SQLite at the actual `DB_PATH` and verify recovery before important operations. Use a consistent SQLite backup method for a running database, or stop the backend before backing it up.
+
+### 8.10 Manually Trigger a Health Check
 
 In the service list, click the **run button (▶)** on a service row to immediately trigger a health check without waiting for the next scheduled cycle. Results update in real-time on the page.
 
-### 8.10 Service Status Reference
+### 8.11 Service Status Reference
 
 | Status | Color | Meaning |
 |--------|-------|---------|
@@ -759,6 +779,19 @@ In the service list, click the **run button (▶)** on a service row to immediat
 | **WARNING** | 🟠 Orange | Consecutive failures reached the Warning threshold |
 | **DOWN** | 🔴 Red | Consecutive failures reached the Error threshold |
 | **UNKNOWN** | Gray | No check has been executed yet, or monitoring is disabled |
+
+### 8.12 Service Details & History
+
+Click a **service name** in the list to open its details drawer. The topology graph also provides a details entry point:
+
+| Tab | Contents |
+|-----|----------|
+| **Overview** | Target, project, host, check method, risk, latest result and error; expand output when available |
+| **History** | Latest 20 or 50 checks, including status, duration and errors; expand output when available and permitted |
+| **Dependencies** | Services depended on and dependent services, with type, risk and description |
+| **Configuration** | Monitoring/alert switches, schedule, thresholds, failure count and check settings |
+
+The header can show service paused, host paused, or stale-data indicators. For fixed-interval services, data is stale when the latest record is older than `max(2 x check interval, 60 seconds)`; this is not itself a failed check. Administrators can run a check or open editing from the footer. Viewers can inspect details but do not receive run/edit buttons in this drawer.
 
 ---
 
@@ -819,6 +852,12 @@ The preview area also includes an **Execution Plan (Next 24 Hours)** timeline th
 | Service Edit Form → Schedule Configuration Panel | Configure scheduling for a single service independently |
 | System Settings → Default Check Interval | Set the default fixed interval for new services |
 
+### 9.4 Default Interval & Rule Limits
+
+- In Time Rules mode, **Default Interval** applies when no enabled rule matches. Monitoring does not automatically stop outside the configured ranges.
+- Rules support names, enable/disable switches and weekdays. Fixed/default intervals allow 10-86400 seconds; intervals within a rule allow 10-3600 seconds.
+- Execution Preview helps inspect matched rules and upcoming plans; it does not guarantee exact execution times. The preview API currently formats time using Asia/Shanghai rather than following the system timezone everywhere.
+
 ---
 
 ## Chapter 10: Dependency Topology Graph
@@ -835,11 +874,13 @@ The dependency topology graph visualizes all services within a project and their
 
 | Operation | Method |
 |-----------|--------|
-| **Drag Nodes** | Click and drag a node to rearrange the layout |
+| **Drag Nodes** | Administrators enter Customize Layout, then drag nodes |
 | **Zoom Canvas** | Scroll wheel to zoom, or use control buttons |
 | **Pan Canvas** | Click and drag on blank area |
-| **View Service Details** | Click a node to display service status and check info in the right panel |
-| **Reset Layout** | Click the Reset Layout button to restore automatic layout |
+| **View Service Details** | Use the node's service details entry point to open the details drawer |
+| **Save Layout** | Administrators adjust nodes in Customize Layout mode and click Save Layout |
+
+Administrators should enter **Customize Layout**, make adjustments, click **Save Layout**, then exit customization. Box selection, multiple selection and group movement are supported. Dragging alone should not be treated as a persisted change. Viewers cannot edit layouts or dependencies. The interactive canvas also supports adding, editing and deleting dependency links.
 
 ### 10.2 Node & Edge Meanings
 
@@ -876,7 +917,15 @@ When the **Impact Analysis** toggle at the top of the page is enabled and there 
 
 The **Security Panel** on the right side of the topology graph displays:
 - Security configuration status associated with the project
-- Credential expiration reminders (within 30 days) for timely operations team action
+- Configuration status and an expiring filter, using the 7/3-day thresholds in Chapter 12
+- Failure information for unverified SSL certificates, rather than treating an unknown expiry as expired
+
+Long security configuration notes scroll independently within the notes area and support keyboard focus. Scrolling a note is separate from scrolling the security panel list.
+
+### 10.5 Status of Other Navigation Entries
+
+- **Connections (`/connections`)**: Currently edits sample data held only in frontend memory, with no backend persistence API for connection entities. Reloading or re-entering the page discards changes. Configure actual SSH connections in host settings.
+- **Cross-Project Dependencies (`/cross-deps`)**: The standalone page has a Coming Soon overlay and is not a supported production configuration workflow. Cross-project associations in project topology do not imply that this standalone page is complete.
 
 ---
 
@@ -922,11 +971,13 @@ After configuration, click the **Test Teams** button to send a test notification
 
 | Event | Trigger Condition | Notification Content |
 |-------|-------------------|---------------------|
-| **Warning** | Consecutive failures ≥ Warning Threshold | Service entered WARNING state notification |
-| **Fault** | Consecutive failures ≥ Error Threshold | Service entered DOWN state notification |
-| **Recovery** | Service recovered from fault to UP | Recovery notification |
+| **First warning/fault** | Failure count exactly reaches Alert Trigger, with effective status WARNING/DOWN | Notification for that status |
+| **Fault escalation** | An alert was already generated, count reaches Error Threshold, and effective status is DOWN | Additional WARNING-to-DOWN notification |
+| **Recovery** | Raw check returns UP and an alert was previously generated | Recovery notification and failure-count reset |
 
 > The service-level **Alerts** toggle must be enabled for that service's alert notifications to be sent.
+
+Repeated notifications are suppressed during a continuing failure; see Section 8.5 for thresholds and edge cases. SMTP/Teams editing and test buttons are available to administrators. Save changed settings before sending a test notification.
 
 ### 11.4 Alert History
 
@@ -936,9 +987,13 @@ The **Alert History** card at the bottom of the page displays all historical ale
 |-------|-------------|
 | Time | Time the alert occurred |
 | Service | Name of the service that triggered the alert |
-| Type | Alert type (warning / error / recovery) |
+| Type | Alert type (warning / down / recovery / expiry); expiry identifies security configuration reminders |
 | Message | Detailed alert content |
 | Notified | Whether the notification was successfully sent |
+
+### 11.5 Header Notification Center
+
+Click the header bell to view recent alerts; its badge shows the unacknowledged count. Opening the list automatically acknowledges existing alerts, and an acknowledgement action is also available. Acknowledgement means read, not recovered or successfully delivered. Read status is currently global, not maintained separately for each user.
 
 ---
 
@@ -960,16 +1015,15 @@ The security configuration module centrally manages expiration dates for various
 
 ### 12.2 Add a Security Configuration
 
-1. Click the **Add** button in the top-right corner
-2. Fill in the configuration information:
-   - **Name** (required): Display name, e.g., `aws-prod-access-key`
-   - **Type** (required): Select configuration type (AccessKey / Password / SSL Certificate)
-   - **Validity Period**: Validity period in days (default 60 days)
-   - **Expiry Date** (required): Expiration date
-   - **Reminder Rules**: Check reminders for 7 days / 3 days / 1 day before expiration
-   - **Affected Services**: Associate affected services (selectable by project group)
-   - **Notes** (optional): Additional notes
-3. Click Save
+As an administrator, click **Add**, select a type, and fill in the corresponding fields.
+
+**AccessKey / Password**: Enter a name and choose an expiry mode:
+- **Explicit expiry date**: Select the expiration date directly.
+- **Reset date + validity period**: Select a reset date and enter 1-365 days (default 60); the expiry date is calculated automatically.
+
+**SSL Certificate**: Enter a domain such as `example.com`. The backend retrieves the name and expiry date from the domain's **443** port; these fields are not entered manually. Only domain names are accepted, not IP addresses, `localhost`, full URLs or ports. Saving immediately reads the certificate; a failed read displays an error and does not save the attempted change.
+
+Both types support reminder rules (7/3/1 days), affected services and notes. Ensure that the backend network can resolve and reach the domain. SSL operations require administrator access.
 
 ### 12.3 Expiration Status Reference
 
@@ -977,25 +1031,30 @@ The system automatically calculates and displays status based on remaining valid
 
 | Status | Color | Trigger Condition |
 |--------|-------|-------------------|
-| **Normal** | 🟢 Green | More than 30 days until expiration |
-| **Warning** | 🟠 Orange | ≤ 30 days until expiration |
-| **Critical** | 🔴 Red | ≤ 7 days until expiration |
-| **Expired** | Gray | Past the expiration date |
+| **Normal** | 🟢 Green | Days remaining > 7 |
+| **Warning** | 🟠 Orange | 3 < days remaining ≤ 7 |
+| **Critical** | 🔴 Red | 0 < days remaining ≤ 3 |
+| **Expired** | Gray | Days remaining ≤ 0 |
+| **Unverified** | Follow the UI indicator | TLS inspection detected; the origin certificate expiry cannot be verified |
 
 The four statistics cards at the top of the page summarize counts for each status (Normal / Warning / Critical / Expired) for quick global assessment.
 
+Days remaining are rounded up from the time difference. SSL rows also show the last check time and failure reason. When a TLS inspection product such as Zscaler is detected, unknown expiry is not counted as expired; bypass TLS inspection for that domain and retry. Other network errors retain the previous expiry date, so inspect the failure message before relying on that value.
+
 ### 12.4 Manually Trigger Expiry Check
 
-Click the **Check Expiry Now** button in the top-right corner. The system will immediately perform an expiry check on all security configurations and send reminders for those about to expire through the configured notification channels.
+Administrators can click **Check Expiry Now** to check all security configurations and retrieve SSL certificates again. Checks also run at backend startup and every hour thereafter.
+
+The largest selected reminder day defines the reminder window: selecting 7/3/1 days allows at most one reminder per day when days remaining are <=7, rather than sending only on days 7, 3 and 1. Expired items can still trigger daily reminders. Manual checks respect the same daily deduplication, so clicking does not guarantee a notification. Recovery to Normal can generate a recovery notification; unverified SSL certificates skip expiry alerts.
 
 ### 12.5 Other Page Operations
 
 | Operation | Description |
 |-----------|-------------|
 | **Type Filter** | Filter the list by configuration type (AccessKey / FTP Password / SSL Certificate) |
-| **Status Filter** | Filter the list by expiry status (Normal / Warning / Critical / Expired) |
+| **Status Filter** | Filter using the expiry states offered by the UI; inspect row messages for unverified SSL certificates |
 | **Search** | Search by name keyword |
-| **Extend** | Quickly extend the validity period: enter the number of extension days in the **Confirm Extension** dialog |
+| **Extend** | Non-SSL items only: set a future expiry date directly, or calculate it from a reset date plus 1-365 days |
 | **Edit** | Modify configuration details |
 | **Delete** | Delete the configuration record |
 
@@ -1014,17 +1073,21 @@ Grafana integration allows embedding external Grafana dashboards into the OpsMon
 1. Click the **Add Dashboard** button
 2. Fill in Grafana connection information:
    - **Grafana URL**: Grafana server address, e.g., `http://grafana.company.com:3000`
-   - **API Key** (optional): If the Grafana dashboard requires authentication, enter the API Key
+   - **API Key** (optional): Used by the backend to query Grafana dashboards and panels
 3. Click **Test Connection** to verify connectivity
-4. After successful connection, select the Dashboard to embed from the dropdown menu
+4. After successful connection, select a Dashboard from the dropdown; if no list is available, enter its Dashboard UID manually
 5. Fill in additional information:
    - **Dashboard Name**: Display name in OpsMonitor
-   - **Project**: Associated project
+   - **Projects**: Associate multiple projects
+   - **Service** (optional): Associate a service
    - **Panel ID** (optional): Specify to embed a specific panel instead of the entire dashboard
 6. **Embed Options**:
    - Theme (Light / Dark)
    - Auto-refresh interval
    - Whether to hide the top navigation bar
+   - Time range, display order and enabled state
+
+> The API Key does not automatically establish a browser login session for the iframe. Grafana must allow embedding and provide appropriate anonymous access or browser authentication. Check HTTPS mixed-content and cross-site cookie restrictions as well. A successful connection test does not guarantee that embedding will work.
 
 ### 13.2 View Grafana Dashboards
 
@@ -1051,10 +1114,12 @@ The system settings page configures global parameters. **Only administrators can
 
 | Setting | Description |
 |---------|-------------|
-| **System Timezone** | System timezone, affects backend log timestamps and UI time display. Supports common timezones including UTC, Asia/Shanghai, etc. |
-| **Date Format** | Date/time display format, default `YYYY-MM-DD HH:mm:ss` |
+| **System Timezone** | Used by the shared logger and this page's time preview; supports UTC, Asia/Shanghai, etc. Not all pages or notifications follow it |
+| **Date Format** | Saves a format preference, default `YYYY-MM-DD HH:mm:ss`; not currently applied consistently across pages |
 
 After changing the timezone, the page displays the current real-time clock in the selected timezone for confirmation.
+
+Application log file rotation and JSON `timestamp` values use UTC regardless of this setting. Log timestamps embedded in backend message text can still use the system timezone.
 
 ### 14.2 Service Default Configuration
 
@@ -1071,10 +1136,26 @@ Global defaults used when creating new services, which can be overridden by serv
 
 | Setting | Description |
 |---------|-------------|
-| **Log Retention Days** | Number of days to retain backend logs; expired logs are automatically cleaned up |
-| **Data Retention Days** | Number of days to retain health check records in the database; expired data is automatically cleaned up to save storage |
-| **Export Config** | Export all service configurations as a JSON file (for backup or environment migration) |
-| **Import Config** | Batch import service configurations from a JSON file |
+| **Application Log Retention** | Shared retention for frontend-reported and backend application logs; default 30 days, integer range 1-365, editable by administrators only |
+| **Data Retention Days** | Check-record retention: cleanup runs at backend startup and every 24 hours, not at a fixed 02:00 daily |
+| **Export Config** | Exports service records as JSON, not a complete system backup |
+| **Import Config** | Service-record import entry point; see Section 8.9 for current limitations and backup advice |
+
+**Application log files and cleanup**:
+
+- `LOG_DIR` contains separate `backend-YYYY-MM-DD.log` and `frontend-YYYY-MM-DD.log` files, with one JSON record per line. Files rotate by UTC date and split at approximately 20 MB; split files follow the same retention policy.
+- Cleanup runs at backend startup and every hour thereafter. Saving Application Log Retention also immediately applies cleanup using the new value.
+- Retention counts UTC dates including today. A value of 1 retains only the current UTC date, not a rolling 24-hour window.
+- **Reducing retention can immediately and irreversibly delete old logs**. Back up files before saving if they must be preserved.
+- This setting cleans only the application logs above and their split files. It does not clear the browser console, Docker/Nginx logs, or the separate `health-check-debug.log`; manage those independently.
+
+**Frontend collection and limitations**:
+
+- Captures `console.warn`, `console.error`, Vue errors, browser unhandled errors/Promise rejections and resource-load errors; ordinary `console.log` and `console.info` are not collected.
+- The browser queues reports only when it holds a login token; the backend still validates the account and token. Errors before login or during authentication failures are not guaranteed to appear in frontend log files.
+- The frontend attempts to send every 5 seconds, up to 5 entries per batch. Its queue holds at most 20 entries and messages are truncated to 2000 characters. It also attempts to send when leaving the page, but network failures, rate limits and page closure can lose records; failed batches are not guaranteed to be retried.
+- Reports are best-effort diagnostic data, not a complete audit trail. File logging attempts to redact some common sensitive fields but cannot identify every secret. Do not deliberately log passwords, keys or sensitive personal information.
+- There is currently no in-app log search or download page. Read files through authorized filesystem access. See Chapter 18, Q9 for missing-log troubleshooting.
 
 ### 14.4 Dependency Type Management
 
@@ -1084,9 +1165,9 @@ The system comes with several preset dependency types (e.g., "Strong Dependency"
 2. Click **Add Custom Type** to create a new dependency type with custom name, icon, and color
 3. **System built-in types** (System) cannot be deleted; custom types can be edited and deleted
 
-### 14.5 Notification Configuration (Global)
+### 14.5 Notification Configuration Entry Point
 
-Global notification configuration sets system-level Email SMTP and Teams Webhook settings, sharing the same notification channel configuration as the [Alert Configuration page](#chapter-11-alert-configuration).
+System Settings has no SMTP/Teams configuration section. Configure and test global notification channels on the [Alert Configuration page](#chapter-11-alert-configuration).
 
 ---
 
@@ -1125,7 +1206,9 @@ Click the **Add User** button in the top-right corner. Fill in username, email, 
 1. Find the target user in the user list
 2. Click the edit button in the **Actions** column
 3. Modify the role (Admin / Viewer) or status (Active / Inactive) in the edit dialog
-4. Permission changes take effect **immediately** —the user will use the new permissions on their next operation
+4. After a role change, ask the user to sign out and back in to refresh the token and UI role. Existing tokens retain the role assigned when issued and last up to 24 hours. Disabling or deleting an account rejects its next request to an authenticated endpoint; this does not protect endpoints that lack authentication
+
+> The last administrator cannot be demoted to Viewer. Create and verify another administrator first.
 
 ### 15.4 Reset Password
 
@@ -1140,7 +1223,8 @@ Click the **Delete** button at the end of the user row and confirm in the confir
 
 > ⚠️ **Restrictions**:
 > - Administrators cannot delete their own account
-> - Deletion is irreversible — all historical data associated with the account will be removed
+> - The last administrator cannot be deleted
+> - Deletion is irreversible but removes only the user account, not monitoring history or service records
 
 ---
 
@@ -1148,14 +1232,14 @@ Click the **Delete** button at the end of the user row and confirm in the confir
 
 ### 16.1 Local Check Types
 
-The following check types are initiated directly from the monitoring server without going through SSH:
+Execution location depends on host connection mode, as shown below. Network and script checks use SSH for SSH-configured hosts; file/log checks require SSH.
 
 | Check Type | Compatible Hosts | Key Parameters | Description |
 |------------|-----------------|----------------|-------------|
 | **TCP** | Local / SSH | Host, Port | Verifies whether the port is open and accepting connections |
 | **HTTP** | Local / SSH | Host, Port, Path, Expected Status Code, Timeout | Sends an HTTP GET request to verify the response |
-| **HTTPS** | Local / SSH | Same as HTTP, with SSL verification | Supports TLS/SSL certificate validity check |
-| **Script** | Local / SSH | Script Type, Script Content, Expected Exit Code | Executes a custom script locally on the monitoring server |
+| **HTTPS** | Local / SSH | Same as HTTP | HTTPS response check; certificate trust is not validated. See Chapter 12 for expiry monitoring |
+| **Script** | Local / SSH | Script Type, Script Content, Expected Exit Code | Executes on the monitoring server for Local hosts, or on the remote target for SSH hosts |
 | **File Monitor** | Requires SSH | Mode, Path, Check Type, Max Age, etc. | Performs file checks on the target host via SSH |
 | **Log Monitor** | Requires SSH | Mode, Path, Content Match Pattern | Monitors log file content changes via SSH |
 
@@ -1221,7 +1305,7 @@ For HTTP/HTTPS and TCP checks, two access modes are supported:
    - Mode: Single File
    - File Path: `/var/data/job-output/result.csv`
    - Check Type (Advanced): `modified`
-   - Max Age: `3600` (seconds)
+   - Max Age: `60` with **Minutes** selected (or `1` **Hour**)
 
 If the file hasn't been updated for more than 1 hour, the service status will change to WARNING/DOWN.
 
@@ -1255,7 +1339,7 @@ fi
 
 ### Scenario 5: Cross-Environment Service Dependency Impact Analysis
 
-**Goal**: In a microservice architecture, quickly identify affected upstream services when a service fails
+**Goal**: In a microservice architecture, quickly identify dependent downstream services when a service fails
 
 **Configuration Steps**:
 1. Configure inter-service dependencies in each service's edit page under the **Dependencies** section
@@ -1364,8 +1448,8 @@ kill -9 <PID>
 
 **Solutions**:
 1. Confirm the JSON file was exported using this system's **Export** feature in the standard format
-2. Pre-create the required projects and hosts in the target environment before importing
-3. Check the browser console or backend logs for specific error messages
+2. The current importer has parameter-binding and field-restoration limitations; pre-creating projects and hosts does not guarantee success. See Section 8.9
+3. Inspect backend logs for SQL/parameter-binding errors. Do not use import for production migration until the implementation has been fixed and verified
 
 ---
 
@@ -1401,6 +1485,16 @@ The connection pool isolation unit is the **credential combination** (`host:port
 
 ---
 
+### Q9: Where are application logs, and why are frontend records missing?
+
+1. Check the backend's effective `LOG_DIR`. The local default is `backend/logs`; the current Compose host directory is `/opt/OpsMonitor/backend/data/logs`. Look for `backend-*.log` or `frontend-*.log` and split files by UTC date.
+2. If files are missing, check directory write permissions, free disk space and `Application log write failed` in the backend console. Application retention does not manage separate Docker/Nginx logs; see Section 14.3.
+3. Frontend reporting covers warnings and errors only. Ordinary logs, errors before login, and content beyond queue/truncation limits are not fully recorded. Confirm login and inspect browser network requests for `POST /api/logs/frontend`.
+4. `204` means the endpoint accepted the request, not that the log is durably stored; `400` means invalid format, `401` means invalid authentication, and `429` means the user rate limit was exceeded. Network failure or page exit can also lose records; use the browser console and backend logs together.
+5. Older files may already have been removed by UTC-date retention. Back up remaining files before adjusting retention. Increasing retention cannot recover deleted logs.
+
+---
+
 ## Appendix A: API Endpoint Quick Reference
 
 | Method | Endpoint | Description |
@@ -1408,6 +1502,8 @@ The connection pool isolation unit is the **credential combination** (`host:port
 | POST | `/api/auth/login` | User login, returns JWT Token |
 | POST | `/api/auth/register` | User registration |
 | GET | `/api/auth/me` | Get current logged-in user info |
+| PUT | `/api/auth/profile` | Update profile |
+| PUT | `/api/auth/password` | Change the current user's password |
 | GET/POST/PUT/DELETE | `/api/users` | User management (Admin only) |
 | GET/POST/PUT/DELETE | `/api/projects` | Project management |
 | GET | `/api/projects/:id/graph` | Get project dependency graph data |
@@ -1415,6 +1511,9 @@ The connection pool isolation unit is the **credential combination** (`host:port
 | POST | `/api/hosts/:id/test-connection` | Test host SSH connection |
 | POST | `/api/hosts/test-all` | Batch test all host connections |
 | GET/POST/PUT/DELETE | `/api/services` | Service management |
+| GET | `/api/services/:id/details` | Service details, recent results, history and dependencies (login required) |
+| PATCH | `/api/services/batch` | Batch update services |
+| POST | `/api/services/layout` | Save service topology layouts |
 | GET | `/api/services/export` | Export all service configurations (JSON) |
 | POST | `/api/services/import` | Import service configurations |
 | PUT | `/api/services/:id/schedule` | Update service schedule configuration |
@@ -1428,18 +1527,27 @@ The connection pool isolation unit is the **credential combination** (`host:port
 | GET/POST/PUT/DELETE | `/api/dependency-types` | Dependency type management |
 | GET | `/api/alerts` | Get alert history records |
 | GET | `/api/alerts/unacknowledged/count` | Get unacknowledged alert count |
+| POST | `/api/alerts/acknowledge` | Acknowledge alerts (global read status) |
 | GET/PUT | `/api/config/notifications` | Notification channel configuration |
 | PUT | `/api/config/notification-lang` | Set notification language preference |
 | POST | `/api/config/notifications/test` | Send test notification |
 | GET/POST/PUT/DELETE | `/api/security-configs` | Security configuration management |
+| GET | `/api/security-configs/stats` | Security configuration state counts |
+| POST | `/api/security-configs/:id/extend` | Renew a non-SSL configuration |
+| POST | `/api/config/security-check/trigger` | Check security configurations and SSL certificates now (Admin only) |
 | GET | `/api/security-configs/check/expiring` | Get expiring security configs |
 | GET/POST/PUT/DELETE | `/api/grafana-dashboards` | Grafana dashboard management |
 | GET | `/api/system-settings` | Get all system settings |
 | GET/PUT | `/api/system-settings/:key` | Get or update a specific system setting |
+| POST | `/api/logs/frontend` | Submit frontend diagnostic logs (login required, not a query endpoint); returns 204 on success |
 | GET | `/api/ssh/pool-stats` | SSH connection pool status |
 | GET | `/api/schedule/templates` | Get schedule template list |
 | POST | `/api/schedule/preview` | Preview schedule execution times |
 | POST | `/api/schedule/validate` | Validate schedule configuration |
+
+> CRUD rows abbreviate resource endpoint families; update/delete usually require `/:id`. Role labels describe intended use. Authentication and authorization are not enforced on every endpoint, so this table is not a security guarantee.
+
+`POST /api/logs/frontend` accepts `{ "entries": [{ "level": "error", "message": "example" }] }`. Batches contain 1-20 entries with `warn`/`error` levels and 1-4096 characters per message. The limit is 60 requests per minute per user ID; invalid format returns 400, invalid authentication 401, and rate limiting 429. The actual frontend uses smaller batch/message limits; see Section 14.3.
 
 ---
 
@@ -1447,7 +1555,10 @@ The connection pool isolation unit is the **credential combination** (`host:port
 
 | Shortcut | Function |
 |----------|----------|
-| `ESC` | Close current popup or dialog |
-| `Ctrl + R` | Refresh current page data |
+| `ESC` | Close a dismissible dialog; clear selection in topology customization mode |
+| `Ctrl + R` | Browser full-page reload, not an application-only data refresh |
+| `Shift + Drag` | Topology customization: box-select nodes |
+| `Ctrl/Cmd + Click` | Topology customization: select multiple nodes |
+| `Ctrl/Cmd + A` | Topology customization: select all nodes |
 
 ---

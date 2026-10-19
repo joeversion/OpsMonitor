@@ -1,8 +1,9 @@
+import logger from './utils/logger';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { initDatabase } from './db/database';
+import db, { initDatabase } from './db/database';
 import servicesRouter from './routes/services';
 import checksRouter from './routes/checks';
 import configRouter from './routes/config';
@@ -21,7 +22,8 @@ import sshPoolRouter from './routes/ssh-pool';
 import { Scheduler } from './services/scheduler';
 import { AuthService } from './services/auth-service';
 import SSHConnectionPool from './services/ssh-connection-pool';
-import logger from './utils/logger';
+import { startLogCleanup, closeApplicationLogs } from './utils/log-storage';
+import logsRouter from './routes/logs';
 
 // Global error handlers to prevent SSH2 errors from crashing the app
 process.on('uncaughtException', (error: Error) => {
@@ -68,12 +70,17 @@ const PORT = Number(process.env.PORT) || 3000;
 // Middleware
 app.use(cors());
 app.use(helmet());
-app.use(morgan('dev'));
+app.use(morgan('combined', { stream: { write: message => logger.api.info(message.trim()) } }));
 app.use(express.json());
 
 // Initialize Database
 logger.database.info('Initializing database...');
 initDatabase();
+startLogCleanup(() => {
+  const setting = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('log_retention_days') as { value: string } | undefined;
+  const days = Number(setting?.value ?? 30);
+  return Number.isInteger(days) && days >= 1 && days <= 365 ? days : 30;
+});
 
 // Initialize default admin user
 AuthService.initDefaultAdmin().catch(err => {
@@ -104,6 +111,7 @@ app.use('/api/dependencies', dependenciesRouter);
 app.use('/api/dependency-types', dependencyTypesRouter);
 app.use('/api/grafana-dashboards', grafanaDashboardsRouter);
 app.use('/api/system-settings', systemSettingsRouter);
+app.use('/api/logs', logsRouter);
 app.use('/api', scheduleRouter);  // Schedule routes use full path like /api/services/:id/schedule
 app.use('/api/ssh', sshPoolRouter);  // SSH connection pool monitoring
 
@@ -119,15 +127,17 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 });
 
 // Graceful shutdown - cleanup SSH connection pool
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   logger.info('Server', 'SIGTERM received, closing SSH connection pool...');
   SSHConnectionPool.closeAllPools();
+  await closeApplicationLogs();
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   logger.info('Server', 'SIGINT received, closing SSH connection pool...');
   SSHConnectionPool.closeAllPools();
+  await closeApplicationLogs();
   process.exit(0);
 });
 
