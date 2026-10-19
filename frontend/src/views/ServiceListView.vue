@@ -3156,10 +3156,10 @@ const loadGeneralSettings = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('resize', _onWindowResize);
   loadGeneralSettings();
-  fetchServices();
+  const servicesReady = fetchServices();
   fetchProjects();
   fetchHosts();
   fetchDependencyTypes();
@@ -3223,13 +3223,12 @@ onMounted(() => {
     const editId = route.query.edit as string;
     
     if (editId) {
-      // Edit mode - wait for services to be loaded before opening edit dialog
-      setTimeout(() => {
-        const service = services.value.find(s => s.id === editId);
-        if (service) {
-          handleEdit(service);
-        }
-      }, 500);
+      await servicesReady;
+      if (route.path !== '/services' || route.query.edit !== editId) return;
+      const service = services.value.find(s => s.id === editId);
+      if (service) {
+        await handleEdit(service);
+      }
     } else if (hostId) {
       // Add mode - wait for hosts to be loaded before opening dialog
       setTimeout(() => {
