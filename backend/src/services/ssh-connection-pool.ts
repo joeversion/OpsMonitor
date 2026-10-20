@@ -187,6 +187,10 @@ export class SSHConnectionPool {
         // 创建新连接，使用锁
         const creationPromise = this.createConnection(credentials, poolKey)
           .then(newConnection => {
+            if (this.pools.get(poolKey) !== pool) {
+              this.closeConnection(newConnection);
+              throw new Error('Connection pool closed during creation');
+            }
             pool.connections.push(newConnection);
             this.creationLocks.delete(poolKey);
             
@@ -318,6 +322,7 @@ export class SSHConnectionPool {
       });
       
       conn.on('ready', () => {
+        if (resolved) return;
         clearTimeout(timeoutId);
         
         const pooledConn: PooledConnection = {
@@ -361,14 +366,16 @@ export class SSHConnectionPool {
       
       // 处理代理连接
       process.nextTick(() => {
+        if (resolved) return;
         try {
           if (credentials.proxy_host) {
-            // Bug #029 Fix: 获取并存储 proxy connection 引用
-            this.connectViaProxy(credentials, connConfig, conn)
-              .then((proxyConn) => {
-                // Store proxy reference for cleanup
-                proxyConnRef = proxyConn;
-              })
+            this.connectViaProxy(
+              credentials,
+              connConfig,
+              conn,
+              proxyConn => { proxyConnRef = proxyConn; },
+              () => resolved
+            )
               .catch((err) => {
                 if (!errorHandled) {
                   errorHandled = true;
@@ -394,15 +401,17 @@ export class SSHConnectionPool {
   
   /**
    * 通过代理连接
-   * Bug #029 Fix: 返回 proxy connection 引用以便后续清理
    */
   private static async connectViaProxy(
     credentials: SSHCredentials,
     targetConfig: ConnectConfig,
-    targetConn: Client
-  ): Promise<Client> {
+    targetConn: Client,
+    onProxyCreated: (proxyConn: Client) => void,
+    isCancelled: () => boolean
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       const proxyConn = new Client();
+      onProxyCreated(proxyConn);
       let proxyCleanedUp = false;
       let proxyErrorHandled = false;
       
@@ -428,27 +437,53 @@ export class SSHConnectionPool {
       });
       
       proxyConn.on('ready', () => {
-        proxyConn.forwardOut(
-          '127.0.0.1',
-          0,
-          credentials.host,
-          credentials.port || 22,
-          (err, stream) => {
-            if (err) {
-              cleanupProxy();
-              return reject(err);
+        if (isCancelled() || proxyCleanedUp) {
+          cleanupProxy();
+          return;
+        }
+        try {
+          proxyConn.forwardOut(
+            '127.0.0.1',
+            0,
+            credentials.host,
+            credentials.port || 22,
+            (err, stream) => {
+              if (isCancelled() || proxyCleanedUp) {
+                if (stream) {
+                  stream.close();
+                  stream.destroy();
+                }
+                cleanupProxy();
+                return;
+              }
+              if (err) {
+                cleanupProxy();
+                return reject(err);
+              }
+
+              targetConfig.sock = stream;
+              targetConn.once('close', () => cleanupProxy());
+              targetConn.once('error', () => cleanupProxy());
+              try {
+                targetConn.connect(targetConfig);
+                resolve();
+              } catch (error) {
+                cleanupProxy();
+                reject(error);
+              }
             }
-            
-            targetConfig.sock = stream;
-            targetConn.connect(targetConfig);
-            
-            targetConn.once('close', () => cleanupProxy());
-            targetConn.once('error', () => cleanupProxy());
-            
-            // Bug #029 Fix: 返回 proxyConn 引用
-            resolve(proxyConn);
-          }
-        );
+          );
+        } catch (error) {
+          cleanupProxy();
+          reject(error);
+        }
+      });
+
+      proxyConn.once('close', () => {
+        if (!proxyCleanedUp) {
+          cleanupProxy();
+          reject(new Error('Proxy connection closed unexpectedly'));
+        }
       });
       
       const proxyConfig: ConnectConfig = {
@@ -469,6 +504,10 @@ export class SSHConnectionPool {
       }
       
       process.nextTick(() => {
+        if (isCancelled() || proxyCleanedUp) {
+          cleanupProxy();
+          return;
+        }
         try {
           proxyConn.connect(proxyConfig);
         } catch (err) {
@@ -580,6 +619,10 @@ export class SSHConnectionPool {
       
       const creationPromise = this.createConnection(credentials, poolKey)
         .then(newConnection => {
+          if (this.pools.get(poolKey) !== pool) {
+            this.closeConnection(newConnection);
+            throw new Error('Connection pool closed during creation');
+          }
           pool.connections.push(newConnection);
           this.creationLocks.delete(poolKey);
           
@@ -725,7 +768,7 @@ export class SSHConnectionPool {
       }
       
       // 如果池为空且没有队列，删除池
-      if (pool.connections.length === 0 && pool.queue.length === 0) {
+      if (pool.connections.length === 0 && pool.queue.length === 0 && !this.creationLocks.has(poolKey)) {
         this.pools.delete(poolKey);
         logger.ssh.debug('Removed empty connection pool', { poolKey });
       }
