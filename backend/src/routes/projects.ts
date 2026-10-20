@@ -34,9 +34,9 @@ router.get('/', (req: Request, res: Response) => {
         p.created_at,
         p.updated_at,
         COUNT(DISTINCT s.id) as service_count,
-        COALESCE(SUM(CASE WHEN latest.status = 'up' THEN 1 ELSE 0 END), 0) as healthy_count,
-        COALESCE(SUM(CASE WHEN latest.status = 'warning' THEN 1 ELSE 0 END), 0) as warning_count,
-        COALESCE(SUM(CASE WHEN latest.status = 'down' THEN 1 ELSE 0 END), 0) as down_count
+        COALESCE(SUM(CASE WHEN s.enabled = 1 AND latest.status = 'up' THEN 1 ELSE 0 END), 0) as healthy_count,
+        COALESCE(SUM(CASE WHEN s.enabled = 1 AND latest.status = 'warning' THEN 1 ELSE 0 END), 0) as warning_count,
+        COALESCE(SUM(CASE WHEN s.enabled = 1 AND latest.status = 'down' THEN 1 ELSE 0 END), 0) as down_count
       FROM projects p
       LEFT JOIN services s ON s.project_id = p.id
       LEFT JOIN (
