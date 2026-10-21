@@ -1606,8 +1606,8 @@ const refreshGraph = async () => {
     for (let i = 0; i < data.nodes.length; i++) {
       const node = data.nodes[i];
       const nodeData = node.data || {};
-      const x = nodeData.layout_x || autoLayoutPosition(node.id, data.nodes, 'x');
-      const y = nodeData.layout_y || autoLayoutPosition(node.id, data.nodes, 'y');
+      const x = nodeData.layout_x ?? autoLayoutPosition(node.id, data.nodes, 'x');
+      const y = nodeData.layout_y ?? autoLayoutPosition(node.id, data.nodes, 'y');
       mappedNodes.push({
         id: node.id,
         name: nodeData.name || '',

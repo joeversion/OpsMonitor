@@ -311,7 +311,7 @@
           'cross-project-node': node.isCrossProjectService
         }
       ]"
-      :style="{ top: (node.y || 100) + 'px', left: (node.x || 100) + 'px' }"
+      :style="{ top: (node.y ?? 100) + 'px', left: (node.x ?? 100) + 'px' }"
       @mousedown.stop="startNodeInteraction($event, node)"
       @click.stop="handleNodeClick(node, $event)"
     >
@@ -617,6 +617,35 @@ const getNodeDimensions = (nodeId: string) => {
   return { width: 180, height: 64 };
 };
 
+const resolveNodeOverlaps = () => {
+  const gap = 24;
+  const rectangles = props.nodes.map(node => ({
+    x: node.x ?? 100,
+    y: node.y ?? 100,
+    ...getNodeDimensions(node.id)
+  }));
+  let changed = false;
+  const updatedNodes = props.nodes.map((node, index) => {
+    const rectangle = rectangles[index]!;
+    const overlaps = (other: typeof rectangle) =>
+      rectangle.x < other.x + other.width &&
+      rectangle.x + rectangle.width > other.x &&
+      rectangle.y < other.y + other.height &&
+      rectangle.y + rectangle.height > other.y;
+
+    if (!rectangles.slice(0, index).some(overlaps)) return node;
+
+    let blockers = rectangles.filter((other, otherIndex) => otherIndex !== index && overlaps(other));
+    while (blockers.length > 0) {
+      rectangle.x = Math.max(...blockers.map(other => other.x + other.width)) + gap;
+      blockers = rectangles.filter((other, otherIndex) => otherIndex !== index && overlaps(other));
+    }
+    changed = true;
+    return { ...node, x: rectangle.x, y: rectangle.y };
+  });
+  if (changed) emit('update:nodes', updatedNodes);
+};
+
 // Link Path Calculation with intelligent anchor point selection
 // Adaptive Rule: Adjust connection strategy based on global layout direction
 // Per-link direction setting controls arrow direction (normal vs reverse)
@@ -642,10 +671,10 @@ const getLinkPath = (link: Link) => {
   const effectiveTarget = isReversed ? sourceNode : targetNode;
   
   // Calculate node positions
-  const sourceX = effectiveSource.x || 100;
-  const sourceY = effectiveSource.y || 100;
-  const targetX = effectiveTarget.x || 100;
-  const targetY = effectiveTarget.y || 100;
+  const sourceX = effectiveSource.x ?? 100;
+  const sourceY = effectiveSource.y ?? 100;
+  const targetX = effectiveTarget.x ?? 100;
+  const targetY = effectiveTarget.y ?? 100;
   
   // Calculate center positions
   const sourceCenterX = sourceX + nodeWidth / 2;
@@ -766,10 +795,10 @@ const getLinkLabelPosition = (link: Link) => {
   const sourceDim = getNodeDimensions(sourceNode.id);
   const targetDim = getNodeDimensions(targetNode.id);
   
-  const sourceX = (sourceNode.x || 100) + sourceDim.width / 2;
-  const sourceY = (sourceNode.y || 100) + sourceDim.height;
-  const targetX = (targetNode.x || 100) + targetDim.width / 2;
-  const targetY = targetNode.y || 100;
+  const sourceX = (sourceNode.x ?? 100) + sourceDim.width / 2;
+  const sourceY = (sourceNode.y ?? 100) + sourceDim.height;
+  const targetX = (targetNode.x ?? 100) + targetDim.width / 2;
+  const targetY = targetNode.y ?? 100;
   
   return {
     x: (sourceX + targetX) / 2,
@@ -819,19 +848,18 @@ const fitView = () => {
   if (!rect) return;
   
   // Find bounding box of all nodes
-  const nodeWidth = 180;
-  const nodeHeight = 64;
   const padding = 40; // 减小边距使布局更紧凑
   
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   
   props.nodes.forEach(node => {
-    const x = node.x || 100;
-    const y = node.y || 100;
+    const x = node.x ?? 100;
+    const y = node.y ?? 100;
+    const dimensions = getNodeDimensions(node.id);
     minX = Math.min(minX, x);
     minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x + nodeWidth);
-    maxY = Math.max(maxY, y + nodeHeight);
+    maxX = Math.max(maxX, x + dimensions.width);
+    maxY = Math.max(maxY, y + dimensions.height);
   });
   
   const contentWidth = maxX - minX + padding * 2;
@@ -1072,8 +1100,8 @@ const stopBoxSelect = () => {
   selectedNodeIds.value.clear();
   
   props.nodes.forEach(node => {
-    const nodeX = node.x || 100;
-    const nodeY = node.y || 100;
+    const nodeX = node.x ?? 100;
+    const nodeY = node.y ?? 100;
     
     // Check if node intersects with selection box
     const nodeRight = nodeX + nodeWidth;
@@ -1148,8 +1176,8 @@ const startDragNode = (e: MouseEvent, node: Node) => {
   
   draggingNode.value = node;
   dragOffset.value = {
-    x: e.clientX - (node.x || 100),
-    y: e.clientY - (node.y || 100)
+    x: e.clientX - (node.x ?? 100),
+    y: e.clientY - (node.y ?? 100)
   };
   
   // If this node is part of multi-selection, prepare to drag all selected nodes
@@ -1160,8 +1188,8 @@ const startDragNode = (e: MouseEvent, node: Node) => {
       const selectedNode = props.nodes.find(n => n.id === nodeId);
       if (selectedNode) {
         dragStartPositions.value.set(nodeId, {
-          x: selectedNode.x || 100,
-          y: selectedNode.y || 100
+          x: selectedNode.x ?? 100,
+          y: selectedNode.y ?? 100
         });
       }
     });
@@ -1921,40 +1949,34 @@ const handleGlobalClick = (e: MouseEvent) => {
 
 // Check if nodes have saved layout positions (from database)
 const hasSavedLayout = (): boolean => {
-  if (props.nodes.length === 0) return false;
-  // Consider layout as saved if at least one node has valid x,y that's not default auto-generated
-  // Default auto-generated positions are usually 100 or calculated based on index
   return props.nodes.some(node => {
-    const x = node.x;
-    const y = node.y;
-    // Check if node has non-default position (saved positions are typically different from 100)
-    // Also check if x,y values seem intentionally set (not just default fallbacks)
-    return typeof x === 'number' && typeof y === 'number' && 
-           (x !== 100 || y !== 100) && // Not default fallback
-           !(x === 0 && y === 0); // Not uninitialized
+    const position = node.data && ('layout_x' in node.data || 'layout_y' in node.data)
+      ? { x: node.data.layout_x, y: node.data.layout_y }
+      : node;
+    return Number.isFinite(position.x) && Number.isFinite(position.y);
   });
 };
 
-// Watch for nodes changes and apply default dagre layout on initial load or when nodes count changes
-watch(() => props.nodes.length, (newLength, oldLength) => {
-  // Apply dagre layout when:
-  // 1. First load (isInitialLoad is true) AND no saved layout exists
-  // 2. Node count changes (oldLength is undefined or different) AND no saved layout
-  if (newLength > 0 && (isInitialLoad.value || oldLength === undefined || oldLength !== newLength)) {
-    // Use nextTick to ensure DOM is ready
-    nextTick(() => {
-      // Only apply auto layout if nodes don't have saved positions
-      if (!hasSavedLayout()) {
-        applyLayout('dagre');
-      }
-      // Auto fit view after layout
-      setTimeout(() => fitView(), 100);
-      if (isInitialLoad.value) {
-        isInitialLoad.value = false; // Mark as loaded
-      }
-    });
-  }
-}, { immediate: true });
+watch(
+  () => JSON.stringify(props.nodes.map(node => [node.id, node.x, node.y, node.name, node.project_name])),
+  async (_layout, _oldLayout, onCleanup) => {
+    if (props.nodes.length === 0 || props.isEditMode) return;
+    let cancelled = false;
+    onCleanup(() => { cancelled = true; });
+    await nextTick();
+    if (cancelled || props.isEditMode) return;
+    if (isInitialLoad.value && !hasSavedLayout()) {
+      applyLayout('dagre');
+    }
+    isInitialLoad.value = false;
+    await nextTick();
+    if (cancelled || props.isEditMode) return;
+    resolveNodeOverlaps();
+    await nextTick();
+    if (!cancelled && !props.isEditMode) fitView();
+  },
+  { immediate: true }
+);
 
 onMounted(() => {
   document.addEventListener('click', handleGlobalClick);
