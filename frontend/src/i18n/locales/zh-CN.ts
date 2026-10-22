@@ -1545,6 +1545,7 @@ export default {
 
   // 交互图画布
   graphCanvas: {
+    viewServiceDetails: '查看 {name} 的服务详情',
     viewportHint: '拖动空白处平移 · 滚轮缩放 · 卡片移动无边界限制',
     zoomIn: '放大',
     zoomOut: '缩小',

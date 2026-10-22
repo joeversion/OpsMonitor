@@ -278,6 +278,7 @@
           :links="graphLinks"
           :is-edit-mode="isEditMode && isAdmin"
           :selected-node-id="selectedNode?.id"
+          :is-details-open="serviceDetailsVisible"
 
           :readonly="!isAdmin"
           @select-node="handleNodeSelect"
@@ -1173,7 +1174,6 @@ const handleNodeSelect = (node: any) => {
 
 const openServiceDetails = (id: string) => {
   if (isEditMode.value || !allServices.value.some(service => service.id === id)) return;
-  selectNodeById(id);
   detailsServiceId.value = id;
   serviceDetailsVisible.value = true;
 };

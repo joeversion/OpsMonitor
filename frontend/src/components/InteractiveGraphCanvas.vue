@@ -6,7 +6,7 @@
     :class="{ 'edit-mode': isEditMode, 'panning': isPanning, 'dragging': draggingNode, 'window-fullscreen': isWindowFullscreen }"
     ref="canvasRef" 
     @contextmenu.prevent 
-    @wheel.prevent="handleWheel"
+    @wheel="handleWheel"
     @mousedown="startPan"
   >
     <div class="viewport-controls" @mousedown.stop @wheel.stop>
@@ -343,6 +343,15 @@
           <span v-if="getNodeResponseTime(node)">• {{ getNodeResponseTime(node) }}ms</span>
         </div>
       </div>
+      <button
+        v-if="!isEditMode"
+        type="button"
+        class="node-details-btn"
+        :title="$t('graphCanvas.viewServiceDetails', { name: node.name || node.data?.name || node.id })"
+        :aria-label="$t('graphCanvas.viewServiceDetails', { name: node.name || node.data?.name || node.id })"
+        @mousedown.stop
+        @click.stop="emit('view-service', node.id)"
+      ><InfoFilled aria-hidden="true" /></button>
       <!-- Status indicator -->
       <div class="node-status-indicator" :class="`status-${getNodeStatus(node)}`"></div>
       <!-- Multi-select indicator -->
@@ -444,6 +453,7 @@
 import { ref, shallowRef, watch, onMounted, onUnmounted, nextTick, computed, type ComponentPublicInstance } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
+import { InfoFilled } from '@element-plus/icons-vue';
 import { getDependencyTypes } from '../api/dependency-types';
 import ServiceIcon from './ServiceIcon.vue';
 
@@ -493,11 +503,13 @@ interface Props {
   links: Link[];
   isEditMode?: boolean;
   selectedNodeId?: string | null;
+  isDetailsOpen?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isEditMode: false,
-  selectedNodeId: null
+  selectedNodeId: null,
+  isDetailsOpen: false
 });
 
 const emit = defineEmits([
@@ -918,6 +930,8 @@ const isLinkValid = (link: Link): boolean => {
 
 // Handle mouse wheel for zoom
 const handleWheel = (event: WheelEvent) => {
+  if (props.isDetailsOpen) return;
+  event.preventDefault();
   const delta = event.deltaY > 0 ? -0.1 : 0.1;
   const rect = canvasRef.value?.getBoundingClientRect();
   if (!rect) return;
@@ -1101,6 +1115,7 @@ let panFrame = 0;
 let pendingPan: MouseEvent | null = null;
 
 const startPan = (e: MouseEvent) => {
+  if (props.isDetailsOpen) return;
   // Only start panning with left mouse button
   if (e.button !== 0) return;
   
@@ -1244,6 +1259,7 @@ const selectAllNodes = () => {
 
 // Keyboard shortcuts
 const handleKeyDown = (e: KeyboardEvent) => {
+  if (props.isDetailsOpen) return;
   // Ctrl/Cmd + A: Select all
   if ((e.ctrlKey || e.metaKey) && e.key === 'a' && props.isEditMode) {
     e.preventDefault();
@@ -1313,14 +1329,15 @@ const calcGuideSnap = (nodeId: string, rawX: number, rawY: number): { x: number;
   const guidelines: Guideline[] = [];
   let snappedX = rawX;
   let snappedY = rawY;
+  const { width, height } = getNodeDimensions(nodeId);
   
   // Current node edges and center
   const curLeft = rawX;
-  const curCenterX = rawX + NODE_WIDTH / 2;
-  const curRight = rawX + NODE_WIDTH;
+  const curCenterX = rawX + width / 2;
+  const curRight = rawX + width;
   const curTop = rawY;
-  const curCenterY = rawY + NODE_HEIGHT / 2;
-  const curBottom = rawY + NODE_HEIGHT;
+  const curCenterY = rawY + height / 2;
+  const curBottom = rawY + height;
   
   let bestDx = GUIDE_SNAP_THRESHOLD + 1;
   let bestDy = GUIDE_SNAP_THRESHOLD + 1;
@@ -1334,20 +1351,21 @@ const calcGuideSnap = (nodeId: string, rawX: number, rawY: number): { x: number;
     if (other.id === nodeId) continue;
     const ox = other.x ?? 100;
     const oy = other.y ?? 100;
+    const otherDimensions = getNodeDimensions(other.id);
     const oLeft = ox;
-    const oCenterX = ox + NODE_WIDTH / 2;
-    const oRight = ox + NODE_WIDTH;
+    const oCenterX = ox + otherDimensions.width / 2;
+    const oRight = ox + otherDimensions.width;
     const oTop = oy;
-    const oCenterY = oy + NODE_HEIGHT / 2;
-    const oBottom = oy + NODE_HEIGHT;
+    const oCenterY = oy + otherDimensions.height / 2;
+    const oBottom = oy + otherDimensions.height;
     
     // X-axis alignment checks: left-left, center-center, right-right, left-right, right-left
     const xChecks: Array<{ cur: number; ref: number; type: 'left' | 'center' | 'right'; offset: number }> = [
       { cur: curLeft, ref: oLeft, type: 'left', offset: 0 },
-      { cur: curCenterX, ref: oCenterX, type: 'center', offset: -NODE_WIDTH / 2 },
-      { cur: curRight, ref: oRight, type: 'right', offset: -NODE_WIDTH },
+      { cur: curCenterX, ref: oCenterX, type: 'center', offset: -width / 2 },
+      { cur: curRight, ref: oRight, type: 'right', offset: -width },
       { cur: curLeft, ref: oRight, type: 'left', offset: 0 },
-      { cur: curRight, ref: oLeft, type: 'right', offset: -NODE_WIDTH },
+      { cur: curRight, ref: oLeft, type: 'right', offset: -width },
     ];
     
     for (const check of xChecks) {
@@ -1362,10 +1380,10 @@ const calcGuideSnap = (nodeId: string, rawX: number, rawY: number): { x: number;
     // Y-axis alignment checks: top-top, center-center, bottom-bottom, top-bottom, bottom-top
     const yChecks: Array<{ cur: number; ref: number; type: 'top' | 'center' | 'bottom'; offset: number }> = [
       { cur: curTop, ref: oTop, type: 'top', offset: 0 },
-      { cur: curCenterY, ref: oCenterY, type: 'center', offset: -NODE_HEIGHT / 2 },
-      { cur: curBottom, ref: oBottom, type: 'bottom', offset: -NODE_HEIGHT },
+      { cur: curCenterY, ref: oCenterY, type: 'center', offset: -height / 2 },
+      { cur: curBottom, ref: oBottom, type: 'bottom', offset: -height },
       { cur: curTop, ref: oBottom, type: 'top', offset: 0 },
-      { cur: curBottom, ref: oTop, type: 'bottom', offset: -NODE_HEIGHT },
+      { cur: curBottom, ref: oTop, type: 'bottom', offset: -height },
     ];
     
     for (const check of yChecks) {
@@ -1384,8 +1402,8 @@ const calcGuideSnap = (nodeId: string, rawX: number, rawY: number): { x: number;
     // Determine the guide line X coordinate
     let guideX: number;
     if (snapXType === 'left') guideX = snappedX;
-    else if (snapXType === 'center') guideX = snappedX + NODE_WIDTH / 2;
-    else guideX = snappedX + NODE_WIDTH;
+    else if (snapXType === 'center') guideX = snappedX + width / 2;
+    else guideX = snappedX + width;
     guidelines.push({ x1: guideX, y1: -5000, x2: guideX, y2: 5000, type: 'vertical' });
   }
   
@@ -1394,8 +1412,8 @@ const calcGuideSnap = (nodeId: string, rawX: number, rawY: number): { x: number;
     snappedY = snapYTarget;
     let guideY: number;
     if (snapYType === 'top') guideY = snappedY;
-    else if (snapYType === 'center') guideY = snappedY + NODE_HEIGHT / 2;
-    else guideY = snappedY + NODE_HEIGHT;
+    else if (snapYType === 'center') guideY = snappedY + height / 2;
+    else guideY = snappedY + height;
     guidelines.push({ x1: -5000, y1: guideY, x2: 5000, y2: guideY, type: 'horizontal' });
   }
   
@@ -1655,11 +1673,7 @@ const handleNodeClick = (node: Node, event: MouseEvent) => {
   const moved = nodePointerStart && Math.hypot(event.clientX - nodePointerStart.x, event.clientY - nodePointerStart.y) > 5;
   nodePointerStart = null;
   if (moved) return;
-  const viewing = !props.isEditMode && !event.ctrlKey && !event.metaKey && !event.shiftKey;
-  if (!viewing || selectedNodeIds.value.size !== 1 || !selectedNodeIds.value.has(node.id)) {
-    selectNode(node, event);
-  }
-  if (viewing) emit('view-service', node.id);
+  selectNode(node, event);
 };
 
 const selectNode = (node: Node, event?: MouseEvent) => {
@@ -2247,7 +2261,7 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 14px;
+    padding: 10px 36px 10px 14px;
     background: #fff;
     border-radius: 10px;
     border: 2px solid #e4e7ec;
@@ -2262,6 +2276,36 @@ onUnmounted(() => {
 .service-node:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+}
+
+.node-details-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 3px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    color: #175cd3;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.node-details-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.node-details-btn:hover,
+.node-details-btn:focus-visible {
+    background: #eff6ff;
+    border-color: #409eff;
 }
 
 .graph-canvas.dragging .service-node {

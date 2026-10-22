@@ -1545,6 +1545,7 @@ export default {
 
   // InteractiveGraphCanvas
   graphCanvas: {
+    viewServiceDetails: 'View details for {name}',
     viewportHint: 'Drag blank space to pan · Scroll to zoom · No movement limits',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
