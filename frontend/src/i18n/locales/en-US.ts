@@ -1545,6 +1545,14 @@ export default {
 
   // InteractiveGraphCanvas
   graphCanvas: {
+    viewportHint: 'Drag blank space to pan · Scroll to zoom · No movement limits',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    fitView: 'Fit view',
+    enterFullscreen: 'Fullscreen',
+    exitFullscreen: 'Exit fullscreen',
+    fullscreenError: 'Unable to change fullscreen mode',
+    fullscreenFallback: 'Browser fullscreen is unavailable. Expanded to the window; press Esc to exit.',
     layoutLabel: 'Layout:',
     layoutLayered: 'Layered',
     layoutLayeredDesc: 'Auto-arrange by service layer (recommended)',

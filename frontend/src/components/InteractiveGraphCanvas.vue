@@ -1,12 +1,24 @@
 <template>
+  <Teleport to="body" :disabled="!isWindowFullscreen">
   <div 
+    v-bind="$attrs"
     class="graph-canvas" 
-    :class="{ 'edit-mode': isEditMode, 'panning': isPanning }" 
+    :class="{ 'edit-mode': isEditMode, 'panning': isPanning, 'dragging': draggingNode, 'window-fullscreen': isWindowFullscreen }"
     ref="canvasRef" 
     @contextmenu.prevent 
     @wheel.prevent="handleWheel"
     @mousedown="startPan"
   >
+    <div class="viewport-controls" @mousedown.stop @wheel.stop>
+      <button :title="$t('graphCanvas.zoomOut')" :aria-label="$t('graphCanvas.zoomOut')" :disabled="scale <= minScale" @click="zoomAtCenter(-0.1)">−</button>
+      <span class="zoom-level">{{ Math.round(scale * 100) }}%</span>
+      <button :title="$t('graphCanvas.zoomIn')" :aria-label="$t('graphCanvas.zoomIn')" :disabled="scale >= maxScale" @click="zoomAtCenter(0.1)">+</button>
+      <button @click="fitView">{{ $t('graphCanvas.fitView') }}</button>
+      <button :aria-pressed="isFullscreen" @click="toggleFullscreen">
+        {{ isFullscreen ? $t('graphCanvas.exitFullscreen') : $t('graphCanvas.enterFullscreen') }}
+      </button>
+    </div>
+    <div class="viewport-hint">{{ $t('graphCanvas.viewportHint') }}</div>
     <!-- Layout Selector (shown in edit mode) -->
     <div v-if="isEditMode" class="layout-toolbar">
       <div class="layout-section">
@@ -131,7 +143,7 @@
         <!-- Mask for hiding lines behind labels -->
         <mask id="labelMask">
           <!-- White rectangle = visible area (entire canvas) -->
-          <rect x="-5000" y="-5000" width="10000" height="10000" fill="white"/>
+          <rect v-bind="worldBounds" fill="white"/>
           <!-- Black rectangles = hidden areas (label positions) -->
           <g v-for="link in links" :key="'mask-' + link.id">
             <!-- Mask for dependency type label -->
@@ -171,10 +183,7 @@
       <!-- Grid Background (controlled by Grid snap toggle) -->
       <rect 
         v-if="snapToGrid" 
-        x="-5000" 
-        y="-5000" 
-        width="10000" 
-        height="10000" 
+        v-bind="worldBounds"
         fill="url(#grid-large)" 
         class="grid-background"
       />
@@ -299,6 +308,7 @@
     <div 
       v-for="node in nodes" 
       :key="node.id"
+      :ref="element => setNodeElement(node.id, element)"
       class="service-node"
       :data-id="node.id"
       :class="[
@@ -425,14 +435,19 @@
       </div>
       <button class="selector-cancel" @click="cancelNewLink">{{ $t('common.cancel') }}</button>
     </div>
+    <slot name="overlay"></slot>
   </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue';
+import { ref, shallowRef, watch, onMounted, onUnmounted, nextTick, computed, type ComponentPublicInstance } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { ElMessage } from 'element-plus';
 import { getDependencyTypes } from '../api/dependency-types';
 import ServiceIcon from './ServiceIcon.vue';
+
+defineOptions({ inheritAttrs: false });
 
 interface NodeData {
   name?: string;
@@ -504,6 +519,90 @@ const scale = ref(1);
 const panOffset = ref({ x: 0, y: 0 });
 const minScale = 0.3;
 const maxScale = 2;
+const isNativeFullscreen = ref(false);
+const isWindowFullscreen = ref(false);
+const isFullscreen = computed(() => isNativeFullscreen.value || isWindowFullscreen.value);
+const nodesById = computed(() => new Map(props.nodes.map(node => [node.id, node])));
+const nodeElements = new Map<string, HTMLElement>();
+const nodeDimensions = shallowRef(new Map<string, { width: number; height: number }>());
+let nodeResizeObserver: ResizeObserver | undefined;
+let canvasResizeObserver: ResizeObserver | undefined;
+const viewportSize = shallowRef<{ width: number; height: number }>();
+const worldBounds = computed(() => {
+  const left = -panOffset.value.x / scale.value;
+  const top = -panOffset.value.y / scale.value;
+  const right = left + (viewportSize.value?.width ?? 0) / scale.value;
+  const bottom = top + (viewportSize.value?.height ?? 0) / scale.value;
+  let minX = left, minY = top, maxX = right, maxY = bottom;
+  for (const node of props.nodes) {
+    const dimensions = getNodeDimensions(node.id);
+    minX = Math.min(minX, node.x ?? 100);
+    minY = Math.min(minY, node.y ?? 100);
+    maxX = Math.max(maxX, (node.x ?? 100) + dimensions.width);
+    maxY = Math.max(maxY, (node.y ?? 100) + dimensions.height);
+  }
+  return { x: minX - 100, y: minY - 100, width: maxX - minX + 200, height: maxY - minY + 200 };
+});
+
+const setNodeElement = (id: string, element: Element | ComponentPublicInstance | null) => {
+  const previous = nodeElements.get(id);
+  if (previous === element) return;
+  if (previous) nodeResizeObserver?.unobserve(previous);
+  if (element instanceof HTMLElement) {
+    nodeElements.set(id, element);
+    nodeResizeObserver?.observe(element);
+  } else {
+    nodeElements.delete(id);
+    nodeDimensions.value.delete(id);
+  }
+};
+
+const measureNodes = () => {
+  const measurements = new Map<string, { width: number; height: number }>();
+  for (const [id, element] of nodeElements) {
+    measurements.set(id, { width: element.offsetWidth, height: element.offsetHeight });
+  }
+  nodeDimensions.value = measurements;
+};
+
+const toCanvasPoint = (clientX: number, clientY: number) => {
+  const canvas = canvasRef.value!;
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (clientX - rect.left - canvas.clientLeft - panOffset.value.x) / scale.value,
+    y: (clientY - rect.top - canvas.clientTop - panOffset.value.y) / scale.value
+  };
+};
+
+const syncFullscreen = () => {
+  isNativeFullscreen.value = document.fullscreenElement === canvasRef.value;
+};
+
+const toggleFullscreen = async () => {
+  if (isWindowFullscreen.value) {
+    isWindowFullscreen.value = false;
+    return;
+  }
+  const exiting = document.fullscreenElement === canvasRef.value;
+  try {
+    if (exiting) {
+      await document.exitFullscreen();
+    } else {
+      await canvasRef.value!.requestFullscreen();
+    }
+  } catch (error) {
+    if (exiting) {
+      syncFullscreen();
+      if (!isNativeFullscreen.value) return;
+      console.error('Failed to exit topology fullscreen mode:', error);
+      ElMessage.error({ message: t('graphCanvas.fullscreenError'), appendTo: canvasRef.value! });
+      return;
+    }
+    console.warn('Native topology fullscreen unavailable; using window fullscreen:', error);
+    isWindowFullscreen.value = true;
+    ElMessage.warning({ message: t('graphCanvas.fullscreenFallback'), appendTo: canvasRef.value! });
+  }
+};
 
 // Layout algorithm configuration
 const currentLayout = ref<'dagre' | 'layered' | 'force' | 'grid'>('dagre');
@@ -606,15 +705,7 @@ const getNodeIcon = (node: any) => {
 
 // Get actual node dimensions from DOM
 const getNodeDimensions = (nodeId: string) => {
-  const nodeElement = canvasRef.value?.querySelector(`[data-id="${nodeId}"]`) as HTMLElement;
-  if (nodeElement) {
-    return {
-      width: nodeElement.offsetWidth,
-      height: nodeElement.offsetHeight
-    };
-  }
-  // Fallback to default dimensions
-  return { width: 180, height: 64 };
+  return nodeDimensions.value.get(nodeId) ?? { width: NODE_WIDTH, height: NODE_HEIGHT };
 };
 
 const resolveNodeOverlaps = () => {
@@ -649,15 +740,15 @@ const resolveNodeOverlaps = () => {
 // Link Path Calculation with intelligent anchor point selection
 // Adaptive Rule: Adjust connection strategy based on global layout direction
 // Per-link direction setting controls arrow direction (normal vs reverse)
-const getLinkPath = (link: Link) => {
-  const sourceNode = props.nodes.find(n => n.id === link.source);
-  const targetNode = props.nodes.find(n => n.id === link.target);
+const calculateLinkPath = (link: Link) => {
+  const sourceNode = nodesById.value.get(link.source);
+  const targetNode = nodesById.value.get(link.target);
   
   if (!sourceNode || !targetNode) return '';
   
   // Get actual node dimensions from DOM
-  const sourceDim = getNodeDimensions(sourceNode.id);
-  const targetDim = getNodeDimensions(targetNode.id);
+  const sourceDim = getNodeDimensions(link.linkDirection === 'reverse' ? targetNode.id : sourceNode.id);
+  const targetDim = getNodeDimensions(link.linkDirection === 'reverse' ? sourceNode.id : targetNode.id);
   const nodeWidth = sourceDim.width;
   const nodeHeight = sourceDim.height;
   const targetWidth = targetDim.width;
@@ -785,9 +876,9 @@ const getLinkPath = (link: Link) => {
 };
 
 // Get link label position (midpoint of the curve)
-const getLinkLabelPosition = (link: Link) => {
-  const sourceNode = props.nodes.find(n => n.id === link.source);
-  const targetNode = props.nodes.find(n => n.id === link.target);
+const calculateLinkLabelPosition = (link: Link) => {
+  const sourceNode = nodesById.value.get(link.source);
+  const targetNode = nodesById.value.get(link.target);
   
   if (!sourceNode || !targetNode) return { x: 0, y: 0 };
   
@@ -806,6 +897,13 @@ const getLinkLabelPosition = (link: Link) => {
   };
 };
 
+const linkGeometry = computed(() => new Map(props.links.map(link => [
+  link.id,
+  { path: calculateLinkPath(link), label: calculateLinkLabelPosition(link) }
+])));
+const getLinkPath = (link: Link) => linkGeometry.value.get(link.id)?.path ?? '';
+const getLinkLabelPosition = (link: Link) => linkGeometry.value.get(link.id)?.label ?? { x: 0, y: 0 };
+
 const getLinkTypeLabel = (type?: string): string => {
   const typeInfo = dependencyTypes.value.find(t => t.value === type);
   return typeInfo?.label || type || '';
@@ -813,24 +911,21 @@ const getLinkTypeLabel = (type?: string): string => {
 
 // Check if link has valid source and target nodes
 const isLinkValid = (link: Link): boolean => {
-  const sourceNode = props.nodes.find(n => n.id === link.source);
-  const targetNode = props.nodes.find(n => n.id === link.target);
+  const sourceNode = nodesById.value.get(link.source);
+  const targetNode = nodesById.value.get(link.target);
   return !!(sourceNode && targetNode && sourceNode.x !== undefined && targetNode.x !== undefined);
 };
 
 // Handle mouse wheel for zoom
 const handleWheel = (event: WheelEvent) => {
   const delta = event.deltaY > 0 ? -0.1 : 0.1;
-  const newScale = Math.max(minScale, Math.min(maxScale, scale.value + delta));
-  
-  // Calculate mouse position relative to canvas
   const rect = canvasRef.value?.getBoundingClientRect();
   if (!rect) return;
-  
-  const mouseX = event.clientX - rect.left;
-  const mouseY = event.clientY - rect.top;
-  
-  // Adjust pan to zoom towards mouse position
+  zoomAt(delta, event.clientX - rect.left - canvasRef.value!.clientLeft, event.clientY - rect.top - canvasRef.value!.clientTop);
+};
+
+const zoomAt = (delta: number, mouseX: number, mouseY: number) => {
+  const newScale = Math.max(minScale, Math.min(maxScale, scale.value + delta));
   const scaleDiff = newScale - scale.value;
   panOffset.value = {
     x: panOffset.value.x - (mouseX - panOffset.value.x) * (scaleDiff / scale.value),
@@ -838,6 +933,11 @@ const handleWheel = (event: WheelEvent) => {
   };
   
   scale.value = newScale;
+};
+
+const zoomAtCenter = (delta: number) => {
+  const canvas = canvasRef.value;
+  if (canvas) zoomAt(delta, canvas.clientWidth / 2, canvas.clientHeight / 2);
 };
 
 // Fit view to show all nodes
@@ -884,8 +984,8 @@ const fitView = () => {
 
 // Get link status based on source/target node status
 const getLinkStatus = (link: Link): string => {
-  const targetNode = props.nodes.find(n => n.id === link.target);
-  const sourceNode = props.nodes.find(n => n.id === link.source);
+  const targetNode = nodesById.value.get(link.target);
+  const sourceNode = nodesById.value.get(link.source);
   const targetStatus = getNodeStatus(targetNode as Node);
   const sourceStatus = getNodeStatus(sourceNode as Node);
   
@@ -897,7 +997,7 @@ const getLinkStatus = (link: Link): string => {
 
 // Get particle animation duration based on response time
 const getParticleDuration = (link: Link): string => {
-  const targetNode = props.nodes.find(n => n.id === link.target);
+  const targetNode = nodesById.value.get(link.target);
   const responseTime = getNodeResponseTime(targetNode as Node);
   // Faster particles for faster response times
   if (responseTime && responseTime < 100) return '2s';
@@ -907,8 +1007,8 @@ const getParticleDuration = (link: Link): string => {
 
 // Dynamic link class based on status
 const getLinkClass = (link: Link) => {
-  const targetNode = props.nodes.find(n => n.id === link.target);
-  const sourceNode = props.nodes.find(n => n.id === link.source);
+  const targetNode = nodesById.value.get(link.target);
+  const sourceNode = nodesById.value.get(link.source);
   const targetStatus = getNodeStatus(targetNode as Node);
   const sourceStatus = getNodeStatus(sourceNode as Node);
   
@@ -985,7 +1085,7 @@ const getLinkLabelBgStyle = (link: Link): Record<string, string> => {
 };
 
 const getLinkMarker = (link: Link) => {
-  const targetNode = props.nodes.find(n => n.id === link.target);
+  const targetNode = nodesById.value.get(link.target);
   const targetStatus = getNodeStatus(targetNode as Node);
   
   if (targetStatus === 'down') return 'url(#arrowDown)';
@@ -997,6 +1097,8 @@ const getLinkMarker = (link: Link) => {
 // Canvas Panning Logic
 const isPanning = ref(false);
 const panStart = ref({ x: 0, y: 0 });
+let panFrame = 0;
+let pendingPan: MouseEvent | null = null;
 
 const startPan = (e: MouseEvent) => {
   // Only start panning with left mouse button
@@ -1014,23 +1116,14 @@ const startPan = (e: MouseEvent) => {
     return;
   }
   
-  // Get canvas rect for coordinate calculation
-  const canvasRect = canvasRef.value?.getBoundingClientRect();
-  if (!canvasRect) return;
-  
-  const clientX = e.clientX - canvasRect.left;
-  const clientY = e.clientY - canvasRect.top;
-  
-  // Convert to canvas coordinates (accounting for zoom and pan)
-  const canvasX = (clientX - panOffset.value.x) / scale.value;
-  const canvasY = (clientY - panOffset.value.y) / scale.value;
+  const point = toCanvasPoint(e.clientX, e.clientY);
   
   // Check if Shift key is pressed for box selection in edit mode
   if (props.isEditMode && e.shiftKey) {
     // Start box selection
     isBoxSelecting.value = true;
-    boxSelectionStart.value = { x: canvasX, y: canvasY };
-    boxSelectionEnd.value = { x: canvasX, y: canvasY };
+    boxSelectionStart.value = point;
+    boxSelectionEnd.value = point;
     
     window.addEventListener('mousemove', onBoxSelect);
     window.addEventListener('mouseup', stopBoxSelect);
@@ -1055,7 +1148,15 @@ const startPan = (e: MouseEvent) => {
 
 const onPan = (e: MouseEvent) => {
   if (!isPanning.value) return;
-  
+  pendingPan = e;
+  if (!panFrame) panFrame = requestAnimationFrame(flushPan);
+};
+
+const flushPan = () => {
+  panFrame = 0;
+  const e = pendingPan;
+  pendingPan = null;
+  if (!e || !isPanning.value) return;
   panOffset.value = {
     x: e.clientX - panStart.value.x,
     y: e.clientY - panStart.value.y
@@ -1063,6 +1164,8 @@ const onPan = (e: MouseEvent) => {
 };
 
 const stopPan = () => {
+  cancelAnimationFrame(panFrame);
+  flushPan();
   isPanning.value = false;
   window.removeEventListener('mousemove', onPan);
   window.removeEventListener('mouseup', stopPan);
@@ -1072,17 +1175,7 @@ const stopPan = () => {
 const onBoxSelect = (e: MouseEvent) => {
   if (!isBoxSelecting.value) return;
   
-  const canvasRect = canvasRef.value?.getBoundingClientRect();
-  if (!canvasRect) return;
-  
-  const clientX = e.clientX - canvasRect.left;
-  const clientY = e.clientY - canvasRect.top;
-  
-  // Convert to canvas coordinates
-  const canvasX = (clientX - panOffset.value.x) / scale.value;
-  const canvasY = (clientY - panOffset.value.y) / scale.value;
-  
-  boxSelectionEnd.value = { x: canvasX, y: canvasY };
+  boxSelectionEnd.value = toCanvasPoint(e.clientX, e.clientY);
 };
 
 const stopBoxSelect = () => {
@@ -1159,6 +1252,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
   
   // Escape: Clear selection
   if (e.key === 'Escape') {
+    isWindowFullscreen.value = false;
+    if (document.fullscreenElement === canvasRef.value) void toggleFullscreen();
     selectedNodeIds.value.clear();
     highlightedLinks.value.clear();
     highlightedNodes.value.clear();
@@ -1170,14 +1265,17 @@ const handleKeyDown = (e: KeyboardEvent) => {
 const draggingNode = ref<Node | null>(null);
 const dragOffset = ref({ x: 0, y: 0 });
 const dragStartPositions = ref<Map<string, { x: number, y: number }>>(new Map());
+let dragFrame = 0;
+let pendingDrag: MouseEvent | null = null;
 
 const startDragNode = (e: MouseEvent, node: Node) => {
-  if (!props.isEditMode) return;
-  
+  if (!props.isEditMode || e.button !== 0) return;
+  e.preventDefault();
+  const point = toCanvasPoint(e.clientX, e.clientY);
   draggingNode.value = node;
   dragOffset.value = {
-    x: e.clientX - (node.x ?? 100),
-    y: e.clientY - (node.y ?? 100)
+    x: point.x - (node.x ?? 100),
+    y: point.y - (node.y ?? 100)
   };
   
   // If this node is part of multi-selection, prepare to drag all selected nodes
@@ -1185,7 +1283,7 @@ const startDragNode = (e: MouseEvent, node: Node) => {
     // Store initial positions of all selected nodes
     dragStartPositions.value.clear();
     selectedNodeIds.value.forEach(nodeId => {
-      const selectedNode = props.nodes.find(n => n.id === nodeId);
+      const selectedNode = nodesById.value.get(nodeId);
       if (selectedNode) {
         dragStartPositions.value.set(nodeId, {
           x: selectedNode.x ?? 100,
@@ -1234,8 +1332,8 @@ const calcGuideSnap = (nodeId: string, rawX: number, rawY: number): { x: number;
   // Compare against all other nodes
   for (const other of props.nodes) {
     if (other.id === nodeId) continue;
-    const ox = other.x || 100;
-    const oy = other.y || 100;
+    const ox = other.x ?? 100;
+    const oy = other.y ?? 100;
     const oLeft = ox;
     const oCenterX = ox + NODE_WIDTH / 2;
     const oRight = ox + NODE_WIDTH;
@@ -1305,11 +1403,22 @@ const calcGuideSnap = (nodeId: string, rawX: number, rawY: number): { x: number;
 };
 
 const onDragNode = (e: MouseEvent) => {
+  pendingDrag = e;
+  if (!dragFrame) dragFrame = requestAnimationFrame(flushDrag);
+};
+
+const flushDrag = () => {
+  dragFrame = 0;
+  const e = pendingDrag;
+  pendingDrag = null;
+  if (e) updateDragNode(e);
+};
+
+const updateDragNode = (e: MouseEvent) => {
   if (!draggingNode.value) return;
-  
-  // Calculate raw position for the dragging node
-  let newX = Math.max(-50, e.clientX - dragOffset.value.x);
-  let newY = Math.max(-20, e.clientY - dragOffset.value.y);
+  const point = toCanvasPoint(e.clientX, e.clientY);
+  let newX = point.x - dragOffset.value.x;
+  let newY = point.y - dragOffset.value.y;
   
   // Apply grid snap
   if (snapToGrid.value) {
@@ -1330,16 +1439,16 @@ const onDragNode = (e: MouseEvent) => {
   
   // If multi-selection, move all selected nodes together
   if (dragStartPositions.value.size > 1) {
-    const deltaX = newX - (dragStartPositions.value.get(draggingNode.value.id)?.x || 0);
-    const deltaY = newY - (dragStartPositions.value.get(draggingNode.value.id)?.y || 0);
+    const deltaX = newX - (dragStartPositions.value.get(draggingNode.value.id)?.x ?? 0);
+    const deltaY = newY - (dragStartPositions.value.get(draggingNode.value.id)?.y ?? 0);
     
     // Move all selected nodes by the same delta
     selectedNodeIds.value.forEach(nodeId => {
-      const node = props.nodes.find(n => n.id === nodeId);
+      const node = nodesById.value.get(nodeId);
       const startPos = dragStartPositions.value.get(nodeId);
       if (node && startPos) {
-        node.x = Math.max(-50, startPos.x + deltaX);
-        node.y = Math.max(-20, startPos.y + deltaY);
+        node.x = startPos.x + deltaX;
+        node.y = startPos.y + deltaY;
       }
     });
   } else {
@@ -1350,6 +1459,8 @@ const onDragNode = (e: MouseEvent) => {
 };
 
 const stopDragNode = () => {
+  cancelAnimationFrame(dragFrame);
+  flushDrag();
   draggingNode.value = null;
   dragStartPositions.value.clear();
   activeGuidelines.value = []; // Clear guidelines on drop
@@ -1367,14 +1478,11 @@ const showLinkTypeSelector = ref(false);
 const linkTypeSelectorPos = ref({ x: 0, y: 0 });
 
 const startDragLink = (e: MouseEvent, node: Node, position: 'top' | 'bottom' | 'left' | 'right') => {
-  if (!props.isEditMode) return;
+  if (!props.isEditMode || e.button !== 0) return;
   
   sourceNodeForLink.value = node;
   const rect = (e.target as HTMLElement).getBoundingClientRect();
-  const canvasRect = canvasRef.value!.getBoundingClientRect();
-  
-  const startX = rect.left - canvasRect.left + rect.width / 2;
-  const startY = rect.top - canvasRect.top + rect.height / 2;
+  const { x: startX, y: startY } = toCanvasPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
   
   tempLink.value = {
     startX,
@@ -1389,9 +1497,9 @@ const startDragLink = (e: MouseEvent, node: Node, position: 'top' | 'bottom' | '
 
 const onDragLink = (e: MouseEvent) => {
   if (!tempLink.value) return;
-  const canvasRect = canvasRef.value!.getBoundingClientRect();
-  tempLink.value.endX = e.clientX - canvasRect.left;
-  tempLink.value.endY = e.clientY - canvasRect.top;
+  const point = toCanvasPoint(e.clientX, e.clientY);
+  tempLink.value.endX = point.x;
+  tempLink.value.endY = point.y;
 };
 
 const stopDragLink = (e: MouseEvent) => {
@@ -1965,6 +2073,7 @@ watch(
     onCleanup(() => { cancelled = true; });
     await nextTick();
     if (cancelled || props.isEditMode) return;
+    measureNodes();
     if (isInitialLoad.value && !hasSavedLayout()) {
       applyLayout('dagre');
     }
@@ -1979,6 +2088,21 @@ watch(
 );
 
 onMounted(() => {
+  nodeResizeObserver = new ResizeObserver(measureNodes);
+  nodeElements.forEach(element => nodeResizeObserver!.observe(element));
+  canvasResizeObserver = new ResizeObserver(([entry]) => {
+    if (!entry) return;
+    const { width, height } = entry.contentRect;
+    if (viewportSize.value && width > 0 && height > 0) {
+      panOffset.value = {
+        x: panOffset.value.x + (width - viewportSize.value.width) / 2,
+        y: panOffset.value.y + (height - viewportSize.value.height) / 2
+      };
+    }
+    viewportSize.value = { width, height };
+  });
+  if (canvasRef.value) canvasResizeObserver.observe(canvasRef.value);
+  document.addEventListener('fullscreenchange', syncFullscreen);
   document.addEventListener('click', handleGlobalClick);
   document.addEventListener('keydown', handleKeyDown);
   // Load dependency types from API
@@ -1986,10 +2110,21 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  cancelAnimationFrame(dragFrame);
+  cancelAnimationFrame(panFrame);
+  nodeResizeObserver?.disconnect();
+  canvasResizeObserver?.disconnect();
+  document.removeEventListener('fullscreenchange', syncFullscreen);
   document.removeEventListener('click', handleGlobalClick);
   document.removeEventListener('keydown', handleKeyDown);
   window.removeEventListener('mousemove', onPan);
   window.removeEventListener('mouseup', stopPan);
+  window.removeEventListener('mousemove', onDragNode);
+  window.removeEventListener('mouseup', stopDragNode);
+  window.removeEventListener('mousemove', onBoxSelect);
+  window.removeEventListener('mouseup', stopBoxSelect);
+  window.removeEventListener('mousemove', onDragLink);
+  window.removeEventListener('mouseup', stopDragLink);
 });
 </script>
 
@@ -2005,8 +2140,82 @@ onUnmounted(() => {
         linear-gradient(#f8fafc 1px, transparent 1px),
         #fff;
     background-size: 30px 30px;
-    overflow: hidden;
+    overflow: clip;
     cursor: grab;
+    box-sizing: border-box;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    user-select: none;
+}
+
+.graph-canvas:fullscreen {
+    border-radius: 0;
+    width: 100vw;
+    height: 100vh;
+}
+
+.graph-canvas.window-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    border-radius: 0;
+    width: 100vw;
+    height: 100vh;
+}
+
+.viewport-controls {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.viewport-controls button {
+    padding: 6px 8px;
+    border: 1px solid #e4e7ec;
+    border-radius: 4px;
+    background: #fff;
+    color: #344054;
+    cursor: pointer;
+}
+
+.viewport-controls button:hover:not(:disabled),
+.viewport-controls button:focus-visible {
+    background: #eff6ff;
+    border-color: #409eff;
+}
+
+.viewport-controls button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.zoom-level {
+    min-width: 42px;
+    text-align: center;
+    font-size: 12px;
+}
+
+.viewport-hint {
+    position: absolute;
+    left: 12px;
+    bottom: 64px;
+    max-width: calc(100% - 24px);
+    z-index: 30;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.9);
+    color: #667085;
+    font-size: 12px;
+    pointer-events: none;
 }
 
 .graph-canvas.panning {
@@ -2026,10 +2235,10 @@ onUnmounted(() => {
     position: absolute;
     top: 0;
     left: 0;
-    width: 10000px;
-    height: 10000px;
-    transition: transform 0.1s ease-out;
+    width: 100%;
+    height: 100%;
     overflow: visible;
+    will-change: transform;
 }
 
 /* Service Node */
@@ -2043,7 +2252,7 @@ onUnmounted(() => {
     border-radius: 10px;
     border: 2px solid #e4e7ec;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
     box-shadow: 0 2px 6px rgba(0,0,0,0.04);
     z-index: 20;
     min-width: 180px;
@@ -2053,6 +2262,10 @@ onUnmounted(() => {
 .service-node:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+}
+
+.graph-canvas.dragging .service-node {
+    transform: none;
 }
 
 .service-node.selected {
@@ -2161,8 +2374,8 @@ onUnmounted(() => {
     position: absolute; 
     top: 0; 
     left: 0; 
-    width: 10000px; 
-    height: 10000px; 
+    width: 100%;
+    height: 100%;
     pointer-events: none; 
     z-index: 1;
     overflow: visible;

@@ -286,7 +286,12 @@
           @update-link="handleUpdateLink"
           @delete-link="handleDeleteLink"
           @save-layout="saveLayout"
-        />
+        >
+          <template #overlay>
+            <ServiceDetailsDrawer v-model="serviceDetailsVisible" :service-id="detailsServiceId"
+              @edit="editServiceFromDetails" @checked="updateServiceFromDetails" />
+          </template>
+        </InteractiveGraphCanvas>
         <LayeredGraphCanvas 
           v-else
           ref="canvasRef"
@@ -352,7 +357,7 @@
         
       </LayeredGraphCanvas>
 
-      <ServiceDetailsDrawer v-model="serviceDetailsVisible" :service-id="detailsServiceId"
+      <ServiceDetailsDrawer v-if="!useInteractiveGraph" v-model="serviceDetailsVisible" :service-id="detailsServiceId"
         @edit="editServiceFromDetails" @checked="updateServiceFromDetails" />
       
       <!-- Security Configs Panel - Inside graph area -->

@@ -1545,6 +1545,14 @@ export default {
 
   // 交互图画布
   graphCanvas: {
+    viewportHint: '拖动空白处平移 · 滚轮缩放 · 卡片移动无边界限制',
+    zoomIn: '放大',
+    zoomOut: '缩小',
+    fitView: '适配视图',
+    enterFullscreen: '全屏展示',
+    exitFullscreen: '退出全屏',
+    fullscreenError: '无法切换全屏模式',
+    fullscreenFallback: '浏览器未允许全屏，已展开至窗口；按 Esc 退出。',
     layoutLabel: '布局：',
     layoutLayered: '分层',
     layoutLayeredDesc: '按服务层级自动排列（推荐）',
