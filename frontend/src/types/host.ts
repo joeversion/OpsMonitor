@@ -49,6 +49,8 @@ export interface Host {
     up_count: number;
     warning_count: number;
     down_count: number;
+    unknown_count: number;
+    unmonitored_count: number;
   };
   services?: any[];
   created_at?: string;
@@ -81,6 +83,12 @@ export interface CreateHostDto {
 }
 
 export interface UpdateHostDto extends Partial<CreateHostDto> {}
+
+export interface HostForm extends CreateHostDto {
+  ssh_retry_delay: number;
+  ssh_connection_timeout: number;
+  ssh_command_timeout: number;
+}
 
 export interface HostTestResult {
   success: boolean;

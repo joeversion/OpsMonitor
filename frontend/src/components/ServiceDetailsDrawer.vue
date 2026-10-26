@@ -1,5 +1,7 @@
 <template>
-  <el-drawer :model-value="modelValue" size="min(760px, 100vw)" class="service-details-drawer"
+  <el-drawer :model-value="modelValue" :size="modal ? 'min(760px, 100vw)' : 'min(480px, 100%)'"
+    :modal="modal" :aria-modal="modal" :lock-scroll="modal" :close-on-click-modal="modal"
+    :modal-penetrable="!modal" class="service-details-drawer"
     :title="details?.service.name || t('serviceDetails.title')" @update:model-value="emit('update:modelValue', $event)">
     <div v-loading="loading" class="details-content">
       <div v-if="error" class="load-error" role="alert">
@@ -8,7 +10,7 @@
       </div>
       <template v-if="details">
         <div class="status-line">
-          <StatusBadge :status="details.service.enabled ? details.latest?.status || 'unknown' : 'unknown'" />
+          <StatusBadge :status="details.service.enabled ? details.latest?.status || 'unknown' : 'unmonitored'" />
           <el-tag v-if="!details.service.enabled" type="info">{{ t('serviceDetails.paused') }}</el-tag>
           <el-tag v-if="details.service.host_enabled === 0" type="warning">{{ t('serviceDetails.hostPaused') }}</el-tag>
           <el-tag v-if="isStale" type="warning">{{ t('serviceDetails.stale') }}</el-tag>
@@ -113,7 +115,12 @@ import { runCheck, type CheckResult } from '../api/checks';
 import authUtils from '../utils/auth';
 import StatusBadge from './StatusBadge.vue';
 
-const props = defineProps<{ modelValue: boolean; serviceId: string | null }>();
+const props = withDefaults(defineProps<{
+  modelValue: boolean;
+  serviceId: string | null;
+  modal?: boolean;
+  showLayer?: boolean;
+}>(), { modal: true, showLayer: true });
 const emit = defineEmits<{
   'update:modelValue': [value: boolean];
   edit: [id: string];
@@ -150,7 +157,7 @@ const overviewFacts = computed(() => {
     { label: t('serviceDetails.checkType'), value: service.service_type === 'ssh' ? `SSH / ${service.ssh_check_type || service.check_type}` : service.check_type.toUpperCase() },
     { label: t('serviceDetails.connection'), value: service.host_connection_type || '-' },
     { label: t('serviceDetails.risk'), value: service.risk_level },
-    { label: t('serviceDetails.layer'), value: service.layer || '-' },
+    ...(props.showLayer ? [{ label: t('serviceDetails.layer'), value: service.layer || '-' }] : []),
     { label: t('serviceDetails.impact'), value: service.impact_description || '-' }
   ];
 });

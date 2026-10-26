@@ -31,7 +31,7 @@ export const getServiceDetails = async (id: string, signal?: AbortSignal): Promi
   return response.data;
 };
 
-export const getServices = async (projectId?: number | null, hostId?: string | null): Promise<Service[]> => {
+export const getServices = async (projectId?: string | number | null, hostId?: string | null): Promise<Service[]> => {
   const params: any = {};
   if (projectId) params.project_id = projectId;
   if (hostId) params.host_id = hostId;

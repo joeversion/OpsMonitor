@@ -395,7 +395,13 @@ function deleteRange(index: number) {
 function moveRangeUp(index: number) {
   if (index > 0 && config.value.timeRanges) {
     const temp = config.value.timeRanges[index];
-    config.value.timeRanges[index] = config.value.timeRanges[index - 1];
+    const previous = config.value.timeRanges[index - 1];
+    if (!temp || !previous) {
+      console.error('Invalid time range move', index);
+      ElMessage.error(t('services.msgOperationFailed'));
+      return;
+    }
+    config.value.timeRanges[index] = previous;
     config.value.timeRanges[index - 1] = temp;
     emitUpdate();
   }
@@ -404,7 +410,13 @@ function moveRangeUp(index: number) {
 function moveRangeDown(index: number) {
   if (config.value.timeRanges && index < config.value.timeRanges.length - 1) {
     const temp = config.value.timeRanges[index];
-    config.value.timeRanges[index] = config.value.timeRanges[index + 1];
+    const next = config.value.timeRanges[index + 1];
+    if (!temp || !next) {
+      console.error('Invalid time range move', index);
+      ElMessage.error(t('services.msgOperationFailed'));
+      return;
+    }
+    config.value.timeRanges[index] = next;
     config.value.timeRanges[index + 1] = temp;
     emitUpdate();
   }

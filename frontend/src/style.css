@@ -56,3 +56,22 @@ canvas {
 .g6-component-contextmenu {
   z-index: 9999 !important;
 }
+
+.summary-cards .stat-card .stat-label,
+.summary-cards .stat-card .stat-value {
+  font-family: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.summary-cards .stat-card .stat-label {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.summary-cards .stat-card .stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.5;
+}

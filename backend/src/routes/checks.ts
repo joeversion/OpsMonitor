@@ -171,6 +171,7 @@ router.get('/stats/summary', (req, res) => {
       down: 0,
       warning: 0,
       unknown: 0,
+      unmonitored: 0,
       total: services.length
     };
 
@@ -182,19 +183,14 @@ router.get('/stats/summary', (req, res) => {
     `);
 
     services.forEach(service => {
-      // Disabled services are counted as unknown regardless of check records
       if (!service.enabled) {
-        stats.unknown++;
+        stats.unmonitored++;
         return;
       }
       
       const record = stmt.get(service.id) as { status: string } | undefined;
-      if (record && record.status) {
-        // @ts-ignore
-        if (stats[record.status] !== undefined) {
-          // @ts-ignore
-          stats[record.status]++;
-        }
+      if (record?.status === 'up' || record?.status === 'warning' || record?.status === 'down') {
+        stats[record.status]++;
       } else {
         stats.unknown++;
       }

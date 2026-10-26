@@ -43,6 +43,7 @@
               <span 
                 class="status-indicator" 
                 :class="getProjectStatus(project)"
+                :title="getProjectHealth(project) === 'empty' ? t('hosts.noServices') : t(`statusLabels.${getProjectHealth(project)}`)"
               ></span>
             </div>
           </el-dropdown-item>
@@ -69,7 +70,7 @@ import { ref, computed, onMounted, watch, inject } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ArrowDown, Plus, Setting } from '@element-plus/icons-vue';
-import { getProjects, type ProjectWithStats } from '../api/projects';
+import { getProjects, getProjectHealth, type ProjectWithStats } from '../api/projects';
 import { authUtils } from '../utils/auth';
 
 const props = defineProps<{
@@ -120,9 +121,8 @@ function getGradient(color: string): string {
 }
 
 function getProjectStatus(project: ProjectWithStats): string {
-  if (project.down_count > 0) return 'error';
-  if (project.warning_count > 0) return 'warning';
-  return 'healthy';
+  const status = getProjectHealth(project);
+  return status === 'down' ? 'error' : status;
 }
 
 async function loadProjects() {
@@ -311,6 +311,10 @@ defineExpose({
 
 .status-indicator.healthy {
   background: #12b76a;
+}
+
+.status-indicator.unknown, .status-indicator.unmonitored, .status-indicator.empty {
+  background: #98a2b3;
 }
 
 .status-indicator.warning {

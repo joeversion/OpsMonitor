@@ -9,7 +9,7 @@
       <template #reference>
         <div class="icon-display" :class="{ 'has-icon': modelValue }">
           <span class="icon-preview">
-            <Icon v-if="isIconifyIcon(modelValue)" :icon="modelValue" :width="20" />
+            <Icon v-if="modelValue && isIconifyIcon(modelValue)" :icon="modelValue" :width="20" />
             <span v-else>{{ modelValue || '🔧' }}</span>
           </span>
           <span class="icon-label">{{ modelValue ? $t('iconSelector.changeIcon') : $t('iconSelector.selectIcon') }}</span>

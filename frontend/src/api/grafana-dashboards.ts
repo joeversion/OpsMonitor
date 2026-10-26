@@ -25,7 +25,7 @@ export interface GrafanaDashboard {
   embed_options: EmbedOptions;
   embed_url: string;
   display_order: number;
-  enabled: boolean;
+  enabled: boolean | 0 | 1;
   created_at: string;
   updated_at: string;
 }

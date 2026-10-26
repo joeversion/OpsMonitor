@@ -177,17 +177,17 @@
                 <span class="stat-label">{{ $t('graph.total') }}:</span>
                 <span class="stat-value">{{ stats.total }}</span>
             </div>
-            <div class="stat-pill healthy">
+            <div class="stat-pill healthy" v-if="stats.up > 0">
                 <span class="stat-dot"></span>
                 <span class="stat-label">{{ $t('graph.healthyNode') }}:</span>
                 <span class="stat-value">{{ stats.up }}</span>
             </div>
-            <div class="stat-pill warning">
+            <div class="stat-pill warning" v-if="stats.warning > 0">
                 <span class="stat-dot"></span>
                 <span class="stat-label">{{ $t('graph.warningNode') }}:</span>
                 <span class="stat-value">{{ stats.warning }}</span>
             </div>
-            <div class="stat-pill down">
+            <div class="stat-pill down" v-if="stats.down > 0">
                 <span class="stat-dot"></span>
                 <span class="stat-label">{{ $t('graph.down') }}:</span>
                 <span class="stat-value">{{ stats.down }}</span>
@@ -197,13 +197,18 @@
                 <span class="stat-label">{{ $t('graph.unknown') }}:</span>
                 <span class="stat-value">{{ stats.unknown }}</span>
             </div>
+            <div class="stat-pill unknown" v-if="stats.unmonitored > 0">
+                <span class="stat-dot"></span>
+                <span class="stat-label">{{ $t('common.notMonitored') }}:</span>
+                <span class="stat-value">{{ stats.unmonitored }}</span>
+            </div>
         </div>
         
         <div class="header-controls-right">
           <!-- Security Panel Toggle Button -->
           <button 
             v-if="projectSecurityConfigs.length > 0" 
-            class="security-toggle-btn"
+            class="header-action-btn security-toggle-btn"
             :class="{ 'has-expiring': expiringConfigsCount > 0 }"
             @click="showSecurityPanel = !showSecurityPanel"
           >
@@ -214,25 +219,25 @@
           </button>
           
           <!-- Save Layout Button (only visible in edit mode) -->
-          <el-button 
+          <button
             v-if="isEditMode && isAdmin"
-            type="success"
-            size="small" 
+            class="header-action-btn"
+            :disabled="isTopologyLayoutBusy"
             @click="saveLayout"
           >
-            <el-icon><Check /></el-icon>
-            {{ $t('graph.saveLayout') }}
-          </el-button>
+            <el-icon class="save-layout-icon" aria-hidden="true"><Check /></el-icon>
+            <span class="toggle-label">{{ $t('graph.saveLayout') }}</span>
+          </button>
           
           <!-- Customize Layout / Exit Customization Button -->
-          <el-button 
+          <button
             v-if="isAdmin"
-            :type="isEditMode ? 'default' : 'default'" 
-            size="small" 
+            class="header-action-btn"
             @click="toggleEditMode"
           >
-            {{ isEditMode ? $t('graph.exitCustomization') : $t('graph.customizeLayout') }}
-          </el-button>
+            <el-icon :class="isEditMode ? 'exit-layout-icon' : 'customize-layout-icon'" aria-hidden="true"><Close v-if="isEditMode" /><Edit v-else /></el-icon>
+            <span class="toggle-label">{{ isEditMode ? $t('graph.exitCustomization') : $t('graph.customizeLayout') }}</span>
+          </button>
           
 
           
@@ -271,9 +276,14 @@
         </div>
       </div>
       
+      <el-alert v-if="statusRefreshFailed" type="warning" :closable="false" show-icon>
+        <span>{{ $t('graphCanvas.statusRefreshFailed') }}</span>
+        <el-button link type="primary" @click="refreshNodeStatuses">{{ $t('graphCanvas.retryStatus') }}</el-button>
+      </el-alert>
       <div class="graph-canvas-wrapper">
         <InteractiveGraphCanvas 
           v-if="useInteractiveGraph"
+          :key="currentProjectId"
           v-model:nodes="graphNodes"
           :links="graphLinks"
           :is-edit-mode="isEditMode && isAdmin"
@@ -286,10 +296,11 @@
           @add-link="handleAddLink"
           @update-link="handleUpdateLink"
           @delete-link="handleDeleteLink"
-          @save-layout="saveLayout"
+          @layout-busy="isTopologyLayoutBusy = $event"
         >
           <template #overlay>
             <ServiceDetailsDrawer v-model="serviceDetailsVisible" :service-id="detailsServiceId"
+              :modal="false" :show-layer="false"
               @edit="editServiceFromDetails" @checked="updateServiceFromDetails" />
           </template>
         </InteractiveGraphCanvas>
@@ -409,7 +420,7 @@
                 <span class="expiry-label">{{ $t('graph.expires') }}:</span>
                 <span class="expiry-date">{{ formatSecurityDate(config.expiry_date) }}</span>
                 <span class="days-remaining" :class="config.status">
-                  ({{ config.days_remaining > 0 ? $t('graph.daysLeft', { count: config.days_remaining }) : $t('graph.expired') }})
+                  ({{ config.days_remaining != null && config.days_remaining > 0 ? $t('graph.daysLeft', { count: config.days_remaining }) : $t('graph.expired') }})
                 </span>
               </div>
               <div class="security-card-info" v-else>
@@ -451,14 +462,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, inject, watch, type Ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { Graph } from '@antv/g6';
 import { ElMessage } from 'element-plus';
 import { createDependency, updateDependency, deleteDependency, migrateDependencies as migrateDeps } from '../api/dependencies';
 import { getSecurityConfigs, type SecurityConfig } from '../api/security-configs';
-import { Refresh, Upload, Check } from '@element-plus/icons-vue';
+import { Refresh, Upload, Check, Edit, Close, Loading } from '@element-plus/icons-vue';
 import LayeredGraphCanvas from '../components/LayeredGraphCanvas.vue';
 import InteractiveGraphCanvas from '../components/InteractiveGraphCanvas.vue';
 import ServiceDetailsDrawer from '../components/ServiceDetailsDrawer.vue';
@@ -480,10 +491,12 @@ const router = useRouter();
 
 interface ServiceWithStatus {
   id: string;
+  icon?: string;
   name: string;
   host: string;
   port: number;
   status: 'up' | 'down' | 'warning' | 'unknown';
+  enabled?: number;
   responseTime?: number;
   riskLevel: string;
   dependencies?: string[];
@@ -533,6 +546,7 @@ const allServices = ref<ServiceWithStatus[]>([]);
 const showImpactAnalysis = ref(true);
 const useInteractiveGraph = ref(true);
 const isEditMode = ref(false);
+const isTopologyLayoutBusy = ref(false);
 const graphNodes = ref<any[]>([]);
 const graphLinks = ref<any[]>([]);
 let graph: Graph | null = null;
@@ -548,6 +562,7 @@ const showShortcutsHint = ref(true);
 let sseConnection: EventSource | null = null;
 let sseThrottle: ReturnType<typeof setTimeout> | null = null;
 let statusPollTimer: ReturnType<typeof setInterval> | null = null;
+const statusRefreshFailed = ref(false);
 
 // Lightweight status refresh: only update node status without rebuilding graph layout
 const refreshNodeStatuses = async () => {
@@ -555,7 +570,7 @@ const refreshNodeStatuses = async () => {
   try {
     const checksRes = await api.get('/checks/latest');
     const latestChecks = checksRes.data as Record<string, { 
-      status: string; response_time: number; error_message?: string; checked_at?: string 
+      status: ServiceWithStatus['status']; response_time: number; error_message?: string; checked_at?: string
     }>;
     
     // Also fetch services to check enabled status
@@ -567,49 +582,38 @@ const refreshNodeStatuses = async () => {
     graphNodes.value.forEach(node => {
       const svc = svcMap[node.id];
       const isDisabled = svc && svc.enabled === 0;
-      const check = latestChecks[node.id];
-      if (isDisabled) {
-        node.status = 'unknown';
-        if (node.data) node.data.status = 'unknown';
-      } else if (check) {
-        node.status = check.status;
-        node.responseTime = check.response_time;
-        node.errorMessage = check.error_message;
-        if (node.data) {
-          node.data.status = check.status;
-          node.data.responseTime = check.response_time;
-          node.data.errorMessage = check.error_message;
-          node.data.lastCheck = check.checked_at;
-        }
-      } else {
-        node.status = 'unknown';
-        if (node.data) node.data.status = 'unknown';
-      }
+      const check = isDisabled ? undefined : latestChecks[node.id];
+      const hasResult = check && check.status !== 'unknown';
+      const update = {
+        enabled: svc?.enabled,
+        status: check?.status || 'unknown',
+        responseTime: hasResult ? check.response_time : undefined,
+        errorMessage: hasResult ? check.error_message : undefined,
+        lastCheck: hasResult ? check.checked_at : undefined,
+      };
+      Object.assign(node, update);
+      if (node.data) Object.assign(node.data, update);
     });
     
     // Also update allServices for stats/impact panel
     allServices.value.forEach(s => {
       const svc = svcMap[s.id];
       const isDisabled = svc && svc.enabled === 0;
-      if (isDisabled) {
-        s.status = 'unknown' as any;
-      } else {
-        const check = latestChecks[s.id];
-        if (check) {
-          s.status = check.status as any;
-          s.responseTime = check.response_time;
-          s.errorMessage = check.error_message;
-          s.lastCheck = check.checked_at;
-        } else {
-          s.status = 'unknown';
-        }
-      }
+      const check = isDisabled ? undefined : latestChecks[s.id];
+      const hasResult = check && check.status !== 'unknown';
+      s.enabled = svc?.enabled;
+      s.status = check?.status || 'unknown';
+      s.responseTime = hasResult ? check.response_time : undefined;
+      s.errorMessage = hasResult ? check.error_message : undefined;
+      s.lastCheck = hasResult ? check.checked_at : undefined;
     });
     
     // Trigger reactivity
     graphNodes.value = [...graphNodes.value];
+    statusRefreshFailed.value = false;
   } catch (error) {
     console.error('Failed to refresh node statuses:', error);
+    statusRefreshFailed.value = true;
   }
 };
 
@@ -761,7 +765,7 @@ const contextMenu = ref<{
   node: null
 });
 
-const currentProjectId = inject<{ value: string | undefined }>('currentProjectId');
+const currentProjectId = inject<Ref<string | undefined>>('currentProjectId');
 
 // 上下文模式：All Projects 时需要提示用户选择项目
 const isAllProjectsMode = computed(() => !currentProjectId?.value);
@@ -780,10 +784,11 @@ watch(
 
 // Statistics data
 const stats = computed(() => {
-  const result = { total: 0, up: 0, warning: 0, down: 0, unknown: 0 };
+  const result = { total: 0, up: 0, warning: 0, down: 0, unknown: 0, unmonitored: 0 };
   allServices.value.forEach(s => {
     result.total++;
-    if (s.status === 'up') result.up++;
+    if (s.enabled === 0) result.unmonitored++;
+    else if (s.status === 'up') result.up++;
     else if (s.status === 'warning') result.warning++;
     else if (s.status === 'down') result.down++;
     else result.unknown++;
@@ -807,9 +812,9 @@ const showDemoAlert = ref(false);
 
 const toggleDemoMode = () => {
   showDemoAlert.value = !showDemoAlert.value;
-  if (showDemoAlert.value && allServices.value.length > 0) {
+  const demoService = allServices.value[0];
+  if (showDemoAlert.value && demoService) {
     // Create a demo alert using first service
-    const demoService = allServices.value[0];
     const mockAffected: ImpactedService[] = allServices.value.slice(1, 6).map((s, i) => ({
       ...s,
       impactLevel: i === 0 ? 'critical' : i < 2 ? 'high' : i < 4 ? 'medium' : 'low',
@@ -916,8 +921,9 @@ const toggleAlertExpansion = (alertIndex: number) => {
   } else {
     // Adjust index if demo alert is shown
     const realIndex = showDemoAlert.value && demoAlert.value ? alertIndex - 1 : alertIndex;
-    if (realIndex >= 0 && realIndex < serviceAlerts.value.length) {
-      serviceAlerts.value[realIndex].expanded = !serviceAlerts.value[realIndex].expanded;
+    const alert = serviceAlerts.value[realIndex];
+    if (alert) {
+      alert.expanded = !alert.expanded;
     }
   }
 };
@@ -1123,7 +1129,7 @@ const migrateDependencies = async () => {
     message: t('graph.migratingDependencies'),
     type: 'info',
     duration: 0,
-    iconClass: 'el-icon-loading'
+    icon: Loading
   });
   
   try {
@@ -1161,14 +1167,12 @@ const handleDeleteLink = async (link: { id: string, source: string, target: stri
   }
 };
 
-const autoLayout = () => {
-  refreshGraph();
-};
-
 
 const handleNodeSelect = (node: any) => {
   if (node && node.id) {
     selectNodeById(node.id);
+  } else {
+    selectedNode.value = null;
   }
 };
 
@@ -1184,16 +1188,20 @@ const editServiceFromDetails = (id: string) => {
 };
 
 const updateServiceFromDetails = (id: string, result: CheckResult) => {
-  const update = {
-    status: result.status,
-    responseTime: result.response_time,
-    errorMessage: result.error_message || undefined,
-    lastCheck: result.checked_at
-  };
   const service = allServices.value.find(item => item.id === id);
+  const hasResult = service?.enabled !== 0 && result.status !== 'unknown';
+  const update = {
+    status: service?.enabled === 0 ? 'unknown' : result.status,
+    responseTime: hasResult ? result.response_time : undefined,
+    errorMessage: hasResult ? result.error_message || undefined : undefined,
+    lastCheck: hasResult ? result.checked_at : undefined
+  };
   if (service) Object.assign(service, update);
   const node = graphNodes.value.find(item => item.id === id);
-  if (node) Object.assign(node, update);
+  if (node) {
+    Object.assign(node, update);
+    if (node.data) Object.assign(node.data, update);
+  }
 };
 
 const initGraph = async (data: any) => {
@@ -1214,6 +1222,8 @@ const initGraph = async (data: any) => {
       container: container.value,
       width: width,
       height: height,
+      padding: 20,
+      zoomRange: [0.6, 2],
     
     // Use fixed layered layout
     layout: {
@@ -1400,13 +1410,7 @@ const initGraph = async (data: any) => {
       console.log('Fitting view');
       // 自适应图形内容，但设置较大的 minZoom 避免过度缩小
       // minZoom 0.6 确保不同项目显示大小更接近
-      graph.fitView({ 
-        padding: 20,
-        rules: {
-          minZoom: 0.6,  // 提高到 0.6，使不同项目显示更统一
-          maxZoom: 2
-        }
-      });
+      graph.fitView();
     }
   }, 100);
   
@@ -1424,6 +1428,7 @@ const transformData = (services: ServiceWithStatus[]) => {
       data: {
         name: s.name,
         status: s.status,
+        enabled: s.enabled,
         host: s.host,
         port: s.port,
         responseTime: s.responseTime,
@@ -1501,7 +1506,7 @@ const refreshGraph = async () => {
     // Get latest check status
     const checksRes = await api.get('/checks/latest');
     const latestChecks = checksRes.data as Record<string, { 
-      status: string; 
+      status: CheckResult['status'];
       response_time: number;
       error_message?: string;
       checked_at?: string;
@@ -1515,6 +1520,7 @@ const refreshGraph = async () => {
       source_service_id: string;
       target_service_id: string;
       dependency_type: string;
+      link_direction?: string;
       risk_level: string;
       impact_description?: string;
       custom_alert_template?: string;
@@ -1556,7 +1562,7 @@ const refreshGraph = async () => {
     const combinedServices = [...services, ...crossProjectServices];
     
     // Merge services and status
-    allServices.value = combinedServices.map((s: any) => {
+    allServices.value = combinedServices.map((s: any): ServiceWithStatus => {
       // Handle dependencies that may be a string
       let deps: string[] = [];
       if (s.dependencies) {
@@ -1576,16 +1582,18 @@ const refreshGraph = async () => {
       
       // For cross-project services, use the layout from crossProjectLayouts if available
       const crossLayout = isCrossProjectService ? crossProjectLayouts[s.id] : null;
+      const check = s.enabled === 0 ? undefined : latestChecks[s.id];
+      const hasResult = check && check.status !== 'unknown';
       
       return {
         id: s.id,
         name: s.name,
         host: s.host,
         port: s.port,
-        status: s.enabled === 0 ? 'unknown' : (latestChecks[s.id]?.status || 'unknown'),
-        responseTime: latestChecks[s.id]?.response_time,
-        errorMessage: latestChecks[s.id]?.error_message,
-        lastCheck: latestChecks[s.id]?.checked_at,
+        status: check?.status || 'unknown',
+        responseTime: hasResult ? check.response_time : undefined,
+        errorMessage: hasResult ? check.error_message : undefined,
+        lastCheck: hasResult ? check.checked_at : undefined,
         enabled: s.enabled,
         riskLevel: s.risk_level,
         layer: isCrossProjectService ? 'external' : (s.layer || 'backend'), // Mark external services
@@ -1608,8 +1616,7 @@ const refreshGraph = async () => {
     
     // Update reactive state for InteractiveGraphCanvas
     const mappedNodes = [];
-    for (let i = 0; i < data.nodes.length; i++) {
-      const node = data.nodes[i];
+    for (const node of data.nodes) {
       const nodeData = node.data || {};
       const x = nodeData.layout_x ?? autoLayoutPosition(node.id, data.nodes, 'x');
       const y = nodeData.layout_y ?? autoLayoutPosition(node.id, data.nodes, 'y');
@@ -1618,6 +1625,7 @@ const refreshGraph = async () => {
         name: nodeData.name || '',
         layer: nodeData.layer || 'backend',
         status: nodeData.status || 'unknown',
+        enabled: nodeData.enabled,
         port: nodeData.port,
         responseTime: nodeData.responseTime,
         host: nodeData.host,
@@ -1633,6 +1641,7 @@ const refreshGraph = async () => {
       });
     }
     graphNodes.value = mappedNodes;
+    statusRefreshFailed.value = false;
     
     // Build graphLinks from service_dependencies table or fallback to services.dependencies field
     if (dependencies.length > 0) {
@@ -1688,13 +1697,7 @@ const refreshGraph = async () => {
         await graph.render();
         setTimeout(() => {
           if (graph) {
-            graph.fitView({ 
-              padding: 20,
-              rules: {
-                minZoom: 0.6,  // 提高 minZoom 使显示更统一
-                maxZoom: 2
-              }
-            });
+            graph.fitView();
           }
         }, 500);
       } else {
@@ -1713,58 +1716,13 @@ const refreshGraph = async () => {
 // Auto layout helper for nodes without saved position
 const autoLayoutPosition = (nodeId: string, allNodes: any[], axis: 'x' | 'y'): number => {
   const nodeIndex = allNodes.findIndex(n => n.id === nodeId);
-  const node = allNodes[nodeIndex];
-  const layer = node?.data?.layer || 'backend';
-  const layerIndex = layerOrder.indexOf(layer);
-  
-  // Group by layer
-  const nodesInSameLayer = allNodes.filter(n => (n.data?.layer || 'backend') === layer);
-  const indexInLayer = nodesInSameLayer.findIndex(n => n.id === nodeId);
-  
-  if (axis === 'x') {
-    const nodeWidth = 200;
-    const gap = 60;
-    const startX = 100;
-    return startX + indexInLayer * (nodeWidth + gap);
-  } else {
-    const layerHeight = 140;
-    const startY = 60;
-    return startY + layerIndex * layerHeight;
-  }
+  return axis === 'x' ? 100 + (nodeIndex % 4) * 400 : 60 + Math.floor(nodeIndex / 4) * 180;
 };
 
 const selectNodeById = (id: string) => {
   const service = allServices.value.find(s => s.id === id);
   if (service) {
     selectedNode.value = service;
-  }
-};
-
-const fitView = () => {
-  if (graph) {
-    // 自适应缩放，但不低于 0.6 倍
-    graph.fitView({ 
-      padding: 20,
-      rules: {
-        minZoom: 0.6,
-        maxZoom: 2
-      }
-    });
-  }
-};
-
-// Zoom controls
-const zoomIn = () => {
-  if (graph) {
-    const zoom = graph.getZoom();
-    graph.zoomTo(zoom * 1.2);
-  }
-};
-
-const zoomOut = () => {
-  if (graph) {
-    const zoom = graph.getZoom();
-    graph.zoomTo(zoom * 0.8);
   }
 };
 
@@ -1843,13 +1801,7 @@ const handleResize = () => {
     const height = Math.max(container.value.clientHeight || 600, 100);
     graph.resize(width, height);
     // 自适应缩放，不低于 0.6 倍
-    graph.fitView({ 
-      padding: 20,
-      rules: {
-        minZoom: 0.6,
-        maxZoom: 2
-      }
-    });
+    graph.fitView();
   }
 };
 </script>
@@ -3386,8 +3338,7 @@ const handleResize = () => {
   font-size: 13px;
 }
 
-/* Security Toggle Button in Header */
-.security-toggle-btn {
+.header-action-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3395,16 +3346,28 @@ const handleResize = () => {
   background: #fff;
   border: 1px solid #e4e7ec;
   border-radius: 6px;
+  font-family: inherit;
   font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
   color: #344054;
   cursor: pointer;
   transition: all 0.2s;
-  margin-right: 8px;
 }
 
-.security-toggle-btn:hover {
+.header-action-btn:hover:not(:disabled) {
   background: #f9fafb;
   border-color: #d0d5dd;
+}
+
+.header-action-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.header-action-btn:focus-visible {
+  outline: 2px solid #9ab8f7;
+  outline-offset: 2px;
 }
 
 .security-toggle-btn.has-expiring {
@@ -3413,8 +3376,26 @@ const handleResize = () => {
   color: #b42318;
 }
 
-.security-toggle-btn .toggle-label {
+.header-action-btn .toggle-label {
   font-weight: 500;
+}
+
+.header-action-btn .el-icon :deep(svg) {
+  stroke: currentColor;
+  stroke-width: 24;
+  stroke-linejoin: round;
+}
+
+.save-layout-icon {
+  color: #039855;
+}
+
+.customize-layout-icon {
+  color: #1570ef;
+}
+
+.exit-layout-icon {
+  color: #667085;
 }
 
 .security-toggle-btn .expiring-badge {

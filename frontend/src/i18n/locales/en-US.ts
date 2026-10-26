@@ -34,6 +34,7 @@ export default {
     actions: 'Actions',
     enabled: 'Enabled',
     disabled: 'Disabled',
+    notMonitored: 'Not monitored',
     status: 'Status',
     name: 'Name',
     type: 'Type',
@@ -64,9 +65,10 @@ export default {
 
   // ==================== Status Labels ====================
   statusLabels: {
+    unmonitored: 'Not monitored',
     up: 'UP',
     down: 'DOWN',
-    warning: 'WARNING',
+    warning: 'Warning',
     unknown: 'UNKNOWN',
     normal: 'Normal',
     healthy: 'Healthy',
@@ -223,6 +225,7 @@ export default {
     totalServices: 'Total Services',
     healthy: 'Healthy',
     warning: 'Warning',
+    downUnknownUnmonitored: 'Down / Unknown / Not monitored',
     downUnknown: 'Down / Unknown',
     allServices: 'All services',
     percentOfTotal: '% of total',
@@ -392,6 +395,7 @@ export default {
     riskMediumSimple: 'Medium',
     riskHighSimple: 'High',
     tagXProject: 'X-Project',
+    crossProjectTypeHint: 'Cross-project dependencies use the default type and a fixed dashed line.',
     // Batch edit dialog
     batchEditTitle: 'Batch Edit Services',
     batchEditInfo: 'Editing {n} service(s). Only fields you modify will be updated.',
@@ -1545,6 +1549,17 @@ export default {
 
   // InteractiveGraphCanvas
   graphCanvas: {
+    statusRefreshFailed: 'Status refresh failed. Displayed statuses may be out of date.',
+    retryStatus: 'Retry',
+    nodeCount: '{count} services',
+    selectedCount: '{count} selected',
+    lineBezier: 'Lines: curves',
+    lineOrthogonal: 'Lines: orthogonal',
+    applyLayout: 'Apply layout',
+    layoutRunning: 'Arranging…',
+    layoutFailed: 'Unable to calculate layout. Existing positions are unchanged. Please retry.',
+    renderFailed: 'Unable to render the topology. Please refresh and retry.',
+    dependencyTypesFailed: 'Unable to load dependency types. Showing built-in types.',
     viewServiceDetails: 'View details for {name}',
     viewportHint: 'Drag blank space to pan · Scroll to zoom · No movement limits',
     zoomIn: 'Zoom in',
@@ -1569,8 +1584,8 @@ export default {
     dirBottomTop: 'Bottom to Top',
     dirRightLeft: 'Right to Left',
     snapLabel: 'Snap:',
-    snapGrid: 'Grid',
-    snapGridDesc: 'Snap to grid (20px)',
+    snapGrid: 'Grid snap',
+    snapGridDesc: 'Show grid lines and snap to a 20-unit grid; alignment guides take priority',
     snapAlign: 'Align',
     snapAlignDesc: 'Smart alignment guidelines',
     // Edge context menu

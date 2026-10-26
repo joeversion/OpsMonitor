@@ -1,4 +1,5 @@
 import api from './index';
+import { shallowRef } from 'vue';
 
 export interface DependencyType {
   id: string;
@@ -33,9 +34,19 @@ export interface UpdateDependencyTypeDto {
   sort_order?: number;
 }
 
+export const dependencyTypeCatalog = shallowRef<DependencyType[] | null>(null);
+const renamedTypes = new Map<string, string>();
+
+export function resolveDependencyType(name?: string) {
+  const types = dependencyTypeCatalog.value;
+  return types?.find(type => type.name === name)
+    || types?.find(type => type.id === renamedTypes.get(name || ''));
+}
+
 // 获取所有依赖类型
 export async function getDependencyTypes(): Promise<DependencyType[]> {
   const res = await api.get('/dependency-types');
+  dependencyTypeCatalog.value = res.data;
   return res.data;
 }
 
@@ -48,16 +59,23 @@ export async function getDependencyType(id: string): Promise<DependencyType> {
 // 创建自定义依赖类型
 export async function createDependencyType(data: CreateDependencyTypeDto): Promise<DependencyType> {
   const res = await api.post('/dependency-types', data);
+  if (dependencyTypeCatalog.value) dependencyTypeCatalog.value = [...dependencyTypeCatalog.value, res.data];
   return res.data;
 }
 
 // 更新依赖类型
 export async function updateDependencyType(id: string, data: UpdateDependencyTypeDto): Promise<DependencyType> {
   const res = await api.put(`/dependency-types/${id}`, data);
+  const previous = dependencyTypeCatalog.value?.find(type => type.id === id);
+  if (previous && previous.name !== res.data.name) renamedTypes.set(previous.name, id);
+  if (dependencyTypeCatalog.value) {
+    dependencyTypeCatalog.value = dependencyTypeCatalog.value.map(type => type.id === id ? res.data : type);
+  }
   return res.data;
 }
 
 // 删除自定义依赖类型
 export async function deleteDependencyType(id: string): Promise<void> {
   await api.delete(`/dependency-types/${id}`);
+  if (dependencyTypeCatalog.value) dependencyTypeCatalog.value = dependencyTypeCatalog.value.filter(type => type.id !== id);
 }

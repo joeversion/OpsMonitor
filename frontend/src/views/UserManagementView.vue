@@ -9,7 +9,7 @@
     </div>
 
     <!-- Stats Cards -->
-    <el-row :gutter="20" class="stats-row">
+    <el-row :gutter="20" class="stats-row summary-cards">
       <el-col :span="8">
         <div class="stat-card">
           <div class="stat-icon" style="background: #ecf5ff; color: #409EFF;">
@@ -299,7 +299,7 @@ const passwordRules = computed<FormRules>(() => ({
   confirmPassword: [
     { required: true, message: t('users.ruleConfirmPasswordRequired'), trigger: 'blur' },
     {
-      validator: (rule: any, value: any, callback: any) => {
+      validator: (_rule: any, value: any, callback: any) => {
         if (value !== passwordForm.password) {
           callback(new Error(t('users.rulePasswordMismatch')));
         } else {

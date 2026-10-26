@@ -1,7 +1,7 @@
 <template>
   <div class="grafana-dashboards-view">
     <!-- Stats Row -->
-    <el-row :gutter="20" class="stats-row">
+    <el-row :gutter="20" class="stats-row summary-cards">
       <el-col :span="8">
         <div class="stat-card">
           <div class="stat-icon" style="background: #ecf5ff; color: #409EFF;">
@@ -393,7 +393,7 @@ const services = ref<Service[]>([]);
 
 // Filters
 const searchQuery = ref('');
-const filterProject = ref<number[]>([]);
+const filterProject = ref<string[]>([]);
 const filterEnabled = ref('');
 
 // Dialog
@@ -467,7 +467,7 @@ const filteredDashboards = computed(() => {
     const matchSearch = !searchQuery.value || 
       d.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       d.description?.toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchProject = filterProject.value.length === 0 || filterProject.value.includes(d.project_id);
+    const matchProject = filterProject.value.length === 0 || (d.project_id !== undefined && filterProject.value.includes(d.project_id));
     const matchEnabled = !filterEnabled.value || 
       (filterEnabled.value === 'enabled' ? d.enabled : !d.enabled);
     return matchSearch && matchProject && matchEnabled;
@@ -482,9 +482,9 @@ const groupedDashboards = computed(() => {
     if (!groups[folder]) groups[folder] = [];
     groups[folder].push(d);
   }
-  return Object.keys(groups).sort().map(name => ({
+  return Object.entries(groups).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([name, dashboards]) => ({
     name,
-    dashboards: groups[name].sort((a, b) => a.title.localeCompare(b.title))
+    dashboards: dashboards.sort((a, b) => a.title.localeCompare(b.title))
   }));
 });
 

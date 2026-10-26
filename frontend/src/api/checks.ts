@@ -18,6 +18,7 @@ export interface SystemStats {
   down: number;
   warning: number;
   unknown: number;
+  unmonitored: number;
   total: number;
 }
 
@@ -36,7 +37,7 @@ export const runCheck = async (serviceId: string): Promise<CheckResult> => {
   return response.data;
 };
 
-export const getSystemStats = async (projectId?: number | null): Promise<SystemStats> => {
+export const getSystemStats = async (projectId?: string | number | null): Promise<SystemStats> => {
   const params = projectId ? { project_id: projectId } : {};
   const response = await api.get<SystemStats>('/checks/stats/summary', { params });
   return response.data;

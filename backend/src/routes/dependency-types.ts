@@ -61,11 +61,16 @@ const initDependencyTypes = () => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
-    insertStmt.run('type-depends', 'depends', 'Depends', '🔗', 'Strong dependency, must be available', '#ef4444', 'solid', 1, 1);
+    insertStmt.run('type-depends', 'depends', 'Depends', '🔗', 'Strong dependency, must be available', '#1570ef', 'solid', 1, 1);
     insertStmt.run('type-uses', 'uses', 'Uses', '📡', 'Weak dependency, can degrade', '#6366f1', 'dashed', 1, 2);
     insertStmt.run('type-sync', 'sync', 'Sync', '🔄', 'Data synchronization relationship', '#06b6d4', 'dotted', 1, 3);
     insertStmt.run('type-backup', 'backup', 'Backup', '💾', 'Backup/redundancy relationship', '#10b981', 'long-dash', 1, 4);
   }
+  db.prepare(`
+    UPDATE dependency_types SET color = '#1570ef'
+    WHERE id = 'type-depends' AND name = 'depends' AND is_system = 1
+      AND color = '#ef4444' AND updated_at = created_at
+  `).run();
 };
 
 // 初始化
@@ -148,30 +153,27 @@ router.put('/:id', (req: Request, res: Response) => {
       if (nameConflict) {
         return res.status(400).json({ error: 'Dependency type name already exists' });
       }
-      
-      // 检查是否有依赖关系使用旧的 name，如果有则需要更新它们
-      const usageCount = db.prepare('SELECT COUNT(*) as count FROM service_dependencies WHERE dependency_type = ?').get(existing.name) as { count: number };
-      if (usageCount.count > 0) {
-        // 更新所有使用旧 name 的依赖关系
-        db.prepare('UPDATE service_dependencies SET dependency_type = ? WHERE dependency_type = ?').run(name, existing.name);
-      }
     }
     
-    // 更新依赖类型（包括 name）
-    db.prepare(`
-      UPDATE dependency_types 
-      SET name = COALESCE(?, name),
-          label = COALESCE(?, label),
-          icon = COALESCE(?, icon),
-          description = COALESCE(?, description),
-          color = COALESCE(?, color),
-          line_style = COALESCE(?, line_style),
-          sort_order = COALESCE(?, sort_order),
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(name, label, icon, description, color, line_style, sort_order, id);
-    
-    const updated = db.prepare('SELECT * FROM dependency_types WHERE id = ?').get(id);
+    const updated = db.transaction(() => {
+      if (name && name !== existing.name) {
+        db.prepare('UPDATE service_dependencies SET dependency_type = ? WHERE dependency_type = ?').run(name, existing.name);
+      }
+      db.prepare(`
+        UPDATE dependency_types
+        SET name = COALESCE(?, name),
+            label = COALESCE(?, label),
+            icon = COALESCE(?, icon),
+            description = COALESCE(?, description),
+            color = COALESCE(?, color),
+            line_style = COALESCE(?, line_style),
+            sort_order = COALESCE(?, sort_order),
+            updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
+        WHERE id = ?
+      `).run(name, label, icon, description, color, line_style, sort_order, id);
+
+      return db.prepare('SELECT * FROM dependency_types WHERE id = ?').get(id);
+    })();
     res.json(updated);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

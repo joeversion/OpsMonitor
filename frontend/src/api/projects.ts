@@ -14,6 +14,17 @@ export interface ProjectWithStats extends Project {
   healthy_count: number;
   warning_count: number;
   down_count: number;
+  unknown_count: number;
+  unmonitored_count: number;
+}
+
+export function getProjectHealth(project: ProjectWithStats) {
+  if (project.down_count > 0) return 'down';
+  if (project.warning_count > 0) return 'warning';
+  if (project.unknown_count > 0) return 'unknown';
+  if (project.healthy_count > 0) return 'healthy';
+  if (project.unmonitored_count > 0) return 'unmonitored';
+  return 'empty';
 }
 
 export interface ProjectGraphData {
@@ -21,6 +32,7 @@ export interface ProjectGraphData {
     id: string;
     name: string;
     status: 'up' | 'down' | 'warning' | 'unknown';
+    enabled: number;
     responseTime?: number;
     host: string;
     port: number;

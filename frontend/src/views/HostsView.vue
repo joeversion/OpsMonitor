@@ -13,7 +13,7 @@
       </div>
       
       <!-- Stats Cards -->
-      <div class="stats-grid">
+      <div class="stats-grid summary-cards">
         <div class="stat-card">
           <div class="stat-value">{{ filteredHosts.length }}</div>
           <div class="stat-label">{{ $t('hosts.totalHosts') }}</div>
@@ -93,6 +93,7 @@
                 </span>
                 <span 
                   class="quick-badge" 
+                  :title="host.health_stats?.unmonitored_count === host.service_count && host.service_count ? t('common.notMonitored') : undefined"
                   :class="`badge-svc-${getServiceStatus(host)}`">
                   <span v-if="getServiceStatus(host) !== 'none'">●</span>
                   <span v-else>−</span>{{ $t('hosts.badgeSvc') }}
@@ -112,23 +113,27 @@
               <div class="content-value">
                 <span v-if="!host.service_count" class="no-services">{{ $t('hosts.noServices') }}</span>
                 <template v-else>
-                  <span class="info-text">{{ host.service_count }} {{ $t('hosts.monitored') }}</span>
+                  <span class="info-text">{{ host.service_count }} {{ $t('projectsPage.services') }}</span>
                   <el-button type="text" size="small" @click.stop="goToHostDetail(host)" style="margin-left:8px">{{ $t('hosts.btnViewServices') }}</el-button>
-                  <span v-if="host.health_stats?.up_count > 0" class="stat-chip up">
+                  <span v-if="host.health_stats && host.health_stats.up_count > 0" class="stat-chip up">
                     <span>✓</span>
                     <span>{{ host.health_stats.up_count }} {{ $t('statusLabels.up') }}</span>
                   </span>
-                  <span v-if="host.health_stats?.warning_count > 0" class="stat-chip warning">
+                  <span v-if="host.health_stats && host.health_stats.warning_count > 0" class="stat-chip warning">
                     <span>⚠</span>
                     <span>{{ host.health_stats.warning_count }} {{ $t('statusLabels.warning') }}</span>
                   </span>
-                  <span v-if="host.health_stats?.down_count > 0" class="stat-chip down">
+                  <span v-if="host.health_stats && host.health_stats.down_count > 0" class="stat-chip down">
                     <span>✗</span>
                     <span>{{ host.health_stats.down_count }} {{ $t('statusLabels.down') }}</span>
                   </span>
-                  <span v-if="host.health_stats?.unknown_count > 0" class="stat-chip unknown">
+                  <span v-if="host.health_stats && host.health_stats.unknown_count > 0" class="stat-chip unknown">
                     <span>?</span>
                     <span>{{ host.health_stats.unknown_count }} {{ $t('statusLabels.unknown') }}</span>
+                  </span>
+                  <span v-if="host.health_stats && host.health_stats.unmonitored_count > 0" class="stat-chip unknown">
+                    <span>−</span>
+                    <span>{{ host.health_stats.unmonitored_count }} {{ $t('common.notMonitored') }}</span>
                   </span>
                 </template>
               </div>
@@ -469,11 +474,11 @@
 <script setup lang="ts">
 import { ref, computed, inject, onMounted, watch, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { Plus, Search, Grid, List, Connection } from '@element-plus/icons-vue';
+import { Plus, Grid, List } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox, ElLoading, type FormInstance, type FormRules } from 'element-plus';
 import { useI18n } from 'vue-i18n';
 import hostsApi from '../api/hosts';
-import type { Host, CreateHostDto } from '../types/host';
+import type { Host, HostForm } from '../types/host';
 import { getProjects, type ProjectWithStats } from '../api/projects';
 import api from '../api';
 import authUtils from '../utils/auth';
@@ -497,7 +502,6 @@ const loading = ref(false);
 const saving = ref(false);
 const testing = ref(false);
 const allHosts = ref<Host[]>([]);
-const autoRefresh = ref(true); // Default to true, timer starts in onMounted
 let refreshTimer: number | null = null;
 const projects = ref<ProjectWithStats[]>([]);
 const searchQuery = ref('');
@@ -511,7 +515,7 @@ const isEditing = ref(false);
 const editingId = ref('');
 const formRef = ref<FormInstance>();
 
-const hostForm = ref<CreateHostDto>({
+const hostForm = ref<HostForm>({
   name: '',
   ip: '',
   project_id: '',
@@ -543,7 +547,7 @@ const formRules = computed<FormRules>(() => ({
   ip: [
     { required: true, message: t('hosts.ruleAddressRequired'), trigger: 'blur' },
     { 
-      validator: (rule: any, value: any, callback: any) => {
+      validator: (_rule: any, value: any, callback: any) => {
         // Allow IP address (e.g., 192.168.1.100) or hostname/domain (e.g., example.com, localhost)
         const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
         const hostnamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
@@ -642,25 +646,6 @@ onUnmounted(() => {
 watch(() => (currentProjectId as any)?.value, () => {
   fetchHosts();
 });
-
-// 自动刷新处理
-const handleAutoRefreshChange = (enabled: boolean) => {
-  // Always clear existing timer first to prevent duplicates
-  if (refreshTimer) {
-    clearInterval(refreshTimer);
-    refreshTimer = null;
-  }
-  
-  if (enabled) {
-    // Start auto-refresh every 30 seconds
-    refreshTimer = window.setInterval(() => {
-      fetchHosts();
-    }, 30000);
-    ElMessage.success(t('hosts.msgAutoRefresh'));
-  } else {
-    ElMessage.info(t('hosts.msgAutoRefreshStopped'));
-  }
-};
 
 // 计算可用的代理主机（SSH类型且不是当前正在编辑的主机）
 const availableProxyHosts = computed(() => {
@@ -907,7 +892,11 @@ const getServiceStatus = (host: Host): string => {
     return 'warn';
   }
   
-  // 全部 up
+  if (host.health_stats.unknown_count > 0) {
+    return 'none';
+  }
+
+  // 至少有一个正常服务，其余未监控服务不参与健康判断
   if (host.health_stats.up_count > 0) {
     return 'ok';
   }
@@ -1003,9 +992,9 @@ const testConnection = async (host: Host) => {
       ssh_proxy_port: host.ssh_proxy_port,
       // SSH connection settings (per-host)
       ssh_max_retries: host.ssh_max_retries,
-      ssh_retry_delay: host.ssh_retry_delay * 1000,
-      ssh_connection_timeout: host.ssh_connection_timeout * 1000,
-      ssh_command_timeout: host.ssh_command_timeout * 1000
+      ssh_retry_delay: host.ssh_retry_delay === undefined ? undefined : host.ssh_retry_delay * 1000,
+      ssh_connection_timeout: host.ssh_connection_timeout === undefined ? undefined : host.ssh_connection_timeout * 1000,
+      ssh_command_timeout: host.ssh_command_timeout === undefined ? undefined : host.ssh_command_timeout * 1000
     });
     
     clearTimeout(timeoutWarning);
@@ -1086,19 +1075,6 @@ const testConnectionDialog = async () => {
   };
 
   await testConnection(tempHost);
-};
-
-const handleAddService = () => {
-  if (!selectedHost.value) return;
-  
-  // Navigate to services page with host filter parameter
-  router.push({
-    path: '/services',
-    query: {
-      host_id: selectedHost.value.id,
-      project_id: selectedHost.value.project_id
-    }
-  });
 };
 
 // Project-aware navigation helpers

@@ -20,7 +20,7 @@
     </div>
     
     <!-- Overview Stats -->
-    <el-row :gutter="20" class="stats-row">
+    <el-row :gutter="20" class="stats-row summary-cards">
       <el-col :span="6">
         <div class="stat-card">
           <div class="stat-icon" style="background: #ecf5ff; color: #409EFF;">

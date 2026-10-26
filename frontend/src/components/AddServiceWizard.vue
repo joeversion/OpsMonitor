@@ -469,7 +469,9 @@
             </el-table-column>
             <el-table-column :label="$t('common.type')" width="120">
               <template #default="scope">
-                <el-select v-model="scope.row.dependency_type" size="small">
+                <el-select v-model="scope.row.dependency_type" size="small"
+                  :disabled="isCrossProjectDependency(scope.row.target_service_id)"
+                  :title="isCrossProjectDependency(scope.row.target_service_id) ? $t('services.crossProjectTypeHint') : undefined">
                   <el-option
                     v-for="type in dependencyTypes"
                     :key="type.name"
@@ -523,7 +525,9 @@
             </el-select>
           </el-col>
           <el-col :span="6">
-            <el-select v-model="newDependency.dependency_type" style="width: 100%;">
+            <el-select v-model="newDependency.dependency_type" style="width: 100%;"
+              :disabled="isCrossProjectDependency(newDependency.target_service_id)"
+              :title="isCrossProjectDependency(newDependency.target_service_id) ? $t('services.crossProjectTypeHint') : undefined">
               <el-option
                 v-for="type in dependencyTypes"
                 :key="type.name"
@@ -531,6 +535,7 @@
                 :value="type.name"
               />
             </el-select>
+            <div v-if="isCrossProjectDependency(newDependency.target_service_id)" class="form-hint">{{ $t('services.crossProjectTypeHint') }}</div>
           </el-col>
           <el-col :span="5">
             <el-select v-model="newDependency.risk_level" style="width: 100%;">
@@ -855,20 +860,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue';
+import { ref, reactive, computed, watch, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import {
-  Plus, Edit, Monitor, Right, Check, Setting, Bell, Warning,
-  Document, Pointer, DataLine, Clock, CircleClose, Link, Delete, Close
+  Plus, Edit, Monitor, Check, Setting, Bell, Warning,
+  Document, Pointer, Clock, CircleClose, Delete, Close
 } from '@element-plus/icons-vue';
 import ScheduleConfigPanel from './ScheduleConfigPanel.vue';
 import IconSelector from './IconSelector.vue';
 import { hostsApi } from '../api/hosts';
 import { getServiceDependencies } from '../api/dependencies';
 import type { ScheduleConfig } from '../types/schedule';
-import type { Service, CreateServiceDto } from '../types/service';
-import type { Host, CreateHostDto } from '../types/host';
+import type { Service, CreateServiceDto, ScriptCheckConfig, FileCheckConfig } from '../types/service';
+import type { Host, HostForm } from '../types/host';
 import type { ProjectWithStats } from '../api/projects';
 import type { DependencyType } from '../api/dependency-types';
 
@@ -947,7 +952,7 @@ const submitting = ref(false);
 const showBanner = ref(true);
 
 // Form data
-const form = reactive<CreateServiceDto>({
+const form = reactive<CreateServiceDto & { failure_threshold: number }>({
   name: '',
   project_id: undefined,
   host: '',
@@ -973,7 +978,7 @@ const selectedHostData = ref<Host | null>(null);
 // Add Host Dialog
 const showAddHostDialog = ref(false);
 const creatingHost = ref(false);
-const newHostForm = reactive<CreateHostDto>({
+const newHostForm = reactive<HostForm>({
   name: '',
   ip: '',
   project_id: '',
@@ -1005,7 +1010,7 @@ const httpConfig = reactive({
 });
 
 // Script config
-const scriptCheckConfig = reactive({
+const scriptCheckConfig = reactive<ScriptCheckConfig>({
   script_type: 'bash',
   script_content: '',
   expected_exit_code: 0,
@@ -1013,7 +1018,7 @@ const scriptCheckConfig = reactive({
 });
 
 // File check config
-const fileCheckConfig = reactive({
+const fileCheckConfig = reactive<FileCheckConfig>({
   mode: 'single',
   file_path: '',
   directory_path: '',
@@ -1042,6 +1047,7 @@ interface ServiceDepItem {
   dependency_type: string;
   risk_level: string;
   isNew?: boolean;
+  isExisting?: boolean;
 }
 const serviceDependencies = ref<ServiceDepItem[]>([]);
 const newDependency = reactive({
@@ -1224,8 +1230,22 @@ const isCrossProjectDependency = (targetServiceId: string): boolean => {
   // Compare with current form project_id
   const currentProjectId = form.project_id;
   if (!targetService) return false;
-  return targetService.project_id !== currentProjectId;
+  return (targetService.project_id || null) !== (currentProjectId || null);
 };
+
+const defaultDependencyType = computed(() => props.dependencyTypes.find(type => type.id === 'type-depends')?.name || 'depends');
+
+watchEffect(() => {
+  if (!props.modelValue || !props.dependencyTypes.length) return;
+  if (isCrossProjectDependency(newDependency.target_service_id)) {
+    newDependency.dependency_type = defaultDependencyType.value;
+  }
+  for (const dependency of serviceDependencies.value) {
+    if (isCrossProjectDependency(dependency.target_service_id)) {
+      dependency.dependency_type = defaultDependencyType.value;
+    }
+  }
+});
 
 const addDependency = () => {
   if (!newDependency.target_service_id) return;
@@ -1341,22 +1361,22 @@ const handleSubmit = async () => {
 
     // Add HTTP config if applicable (timeout UI is in seconds, store as ms)
     if (form.check_type === 'http' || form.check_type === 'https') {
-      (submitData as any).http_config = { ...httpConfig, timeout: httpConfig.timeout * 1000 };
+      submitData.http_config = { ...httpConfig, timeout: httpConfig.timeout * 1000 };
     }
 
     // Add TCP config if applicable (timeout UI is in seconds, store as ms)
     if (form.check_type === 'tcp') {
-      (submitData as any).check_config = JSON.stringify({ timeout: tcpConfig.timeout * 1000 });
+      submitData.check_config = JSON.stringify({ timeout: tcpConfig.timeout * 1000 });
     }
 
     // Add script config if applicable
     if (form.check_type === 'script') {
-      (submitData as any).script_config = scriptCheckConfig;
+      submitData.script_config = scriptCheckConfig;
     }
 
     // Add file config if applicable
     if (form.check_type === 'file' || form.check_type === 'log') {
-      (submitData as any).file_config = fileCheckConfig;
+      submitData.file_config = fileCheckConfig;
     }
 
     emit('submit', submitData, serviceDependencies.value);

@@ -1,7 +1,7 @@
 # OpsMonitor Service Monitoring System — User Manual
 
 > **Version**: 2.2.0
-> **Updated**: 2026-10-19
+> **Updated**: 2026-10-23
 > **Scope**: OpsMonitor Service Monitoring System (Frontend port: 5173, Backend port: 3000)
 
 > Revised against the current source code. Features marked as limited or coming soon are not complete. Existing screenshots are for orientation; follow the text for newly documented operations.
@@ -329,9 +329,9 @@ Four statistics cards are displayed at the top of the page:
 | **Total Services** | Total number of services in the current project (or all projects) |
 | **Healthy** | Number of services with UP status |
 | **Warning** | Number of services with WARNING status |
-| **Down** | Number of services with DOWN/UNKNOWN status |
+| **Down** | Combined count of DOWN, UNKNOWN, and not monitored services; the card shows a separate breakdown |
 
-Each card includes a progress bar below it for visual representation of status proportions.
+Each card includes a progress bar below it for visual representation of status proportions. Not monitored means monitoring is disabled for the service; it is counted separately from UNKNOWN.
 
 ### 5.2 Charts
 
@@ -339,7 +339,7 @@ Below the statistics cards are two chart panels and a system overview area:
 
 | Chart | Description |
 |-------|-------------|
-| **Status Distribution Pie Chart** | Shows the proportion of services in each status: UP / WARNING / DOWN / UNKNOWN |
+| **Status Distribution Pie Chart** | Shows the proportion of services in each status: UP / WARNING / DOWN / UNKNOWN / Not monitored |
 | **Project Services Bar Chart** | Displays service counts grouped by project |
 | **System Overview** | Quick statistics for projects, hosts, dependencies, Grafana dashboards, security configs, and issues |
 
@@ -428,6 +428,8 @@ The last card in the project list is an **Add New Project** card. Clicking it op
 | Individual project names | Switch to that project's context; colored dots on the right indicate health status (🟢 Healthy / 🟡 Warning / 🔴 Fault) |
 | **New Project** | Navigate to the Projects page and open the creation dialog |
 | **Manage Projects** | Navigate to the Projects page for project management |
+
+Project cards show separate healthy and warning counts, plus a combined **DOWN / UNKNOWN / Not monitored** count. Not monitored services are counted separately from UNKNOWN.
 
 ---
 
@@ -526,10 +528,12 @@ The add/edit host dialog provides a **Connection Test** feature:
 |-------------|-------|---------|
 | CONN OK | 🟢 Green | Last connection test succeeded |
 | CONN FAIL | 🔴 Red | Last connection test failed |
-| SVC OK | 🟢 Green | All services on this host are healthy |
+| SVC OK | 🟢 Green | Host service health is normal (see details below) |
 | SVC WARN | 🟠 Orange | Some services on this host are in warning state |
 | SVC ERROR | 🔴 Red | Some services on this host are in fault state |
-| SVC — | Gray | No services configured on this host yet |
+| SVC — | Gray | No service health status is available; the host may have no services, services without a status, or only services with monitoring disabled |
+
+Host cards show separate counts for UP, WARNING, DOWN, UNKNOWN, and **Not monitored** services. Services with monitoring disabled are counted as Not monitored, not UNKNOWN, and do not affect the host service-health badge. If all services on a host are not monitored, the badge is the gray SVC —. SVC OK means at least one service is UP and no service is DOWN, WARNING, or UNKNOWN; not monitored services are excluded.
 
 ### 7.6 Edit & Delete Hosts
 
@@ -778,7 +782,8 @@ In the service list, click the **run button (▶)** on a service row to immediat
 | **UP** | 🟢 Green | Service is healthy, latest check succeeded |
 | **WARNING** | 🟠 Orange | Consecutive failures reached the Warning threshold |
 | **DOWN** | 🔴 Red | Consecutive failures reached the Error threshold |
-| **UNKNOWN** | Gray | No check has been executed yet, or monitoring is disabled |
+| **UNKNOWN** | Gray | Monitoring is enabled, but there is no valid check status yet |
+| **Not monitored** | Gray | Monitoring is disabled for the service; counted separately from UNKNOWN |
 
 ### 8.12 Service Details & History
 
@@ -879,8 +884,11 @@ The dependency topology graph visualizes all services within a project and their
 | **Pan Canvas** | Click and drag on blank area |
 | **View Service Details** | Use the node's service details entry point to open the details drawer |
 | **Save Layout** | Administrators adjust nodes in Customize Layout mode and click Save Layout |
+| **Automatic Layout** | In customization mode, choose Directed, Force, or Grid layout and a direction, then click Apply Layout |
+| **Lines & Alignment** | Toggle curved/orthogonal edges; optionally enable grid snapping and node alignment guides |
+| **Fit & Fullscreen** | Use Fit View to fit the graph to the canvas, or switch to fullscreen |
 
-Administrators should enter **Customize Layout**, make adjustments, click **Save Layout**, then exit customization. Box selection, multiple selection and group movement are supported. Dragging alone should not be treated as a persisted change. Viewers cannot edit layouts or dependencies. The interactive canvas also supports adding, editing and deleting dependency links.
+Administrators should enter **Customize Layout**, adjust nodes manually or apply an automatic layout, click **Save Layout**, then exit customization. Box selection, multiple selection and group movement are supported. Dragging or applying a layout without saving does not persist the change. Viewers cannot edit layouts or dependencies. The interactive canvas also supports adding, editing and deleting dependency links.
 
 ### 10.2 Node & Edge Meanings
 
@@ -892,6 +900,7 @@ Administrators should enter **Customize Layout**, make adjustments, click **Save
 | 🟠 Orange | WARNING |
 | 🔴 Red | DOWN (Fault) |
 | Gray | UNKNOWN |
+| Gray dashed | Not monitored (monitoring is disabled) |
 
 **Edge Colors** (represent dependency chain status):
 

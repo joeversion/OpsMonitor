@@ -1,6 +1,6 @@
 <template>
   <span class="service-icon" :style="{ fontSize: size + 'px' }">
-    <Icon v-if="isIconifyIcon" :icon="icon" :width="size" />
+    <Icon v-if="icon && isIconifyIcon" :icon="icon" :width="size" />
     <span v-else class="icon-emoji">{{ icon || defaultIcon }}</span>
   </span>
 </template>

@@ -94,10 +94,11 @@ OpsMonitor/
 │   │   │   └── schedule-validator.ts # 调度验证工具
 │   │   ├── types/           # TypeScript 类型定义
 │   │   └── app.ts           # Express 应用入口
-│   ├── scripts/               # 运维脚本 (3 个)
+│   ├── scripts/               # 运维与文档脚本 (4 个)
 │   │   ├── check-data-consistency.js
 │   │   ├── add-data-consistency-triggers.js
-│   │   └── add-host-sync-trigger.js
+│   │   ├── add-host-sync-trigger.js
+│   │   └── seed-docs-screenshots.js # 初始化隔离的手册截图演示数据
 │   ├── Dockerfile             # 生产环境 Docker 镜像
 │   ├── package.json
 │   └── tsconfig.json
@@ -117,13 +118,13 @@ OpsMonitor/
 │   │   │   ├── ConnectionsView.vue   # SSH 连接管理
 │   │   │   ├── SettingsView.vue      # 系统设置
 │   │   │   └── UserManagementView.vue # 用户管理
-│   │   ├── components/      # 可复用组件 (14 个)
+│   │   ├── components/      # 可复用组件
 │   │   │   ├── AddServiceWizard.vue  # 添加服务向导
 │   │   │   ├── LangSwitch.vue        # 语言切换组件
 │   │   │   ├── ProjectSelector.vue   # 项目选择器
 │   │   │   ├── StatusBadge.vue       # 服务状态徽章
 │   │   │   ├── ResponseChart.vue     # 响应时间图表
-│   │   │   ├── InteractiveGraphCanvas.vue # 交互式依赖图画布
+│   │   │   ├── InteractiveGraphCanvas.vue # Vue Flow 交互式依赖图画布
 │   │   │   ├── LayeredGraphCanvas.vue # 分层依赖图画布
 │   │   │   ├── ScheduleConfigPanel.vue # 调度配置面板
 │   │   │   ├── ScheduleTemplateSelector.vue # 调度模板选择器
@@ -131,7 +132,13 @@ OpsMonitor/
 │   │   │   ├── WeekdaySelector.vue   # 星期选择器
 │   │   │   ├── IconSelector.vue      # 图标选择器
 │   │   │   ├── ServiceIcon.vue       # 服务图标
-│   │   │   └── HelloWorld.vue        # 示例组件
+│   │   │   ├── HelloWorld.vue        # 示例组件
+│   │   │   └── topology/             # 拓扑节点、连线、布局与几何工具
+│   │   │       ├── ServiceTopologyNode.vue
+│   │   │       ├── ServiceTopologyEdge.vue
+│   │   │       ├── layout.ts         # ELK.js 自动布局
+│   │   │       ├── geometry.ts       # 对齐辅助
+│   │   │       └── types.ts
 │   │   ├── api/             # API 调用封装
 │   │   ├── i18n/            # 国际化 (中英文)
 │   │   ├── router/          # Vue Router 路由配置
@@ -189,6 +196,34 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### 用户手册截图（隔离演示数据）
+
+复拍手册截图时，可使用独立的 `backend/data/docs-screenshots.db`，不要连接生产库或包含真实数据的开发库。Windows PowerShell 中依次在三个终端执行：
+
+```powershell
+# 终端 1：初始化空截图数据库并启动后端
+Set-Location backend
+node scripts/seed-docs-screenshots.js init
+$env:DB_PATH = (Join-Path (Get-Location) 'data\docs-screenshots.db')
+$env:PORT = '3001'
+npm run dev
+```
+
+```powershell
+# 终端 2：后端启动至少 35 秒后播种（确保空数据库的调度器已完成初始化）
+Set-Location backend
+node scripts/seed-docs-screenshots.js seed
+```
+
+```powershell
+# 终端 3：启动使用隔离后端的前端
+Set-Location frontend
+$env:VITE_API_PROXY_TARGET = 'http://localhost:3001'
+.\node_modules\.bin\vite.cmd --host 127.0.0.1 --port 5175 --strictPort
+```
+
+打开 `http://127.0.0.1:5175`，切换到英文界面；概览、项目、主机和服务截图使用 **All Projects**，拓扑图选择 **Atlas Commerce**。演示数据使用虚构名称和保留测试网段，服务告警关闭、主机监控关闭。截图文件位于 `docs/images/`。
 
 ### 生产部署
 
@@ -274,7 +309,7 @@ JWT_SECRET=your-secret-key-here   # 默认已内置，生产环境建议替换
 
 ## 技术栈
 
-**前端:** Vue 3 + TypeScript · Element Plus · ECharts & G6 · Pinia · Axios · vue-i18n
+**前端:** Vue 3 + TypeScript · Element Plus · ECharts & G6 · Vue Flow · ELK.js · Pinia · Axios · vue-i18n
 
 **后端:** Node.js + Express · SQLite · JWT · node-cron · ssh2
 
@@ -372,10 +407,11 @@ OpsMonitor/
 │   │   │   └── schedule-validator.ts # Schedule validation utility
 │   │   ├── types/           # TypeScript type definitions
 │   │   └── app.ts           # Express app entry point
-│   ├── scripts/               # Maintenance scripts (3)
+│   ├── scripts/               # Maintenance and documentation scripts (4)
 │   │   ├── check-data-consistency.js
 │   │   ├── add-data-consistency-triggers.js
-│   │   └── add-host-sync-trigger.js
+│   │   ├── add-host-sync-trigger.js
+│   │   └── seed-docs-screenshots.js # Seed isolated user-manual screenshot data
 │   ├── Dockerfile             # Production Docker image
 │   ├── package.json
 │   └── tsconfig.json
@@ -395,13 +431,13 @@ OpsMonitor/
 │   │   │   ├── ConnectionsView.vue   # SSH connection management
 │   │   │   ├── SettingsView.vue      # System settings
 │   │   │   └── UserManagementView.vue # User management
-│   │   ├── components/      # Reusable components (14)
+│   │   ├── components/      # Reusable components
 │   │   │   ├── AddServiceWizard.vue  # Add service wizard
 │   │   │   ├── LangSwitch.vue        # Language switch component
 │   │   │   ├── ProjectSelector.vue   # Project selector
 │   │   │   ├── StatusBadge.vue       # Service status badge
 │   │   │   ├── ResponseChart.vue     # Response time chart
-│   │   │   ├── InteractiveGraphCanvas.vue # Interactive dependency graph canvas
+│   │   │   ├── InteractiveGraphCanvas.vue # Vue Flow interactive dependency graph
 │   │   │   ├── LayeredGraphCanvas.vue # Layered dependency graph canvas
 │   │   │   ├── ScheduleConfigPanel.vue # Schedule config panel
 │   │   │   ├── ScheduleTemplateSelector.vue # Schedule template selector
@@ -409,7 +445,13 @@ OpsMonitor/
 │   │   │   ├── WeekdaySelector.vue   # Weekday selector
 │   │   │   ├── IconSelector.vue      # Icon selector
 │   │   │   ├── ServiceIcon.vue       # Service icon
-│   │   │   └── HelloWorld.vue        # Example component
+│   │   │   ├── HelloWorld.vue        # Example component
+│   │   │   └── topology/             # Topology nodes, edges, layout, and geometry
+│   │   │       ├── ServiceTopologyNode.vue
+│   │   │       ├── ServiceTopologyEdge.vue
+│   │   │       ├── layout.ts         # ELK.js automatic layout
+│   │   │       ├── geometry.ts       # Alignment guides
+│   │   │       └── types.ts
 │   │   ├── api/             # API call wrappers
 │   │   ├── i18n/            # Internationalization (zh-CN / en-US)
 │   │   ├── router/          # Vue Router configuration
@@ -467,6 +509,34 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### User Manual Screenshots (Isolated Demo Data)
+
+For manual screenshots, use the isolated `backend/data/docs-screenshots.db`; do not connect to a production or real-data development database. In Windows PowerShell, run these commands in three separate terminals:
+
+```powershell
+# Terminal 1: initialize the empty screenshot database and start the backend
+Set-Location backend
+node scripts/seed-docs-screenshots.js init
+$env:DB_PATH = (Join-Path (Get-Location) 'data\docs-screenshots.db')
+$env:PORT = '3001'
+npm run dev
+```
+
+```powershell
+# Terminal 2: seed at least 35 seconds after backend startup so its empty scheduler has initialized
+Set-Location backend
+node scripts/seed-docs-screenshots.js seed
+```
+
+```powershell
+# Terminal 3: start the frontend with the isolated backend proxy
+Set-Location frontend
+$env:VITE_API_PROXY_TARGET = 'http://localhost:3001'
+.\node_modules\.bin\vite.cmd --host 127.0.0.1 --port 5175 --strictPort
+```
+
+Open `http://127.0.0.1:5175` and switch to English. Use **All Projects** for the overview, projects, hosts, and services screenshots; select **Atlas Commerce** for the topology screenshot. Demo names are synthetic, addresses use a reserved test network, service alerts are disabled, and host monitoring is disabled. Screenshot files are in `docs/images/`.
 
 ### Production Deployment
 
@@ -552,7 +622,7 @@ Full documentation: [User Manual (English)](docs/USER_MANUAL_EN.md) | [用户手
 
 ## Tech Stack
 
-**Frontend:** Vue 3 + TypeScript · Element Plus · ECharts & G6 · Pinia · Axios · vue-i18n
+**Frontend:** Vue 3 + TypeScript · Element Plus · ECharts & G6 · Vue Flow · ELK.js · Pinia · Axios · vue-i18n
 
 **Backend:** Node.js + Express · SQLite · JWT · node-cron · ssh2
 

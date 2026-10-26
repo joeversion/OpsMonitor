@@ -9,7 +9,7 @@
     </div>
 
     <!-- Global Stats -->
-    <el-row :gutter="20" class="stats-row">
+    <el-row :gutter="20" class="stats-row summary-cards">
       <el-col :span="4">
         <div class="stat-card">
           <div class="stat-icon" style="background: #ecf5ff; color: #409EFF;">
@@ -60,8 +60,9 @@
             <el-icon :size="24"><CircleCloseFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">{{ $t('statusLabels.down') }}</div>
-            <div class="stat-value" style="color: #F56C6C">{{ totalDown }}</div>
+            <div class="stat-label">{{ $t('home.downUnknownUnmonitored') }}</div>
+            <div class="stat-value" style="color: #F56C6C">{{ totalDown + totalUnknown + totalUnmonitored }}</div>
+            <div class="stat-detail">{{ totalDown }} {{ $t('home.down') }}, {{ totalUnknown }} {{ $t('home.unknown') }}, {{ totalUnmonitored }} {{ $t('common.notMonitored') }}</div>
           </div>
         </div>
       </el-col>
@@ -73,7 +74,7 @@
         v-for="project in filteredProjects" 
         :key="project.id" 
         class="project-card"
-        :class="{ 'is-current': String(project.id) === String(currentProjectId?.value) }"
+        :class="{ 'is-current': String(project.id) === String(currentProjectId) }"
         @click="selectProject(project)"
       >
         <div class="card-header">
@@ -130,19 +131,19 @@
         <div class="card-stats">
           <div class="pstat">
             <div class="pstat-value">{{ project.service_count }}</div>
-            <div class="pstat-label">{{ $t('projectsPage.services') }}</div>
+            <div class="pstat-label" :title="$t('projectsPage.services')">{{ $t('projectsPage.services') }}</div>
           </div>
           <div class="pstat">
             <div class="pstat-value healthy">{{ project.healthy_count }}</div>
-            <div class="pstat-label">{{ $t('statusLabels.healthy') }}</div>
+            <div class="pstat-label" :title="$t('statusLabels.healthy')">{{ $t('statusLabels.healthy') }}</div>
           </div>
           <div class="pstat">
             <div class="pstat-value warning">{{ project.warning_count }}</div>
-            <div class="pstat-label">{{ $t('statusLabels.warning') }}</div>
+            <div class="pstat-label" :title="$t('statusLabels.warning')">{{ $t('statusLabels.warning') }}</div>
           </div>
           <div class="pstat">
-            <div class="pstat-value down">{{ project.down_count }}</div>
-            <div class="pstat-label">{{ $t('statusLabels.down') }}</div>
+            <div class="pstat-value down">{{ project.down_count + project.unknown_count + project.unmonitored_count }}</div>
+            <div class="pstat-label" :title="$t('home.downUnknownUnmonitored')">{{ $t('home.downUnknownUnmonitored') }}</div>
           </div>
         </div>
       </div>
@@ -229,7 +230,7 @@ import {
   MoreFilled, Edit, Delete, Check
 } from '@element-plus/icons-vue';
 import { 
-  getProjects, createProject, updateProject, deleteProject,
+  getProjects, createProject, updateProject, deleteProject, getProjectHealth,
   type ProjectWithStats 
 } from '../api/projects';
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
@@ -333,22 +334,26 @@ const totalServices = computed(() => filteredProjects.value.reduce((sum, p) => s
 const totalHealthy = computed(() => filteredProjects.value.reduce((sum, p) => sum + p.healthy_count, 0));
 const totalWarning = computed(() => filteredProjects.value.reduce((sum, p) => sum + p.warning_count, 0));
 const totalDown = computed(() => filteredProjects.value.reduce((sum, p) => sum + p.down_count, 0));
+const totalUnknown = computed(() => filteredProjects.value.reduce((sum, p) => sum + p.unknown_count, 0));
+const totalUnmonitored = computed(() => filteredProjects.value.reduce((sum, p) => sum + p.unmonitored_count, 0));
 
 function getGradient(color: string): string {
   const option = colorOptions.find(c => c.value === color);
   return option ? option.gradient : (colorOptions[0]?.gradient || '');
 }
 
-function getStatusType(project: ProjectWithStats): 'success' | 'warning' | 'danger' {
-  if (project.down_count > 0) return 'danger';
-  if (project.warning_count > 0) return 'warning';
-  return 'success';
+function getStatusType(project: ProjectWithStats): 'success' | 'warning' | 'danger' | 'info' {
+  const status = getProjectHealth(project);
+  if (status === 'down') return 'danger';
+  if (status === 'warning') return 'warning';
+  return status === 'healthy' ? 'success' : 'info';
 }
 
 function getStatusText(project: ProjectWithStats): string {
-  if (project.down_count > 0) return t('statusLabels.critical');
-  if (project.warning_count > 0) return t('statusLabels.warning');
-  return t('statusLabels.healthy');
+  const status = getProjectHealth(project);
+  if (status === 'down') return t('statusLabels.critical');
+  if (status === 'empty') return t('hosts.noServices');
+  return t(`statusLabels.${status}`);
 }
 
 function isDescriptionOverflow(description: string | undefined): boolean {
@@ -532,6 +537,18 @@ onMounted(() => {
 .stat-info {
   text-align: right;
 }
+.stats-row {
+  row-gap: 12px;
+}
+.stats-row > .el-col {
+  flex: 1 0 220px;
+  max-width: 100%;
+}
+.stat-detail {
+  color: #909399;
+  font-size: 11px;
+  margin-top: 4px;
+}
 
 .stat-label {
   color: #909399;
@@ -627,11 +644,12 @@ onMounted(() => {
   padding: 16px 20px;
   background: #f9fafb;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 2fr);
+  gap: 8px;
 }
 
 .pstat {
+  min-width: 0;
   text-align: center;
 }
 
@@ -648,7 +666,9 @@ onMounted(() => {
 .pstat-label {
   font-size: 11px;
   color: #667085;
-  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Add Card */

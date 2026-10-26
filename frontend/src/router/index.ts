@@ -115,7 +115,7 @@ const router = createRouter({
 });
 
 // Navigation guard
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   const isAuthenticated = authUtils.isAuthenticated();
   const requiresAuth = to.meta.requiresAuth !== false;
   const requiresAdmin = to.meta.requiresAdmin === true;

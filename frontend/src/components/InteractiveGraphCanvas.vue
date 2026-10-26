@@ -1,3068 +1,497 @@
 <template>
-  <Teleport to="body" :disabled="!isWindowFullscreen">
-  <div 
-    v-bind="$attrs"
-    class="graph-canvas" 
-    :class="{ 'edit-mode': isEditMode, 'panning': isPanning, 'dragging': draggingNode, 'window-fullscreen': isWindowFullscreen }"
-    ref="canvasRef" 
-    @contextmenu.prevent 
-    @wheel="handleWheel"
-    @mousedown="startPan"
-  >
-    <div class="viewport-controls" @mousedown.stop @wheel.stop>
-      <button :title="$t('graphCanvas.zoomOut')" :aria-label="$t('graphCanvas.zoomOut')" :disabled="scale <= minScale" @click="zoomAtCenter(-0.1)">−</button>
-      <span class="zoom-level">{{ Math.round(scale * 100) }}%</span>
-      <button :title="$t('graphCanvas.zoomIn')" :aria-label="$t('graphCanvas.zoomIn')" :disabled="scale >= maxScale" @click="zoomAtCenter(0.1)">+</button>
-      <button @click="fitView">{{ $t('graphCanvas.fitView') }}</button>
-      <button :aria-pressed="isFullscreen" @click="toggleFullscreen">
-        {{ isFullscreen ? $t('graphCanvas.exitFullscreen') : $t('graphCanvas.enterFullscreen') }}
-      </button>
-    </div>
-    <div class="viewport-hint">{{ $t('graphCanvas.viewportHint') }}</div>
-    <!-- Layout Selector (shown in edit mode) -->
-    <div v-if="isEditMode" class="layout-toolbar">
-      <div class="layout-section">
-        <span class="toolbar-label">{{ $t('graphCanvas.layoutLabel') }}</span>
-        <div class="layout-options">
-          <button 
-            v-for="layout in layoutOptions" 
-            :key="layout.value"
-            class="layout-btn"
-            :class="{ active: currentLayout === layout.value }"
-            @click="applyLayout(layout.value)"
-            :title="layout.description"
-          >
-            <span class="layout-icon">{{ layout.icon }}</span>
-            <span>{{ layout.label }}</span>
-          </button>
-        </div>
-      </div>
-      <div class="toolbar-divider"></div>
-      <div class="layout-section">
-        <span class="toolbar-label">{{ $t('graphCanvas.directionLabel') }}</span>
-        <div class="direction-options">
-          <button 
-            v-for="dir in directionOptions" 
-            :key="dir.value"
-            class="direction-btn"
-            :class="{ active: layoutDirection === dir.value }"
-            @click="layoutDirection = dir.value; applyLayout(currentLayout)"
-            :title="dir.label"
-          >
-            {{ dir.icon }}
-          </button>
-        </div>
-      </div>
-      <div class="toolbar-divider"></div>
-      <div class="layout-section">
-        <span class="toolbar-label">{{ $t('graphCanvas.snapLabel') }}</span>
-        <div class="snap-options">
-          <button 
-            class="snap-btn"
-            :class="{ active: snapToGrid }"
-            @click="snapToGrid = !snapToGrid"
-            :title="$t('graphCanvas.snapGridDesc')"
-          >
-            <span class="snap-icon">⊞</span>
-            <span>{{ $t('graphCanvas.snapGrid') }}</span>
-          </button>
-          <button 
-            class="snap-btn"
-            :class="{ active: snapToGuides }"
-            @click="snapToGuides = !snapToGuides"
-            :title="$t('graphCanvas.snapAlignDesc')"
-          >
-            <span class="snap-icon">⫼</span>
-            <span>{{ $t('graphCanvas.snapAlign') }}</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Zoom/Pan Container -->
-    <div 
-      class="zoom-container" 
-      :style="{ transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${scale})`, transformOrigin: 'top left' }"
-    >
-    <!-- SVG Connections -->
-    <svg class="connections-layer" :class="{ 'edit-mode-layer': isEditMode }">
-      <!-- Animated Background for Warning Links -->
-      <defs>
-        <!-- Grid Pattern -->
-        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#cbd5e1" stroke-width="1"/>
-        </pattern>
-        <pattern id="grid-large" width="100" height="100" patternUnits="userSpaceOnUse">
-          <rect width="100" height="100" fill="url(#grid)"/>
-          <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#94a3b8" stroke-width="1.5"/>
-        </pattern>
-        
-        <linearGradient id="warningGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" style="stop-color:#f79009;stop-opacity:1">
-            <animate attributeName="offset" values="0;1;0" dur="2s" repeatCount="indefinite" />
-          </stop>
-          <stop offset="50%" style="stop-color:#fbbf24;stop-opacity:1">
-            <animate attributeName="offset" values="0.5;1.5;0.5" dur="2s" repeatCount="indefinite" />
-          </stop>
-          <stop offset="100%" style="stop-color:#f79009;stop-opacity:1" />
-        </linearGradient>
-        <linearGradient id="downGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" style="stop-color:#f04438;stop-opacity:1" />
-          <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
-        </linearGradient>
-        <!-- Animated dash for warning/down links -->
-        <pattern id="warningPattern" patternUnits="userSpaceOnUse" width="12" height="4">
-          <line x1="0" y1="2" x2="12" y2="2" stroke="#f79009" stroke-width="3" stroke-dasharray="8,4">
-            <animate attributeName="x1" from="0" to="12" dur="0.5s" repeatCount="indefinite" />
-          </line>
-        </pattern>
-        <!-- Arrow Markers - Enhanced size for better visibility -->
-        <marker id="arrowNormal" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L0,8 L10,4 z" fill="#10b981" />
-        </marker>
-        <marker id="arrowWarning" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L0,8 L10,4 z" fill="#f79009" />
-        </marker>
-        <marker id="arrowDown" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L0,8 L10,4 z" fill="#f04438" />
-        </marker>
-        <marker id="arrowSelected" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L0,8 L10,4 z" fill="#409EFF" />
-        </marker>
-        <!-- Dependency type markers -->
-        <marker id="arrowUses" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
-          <circle cx="4" cy="3" r="3" fill="#6366f1" />
-        </marker>
-        <marker id="arrowSync" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,3 L5,0 L5,6 Z M5,3 L10,0 L10,6 Z" fill="#06b6d4" />
-        </marker>
-        <marker id="arrowHighlight" markerWidth="14" markerHeight="14" refX="11" refY="5" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L0,10 L12,5 z" fill="#8b5cf6" />
-        </marker>
-        
-        <!-- Mask for hiding lines behind labels -->
-        <mask id="labelMask">
-          <!-- White rectangle = visible area (entire canvas) -->
-          <rect v-bind="worldBounds" fill="white"/>
-          <!-- Black rectangles = hidden areas (label positions) -->
-          <g v-for="link in links" :key="'mask-' + link.id">
-            <!-- Mask for dependency type label -->
-            <rect 
-              v-if="link.dependencyType && isLinkValid(link)"
-              :x="getLinkLabelPosition(link).x - 25"
-              :y="getLinkLabelPosition(link).y - 14"
-              width="50"
-              height="28"
-              rx="6"
-              fill="black"
-            />
-            <!-- Mask for status indicator -->
-            <rect 
-              v-if="isLinkValid(link) && getLinkStatus(link) !== 'up' && getLinkStatus(link) !== 'unknown'"
-              :x="getLinkLabelPosition(link).x + 15"
-              :y="getLinkLabelPosition(link).y - 10"
-              width="20"
-              height="20"
-              rx="10"
-              fill="black"
-            />
-            <!-- Mask for cross-project badge -->
-            <rect 
-              v-if="isLinkValid(link) && link.isCrossProject"
-              :x="getLinkLabelPosition(link).x - 28"
-              :y="getLinkLabelPosition(link).y + 10"
-              width="56"
-              height="20"
-              rx="10"
-              fill="black"
-            />
-          </g>
-        </mask>
-      </defs>
-      
-      <!-- Grid Background (controlled by Grid snap toggle) -->
-      <rect 
-        v-if="snapToGrid" 
-        v-bind="worldBounds"
-        fill="url(#grid-large)" 
-        class="grid-background"
-      />
-      
-      <!-- Connection Links Layer (底层：所有连接线，应用 mask 截断标签区域) -->
-      <g class="links-layer" mask="url(#labelMask)">
-        <g v-for="link in links" :key="link.id">
-          <!-- Link hit area for easier clicking -->
-          <path 
-            :d="getLinkPath(link)"
-            class="link-hitarea"
-            @click.stop="onLinkClick($event, link)"
-            @contextmenu.stop.prevent="onLinkContextMenu($event, link)"
-          />
-          <!-- Glow effect for down/warning status -->
-          <path 
-            v-if="getLinkStatus(link) === 'down' || getLinkStatus(link) === 'warning'"
-            :d="getLinkPath(link)"
-            :class="['link-glow', `link-glow-${getLinkStatus(link)}`]"
-          />
-          <!-- Visible link -->
-          <path 
-            :d="getLinkPath(link)"
-            :class="getLinkClass(link)"
-            :style="getLinkStyle(link)"
-            :marker-end="getLinkMarker(link)"
-          />
-          <!-- Animated particles for active connections -->
-          <circle 
-            v-if="getLinkStatus(link) === 'up'"
-            r="3" 
-            fill="#10b981"
-            class="link-particle"
-          >
-            <animateMotion :dur="getParticleDuration(link)" repeatCount="indefinite">
-              <mpath :href="'#path-' + link.id" />
-            </animateMotion>
-          </circle>
-          <!-- Hidden path for particle motion -->
-          <path 
-            :id="'path-' + link.id"
-            :d="getLinkPath(link)"
-            style="visibility: hidden"
-          />
-        </g>
-      </g>
-      
-      <!-- Labels Layer (顶层：所有标签，确保在连接线之上) -->
-      <g class="labels-layer">
-        <g v-for="link in links" :key="'label-' + link.id">
-          <!-- Link label for dependency type (only shown when both nodes exist) -->
-          <g v-if="link.dependencyType && isLinkValid(link)">
-            <rect 
-              :x="getLinkLabelPosition(link).x - 22"
-              :y="getLinkLabelPosition(link).y - 11"
-              width="44"
-              height="22"
-              rx="5"
-              class="link-label-bg"
-              :style="getLinkLabelBgStyle(link)"
-            />
-            <text 
-              :x="getLinkLabelPosition(link).x"
-              :y="getLinkLabelPosition(link).y + 4"
-              class="link-label"
-            >{{ getLinkTypeLabel(link.dependencyType) }}</text>
-          </g>
-          <!-- Status indicator on link -->
-          <g v-if="isLinkValid(link) && getLinkStatus(link) !== 'up' && getLinkStatus(link) !== 'unknown'">
-            <circle 
-              :cx="getLinkLabelPosition(link).x + 25"
-              :cy="getLinkLabelPosition(link).y"
-              r="8"
-              :class="['link-status-indicator', `status-${getLinkStatus(link)}`]"
-            />
-            <text 
-              :x="getLinkLabelPosition(link).x + 25"
-              :y="getLinkLabelPosition(link).y + 4"
-              class="link-status-icon"
-            >{{ getLinkStatus(link) === 'down' ? '!' : '⚠' }}</text>
-          </g>
-          <!-- Cross-project indicator -->
-          <g v-if="isLinkValid(link) && link.isCrossProject" class="cross-project-indicator">
-            <rect 
-              :x="getLinkLabelPosition(link).x - 25"
-              :y="getLinkLabelPosition(link).y + 12"
-              width="50"
-              height="16"
-              rx="8"
-              class="cross-project-badge-bg"
-            />
-            <text 
-              :x="getLinkLabelPosition(link).x"
-              :y="getLinkLabelPosition(link).y + 23"
-              class="cross-project-badge-text"
-            >{{ $t('graphCanvas.badgeXProject') }}</text>
-          </g>
-        </g>
-      </g>
-      
-      <!-- Alignment Guidelines -->
-      <g v-if="activeGuidelines.length > 0" class="guidelines-layer">
-        <line 
-          v-for="(guide, idx) in activeGuidelines" 
-          :key="'guide-' + idx"
-          :x1="guide.x1" :y1="guide.y1" 
-          :x2="guide.x2" :y2="guide.y2"
-          class="alignment-guideline"
-          :class="guide.type"
-        />
-      </g>
-
-      <!-- Temporary link during creation -->
-      <path 
-        v-if="tempLink"
-        :d="getTempLinkPath()"
-        class="link-drag"
-      />
-    </svg>
-    
-    <!-- Nodes (inside zoom container) -->
-    <div 
-      v-for="node in nodes" 
-      :key="node.id"
-      :ref="element => setNodeElement(node.id, element)"
-      class="service-node"
-      :data-id="node.id"
-      :class="[
-        `layer-${getNodeLayer(node)}`, 
-        `status-${getNodeStatus(node)}`,
-        { 
-          'selected': selectedNodeIds.has(node.id),
-          'highlighted': highlightedNodes.has(node.id),
-          'dimmed': (highlightedNodes.size > 0 || selectedNodeIds.size > 0) && !highlightedNodes.has(node.id) && !selectedNodeIds.has(node.id),
-          'cross-project-node': node.isCrossProjectService
-        }
-      ]"
-      :style="{ top: (node.y ?? 100) + 'px', left: (node.x ?? 100) + 'px' }"
-      @mousedown.stop="startNodeInteraction($event, node)"
-      @click.stop="handleNodeClick(node, $event)"
-    >
-      <!-- Cross-project badge with project name -->
-      <div v-if="node.isCrossProjectService" class="cross-project-node-badge">{{ node.project_name || $t('graphCanvas.badgeExternal') }}</div>
-      <!-- Connection Handles -->
-      <div class="node-handle handle-top" @mousedown.stop="startDragLink($event, node, 'top')"></div>
-      <div class="node-handle handle-bottom" @mousedown.stop="startDragLink($event, node, 'bottom')"></div>
-      <div class="node-handle handle-left" @mousedown.stop="startDragLink($event, node, 'left')"></div>
-      <div class="node-handle handle-right" @mousedown.stop="startDragLink($event, node, 'right')"></div>
-      
-      <div class="node-icon">
-        <ServiceIcon :icon="getNodeIcon(node)" :size="28" />
-      </div>
-      <div class="node-info">
-        <div class="node-name">{{ node.name || node.data?.name }}</div>
-        <div class="node-meta">
-          <span v-if="getNodePort(node)">:{{ getNodePort(node) }}</span>
-          <span v-if="getNodeResponseTime(node)">• {{ getNodeResponseTime(node) }}ms</span>
-        </div>
-      </div>
-      <button
-        v-if="!isEditMode"
-        type="button"
-        class="node-details-btn"
-        :title="$t('graphCanvas.viewServiceDetails', { name: node.name || node.data?.name || node.id })"
-        :aria-label="$t('graphCanvas.viewServiceDetails', { name: node.name || node.data?.name || node.id })"
-        @mousedown.stop
-        @click.stop="emit('view-service', node.id)"
-      ><InfoFilled aria-hidden="true" /></button>
-      <!-- Status indicator -->
-      <div class="node-status-indicator" :class="`status-${getNodeStatus(node)}`"></div>
-      <!-- Multi-select indicator -->
-      <div v-if="selectedNodeIds.size > 1 && selectedNodeIds.has(node.id)" class="multi-select-badge">
-        {{ Array.from(selectedNodeIds).indexOf(node.id) + 1 }}
-      </div>
-    </div>
-    </div><!-- End zoom-container -->
-    
-    <!-- Box Selection Visual -->
-    <div 
-      v-if="isBoxSelecting" 
-      class="box-selection"
-      :style="{
-        left: (boxSelectionRect.x * scale + panOffset.x) + 'px',
-        top: (boxSelectionRect.y * scale + panOffset.y) + 'px',
-        width: (boxSelectionRect.width * scale) + 'px',
-        height: (boxSelectionRect.height * scale) + 'px'
-      }"
-    ></div>
-    
-    <!-- Link Context Menu -->
-    <div 
-      v-if="linkContextMenu.visible" 
-      class="link-context-menu"
-      :style="{ left: linkContextMenu.x + 'px', top: linkContextMenu.y + 'px' }"
-      @click.stop
-    >
-      <div class="context-menu-header">{{ $t('graphCanvas.edgeSettingsTitle') }}</div>
-      <div class="context-menu-section">
-        <div class="context-menu-label">{{ $t('graphCanvas.edgeLabelType') }}</div>
-        <div class="context-menu-options">
-          <button 
-            v-for="type in dependencyTypes" 
-            :key="type.value"
-            class="type-option"
-            :class="{ active: linkContextMenu.link?.dependencyType === type.value }"
-            @click="updateLinkType(type.value)"
-          >
-            <span class="type-icon">{{ type.icon }}</span>
-            <span>{{ type.label }}</span>
-          </button>
-        </div>
-      </div>
-      <div class="context-menu-divider"></div>
-      <div class="context-menu-section">
-        <div class="context-menu-label">{{ $t('graphCanvas.edgeLabelDirection') }}</div>
-        <div class="direction-options-menu">
-          <button 
-            v-for="dir in linkDirectionOptions" 
-            :key="dir.value"
-            class="direction-option"
-            :class="{ active: (linkContextMenu.link?.linkDirection || 'normal') === dir.value }"
-            @click="updateLinkDirection(dir.value)"
-            :title="dir.label"
-          >
-            <span class="direction-icon">{{ dir.icon }}</span>
-            <span class="direction-text">{{ dir.shortLabel }}</span>
-          </button>
-        </div>
-      </div>
-      <div class="context-menu-divider"></div>
-      <div class="context-menu-item danger" @click="deleteLink">
-        <span class="menu-icon">🗑️</span>
-        <span>{{ $t('graphCanvas.btnDeleteConn') }}</span>
-      </div>
-    </div>
-    
-    <!-- Link Type Selector (shown when creating new link) -->
-    <div 
-      v-if="showLinkTypeSelector" 
-      class="link-type-selector"
-      :style="{ left: linkTypeSelectorPos.x + 'px', top: linkTypeSelectorPos.y + 'px' }"
-      @click.stop
-    >
-      <div class="selector-header">{{ $t('graphCanvas.selectDepType') }}</div>
-      <div class="selector-options">
-        <button 
-          v-for="type in dependencyTypes" 
-          :key="type.value"
-          class="selector-option"
-          @click="confirmNewLink(type.value)"
-        >
-          <span class="option-icon">{{ type.icon }}</span>
-          <div class="option-info">
-            <span class="option-label">{{ type.label }}</span>
-            <span class="option-desc">{{ type.description }}</span>
-          </div>
+  <Teleport to="body" :disabled="!windowFullscreen">
+    <section ref="canvas" class="graph-canvas" :class="{ 'window-fullscreen': windowFullscreen, 'edit-mode': editable }"
+      tabindex="-1" @keydown="onKeyDown">
+      <div v-if="editable" class="layout-toolbar">
+        <label>{{ t('graphCanvas.layoutLabel') }}
+          <select v-model="layoutKind" :disabled="layoutBusy" :aria-label="t('graphCanvas.layoutLabel')">
+            <option value="layered">{{ t('graphCanvas.layoutDirected') }}</option>
+            <option value="force">{{ t('graphCanvas.layoutForce') }}</option>
+            <option value="box">{{ t('graphCanvas.layoutGrid') }}</option>
+          </select>
+        </label>
+        <select v-model="direction" :disabled="layoutBusy" :aria-label="t('graphCanvas.directionLabel')">
+          <option value="TB">{{ t('graphCanvas.dirTopBottom') }}</option>
+          <option value="BT">{{ t('graphCanvas.dirBottomTop') }}</option>
+          <option value="LR">{{ t('graphCanvas.dirLeftRight') }}</option>
+          <option value="RL">{{ t('graphCanvas.dirRightLeft') }}</option>
+        </select>
+        <button :disabled="layoutBusy || !nodesReady || !nodes.length" @click="applyLayout">{{ t(layoutBusy ? 'graphCanvas.layoutRunning' : 'graphCanvas.applyLayout') }}</button>
+        <button @click="lineStyle = lineStyle === 'bezier' ? 'orthogonal' : 'bezier'">
+          {{ t(lineStyle === 'bezier' ? 'graphCanvas.lineBezier' : 'graphCanvas.lineOrthogonal') }}
         </button>
+        <label :title="t('graphCanvas.snapGridDesc')"><input v-model="snapGrid" type="checkbox">{{ t('graphCanvas.snapGrid') }}</label>
+        <label><input v-model="snapGuides" type="checkbox">{{ t('graphCanvas.snapAlign') }}</label>
       </div>
-      <button class="selector-cancel" @click="cancelNewLink">{{ $t('common.cancel') }}</button>
-    </div>
-    <slot name="overlay"></slot>
-  </div>
+      <div class="flow-stage" :class="{ 'show-grid': editable && snapGrid }" :style="{ backgroundSize: `${20 * viewport.zoom}px ${20 * viewport.zoom}px`, backgroundPosition: `${viewport.x}px ${viewport.y}px` }">
+        <VueFlow :id="flowId" v-model:nodes="flowNodes" :edges="flowEdges"
+          :connection-mode="ConnectionMode.Loose" :nodes-draggable="editable && !layoutBusy"
+          :nodes-connectable="editable && !layoutBusy" :elements-selectable="true"
+          :select-nodes-on-drag="true" :selection-key-code="editable ? 'Shift' : null"
+          :multi-selection-key-code="['Control', 'Meta']" :delete-key-code="null"
+          :pan-on-drag="[0, 1]" :zoom-on-double-click="false" :min-zoom="0.15" :max-zoom="2"
+          :node-drag-threshold="5" :auto-connect="false" :elevate-edges-on-select="false"
+          :edges-updatable="false" :is-valid-connection="validateConnection"
+          @node-click="onNodeClick" @pane-click="clearSelection" @connect="onConnect"
+          @node-drag-start="onDragStart" @node-drag="onDrag" @node-drag-stop="onDragStop"
+          @selection-drag-start="onDragStart" @selection-drag="onDrag" @selection-drag-stop="onDragStop"
+          @edge-context-menu="onEdgeMenu" @edge-click="onEdgeMenu"
+          @nodes-initialized="onInitialized" @error="onFlowError">
+          <template #node-service="nodeProps">
+            <ServiceTopologyNode v-bind="nodeProps" @details="emit('view-service', $event)" />
+          </template>
+          <template #edge-dependency="edgeProps"><ServiceTopologyEdge v-bind="edgeProps" /></template>
+          <MiniMap pannable zoomable :node-color="minimapColor" />
+        </VueFlow>
+        <svg class="alignment-overlay" aria-hidden="true">
+          <g :transform="`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`">
+            <line v-for="(guide, index) in guides" :key="index" v-bind="guide"
+              stroke="#e04aab" stroke-width="1.25" stroke-dasharray="5 4" vector-effect="non-scaling-stroke" />
+          </g>
+        </svg>
+        <div v-if="selectedIds.size" class="selection-summary">
+          {{ t('graphCanvas.selectedCount', { count: selectedIds.size }) }}
+          <button @click="clearSelection">{{ t('common.clear') }} ×</button>
+        </div>
+        <div class="viewport-controls">
+          <button :title="t('graphCanvas.zoomOut')" :aria-label="t('graphCanvas.zoomOut')" :disabled="viewport.zoom <= 0.15" @click="zoomOut()">−</button>
+          <span>{{ Math.round(viewport.zoom * 100) }}%</span>
+          <button :title="t('graphCanvas.zoomIn')" :aria-label="t('graphCanvas.zoomIn')" :disabled="viewport.zoom >= 2" @click="zoomIn()">+</button>
+          <button @click="fit">{{ t('graphCanvas.fitView') }}</button>
+          <button :aria-pressed="isFullscreen" @click="toggleFullscreen">
+            {{ t(isFullscreen ? 'graphCanvas.exitFullscreen' : 'graphCanvas.enterFullscreen') }}
+          </button>
+        </div>
+        <div v-if="menu" class="link-menu nowheel nopan" :style="{ left: `${menu.x}px`, top: `${menu.y}px` }" @keydown.stop>
+          <div class="menu-heading">{{ t(menu.kind === 'create' ? 'graphCanvas.selectDepType' : 'graphCanvas.edgeSettingsTitle') }}</div>
+          <button v-for="type in dependencyTypes" :key="type.value" :class="{ active: (resolveDependencyType(menu.link?.dependencyType)?.name || menu.link?.dependencyType) === type.value }" @click="chooseType(type.value)">
+            <span :style="{ color: type.color }">{{ type.icon }}</span> {{ type.label }}
+          </button>
+          <template v-if="menu.kind === 'edit'">
+            <hr>
+            <button v-for="value in (['normal', 'reverse'] as const)" :key="value"
+              :class="{ active: (menu.link?.linkDirection || 'normal') === value }" @click="changeDirection(value)">
+              {{ t(value === 'normal' ? 'graphCanvas.edgeDirNormal' : 'graphCanvas.edgeDirReverse') }}
+            </button>
+            <button class="danger" @click="removeLink">{{ t('graphCanvas.btnDeleteConn') }}</button>
+          </template>
+          <button @click="menu = null">{{ t('common.cancel') }}</button>
+        </div>
+      </div>
+      <footer class="viewport-hint">{{ t('graphCanvas.viewportHint') }}</footer>
+      <slot name="overlay" />
+    </section>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, watch, onMounted, onUnmounted, nextTick, computed, type ComponentPublicInstance } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useId, watch } from 'vue';
+import {
+  ConnectionMode, MarkerType, VueFlow, useVueFlow,
+  type Connection, type Edge, type EdgeMouseEvent, type Node as FlowNode, type NodeDragEvent,
+  type NodeMouseEvent, type GraphNode,
+} from '@vue-flow/core';
 import { ElMessage } from 'element-plus';
-import { InfoFilled } from '@element-plus/icons-vue';
-import { getDependencyTypes } from '../api/dependency-types';
-import ServiceIcon from './ServiceIcon.vue';
+import { useI18n } from 'vue-i18n';
+import '@vue-flow/core/dist/style.css';
+import '@vue-flow/core/dist/theme-default.css';
+import { MiniMap } from '@vue-flow/minimap';
+import '@vue-flow/minimap/dist/style.css';
+import { getDependencyTypes, dependencyTypeCatalog, resolveDependencyType } from '../api/dependency-types';
+import ServiceTopologyNode from './topology/ServiceTopologyNode.vue';
+import ServiceTopologyEdge from './topology/ServiceTopologyEdge.vue';
+import { alignNode, type Guide } from './topology/geometry';
+import { createLayoutEngine } from './topology/layout';
+import type {
+  CardData, DependencyEdgeData, LayoutDirection, LayoutKind, LineStyle,
+  Rect, RoutedEdge, ServiceLink, ServiceNode,
+} from './topology/types';
 
-defineOptions({ inheritAttrs: false });
-
-interface NodeData {
-  name?: string;
-  layer?: string;
-  status?: string;
-  port?: number;
-  responseTime?: number;
-  [key: string]: any;
-}
-
-interface Node {
-  id: string;
-  name?: string;
-  layer?: string;
-  status?: string;
-  port?: number;
-  responseTime?: number;
-  x: number;
-  y: number;
-  data?: NodeData;
-  isCrossProjectService?: boolean;  // Cross-project service flag
-  project_id?: string;
-  project_name?: string;  // Project name for display
-  [key: string]: any;
-}
-
-interface Link {
-  id: string;
-  source: string;
-  target: string;
-  status?: string;
-  type?: string;
-  dependencyType?: string;
-  riskLevel?: string;
-  linkDirection?: 'normal' | 'reverse';  // 连线方向：normal(A→B) 或 reverse(A←B)
-  isCrossProject?: boolean;  // Cross-project dependency flag
-  sourceProjectName?: string;
-  targetProjectName?: string;
-}
-
-interface Props {
-  nodes: Node[];
-  links: Link[];
+const props = withDefaults(defineProps<{
+  nodes: ServiceNode[];
+  links: ServiceLink[];
   isEditMode?: boolean;
+  readonly?: boolean;
   selectedNodeId?: string | null;
   isDetailsOpen?: boolean;
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  isEditMode: false,
-  selectedNodeId: null,
-  isDetailsOpen: false
-});
-
-const emit = defineEmits([
-  'select-node', 
-  'view-service',
-  'update:nodes', 
-  'add-link', 
-  'update-link',
-  'delete-link',
-  'save-layout'
-]);
-
+}>(), { isEditMode: false, readonly: false, selectedNodeId: null, isDetailsOpen: false });
+const emit = defineEmits<{
+  'update:nodes': [nodes: ServiceNode[]];
+  'select-node': [node: ServiceNode | null];
+  'view-service': [id: string];
+  'add-link': [link: { source: string; target: string; dependencyType: string }];
+  'update-link': [link: { id: string; dependencyType?: string; linkDirection?: 'normal' | 'reverse' }];
+  'delete-link': [link: ServiceLink];
+  'layout-busy': [busy: boolean];
+}>();
 const { t } = useI18n();
-
-const canvasRef = ref<HTMLElement | null>(null);
-
-// Zoom and pan state
-const scale = ref(1);
-const panOffset = ref({ x: 0, y: 0 });
-const minScale = 0.3;
-const maxScale = 2;
-const isNativeFullscreen = ref(false);
-const isWindowFullscreen = ref(false);
-const isFullscreen = computed(() => isNativeFullscreen.value || isWindowFullscreen.value);
+const flowId = `service-topology-${useId()}`;
+const {
+  viewport, getNodes, getSelectedNodes, findNode, updateNode, addSelectedNodes,
+  removeSelectedNodes, fitView, zoomIn, zoomOut, setViewport,
+} = useVueFlow(flowId);
+const canvas = ref<HTMLElement>();
+const flowNodes = shallowRef<FlowNode<CardData>[]>([]);
+const draggingIds = new Set<string>();
+const selectionKey = computed(() => getSelectedNodes.value.map(node => node.id).sort().join('\0'));
+const selectedIds = computed(() => new Set(selectionKey.value ? selectionKey.value.split('\0') : []));
+const editable = computed(() => props.isEditMode && !props.readonly);
+const lineStyle = ref<LineStyle>('bezier');
+const snapGrid = ref(false);
+const snapGuides = ref(true);
+const guides = shallowRef<Guide[]>([]);
+const layoutKind = ref<LayoutKind>('layered');
+const direction = ref<LayoutDirection>('TB');
+const layoutBusy = ref(false);
+const nodesReady = ref(false);
+const routes = shallowRef(new Map<string, RoutedEdge>());
 const nodesById = computed(() => new Map(props.nodes.map(node => [node.id, node])));
-const nodeElements = new Map<string, HTMLElement>();
-const nodeDimensions = shallowRef(new Map<string, { width: number; height: number }>());
-let nodeResizeObserver: ResizeObserver | undefined;
-let canvasResizeObserver: ResizeObserver | undefined;
-const viewportSize = shallowRef<{ width: number; height: number }>();
-const worldBounds = computed(() => {
-  const left = -panOffset.value.x / scale.value;
-  const top = -panOffset.value.y / scale.value;
-  const right = left + (viewportSize.value?.width ?? 0) / scale.value;
-  const bottom = top + (viewportSize.value?.height ?? 0) / scale.value;
-  let minX = left, minY = top, maxX = right, maxY = bottom;
-  for (const node of props.nodes) {
-    const dimensions = getNodeDimensions(node.id);
-    minX = Math.min(minX, node.x ?? 100);
-    minY = Math.min(minY, node.y ?? 100);
-    maxX = Math.max(maxX, (node.x ?? 100) + dimensions.width);
-    maxY = Math.max(maxY, (node.y ?? 100) + dimensions.height);
+const validLinks = computed(() => props.links.filter(link => nodesById.value.has(link.source) && nodesById.value.has(link.target)));
+const relatedIds = computed(() => {
+  const ids = new Set(selectedIds.value);
+  for (const link of validLinks.value) {
+    if (selectedIds.value.has(link.source) || selectedIds.value.has(link.target)) {
+      ids.add(link.source); ids.add(link.target);
+    }
   }
-  return { x: minX - 100, y: minY - 100, width: maxX - minX + 200, height: maxY - minY + 200 };
+  return ids;
 });
-
-const setNodeElement = (id: string, element: Element | ComponentPublicInstance | null) => {
-  const previous = nodeElements.get(id);
-  if (previous === element) return;
-  if (previous) nodeResizeObserver?.unobserve(previous);
-  if (element instanceof HTMLElement) {
-    nodeElements.set(id, element);
-    nodeResizeObserver?.observe(element);
-  } else {
-    nodeElements.delete(id);
-    nodeDimensions.value.delete(id);
-  }
-};
-
-const measureNodes = () => {
-  const measurements = new Map<string, { width: number; height: number }>();
-  for (const [id, element] of nodeElements) {
-    measurements.set(id, { width: element.offsetWidth, height: element.offsetHeight });
-  }
-  nodeDimensions.value = measurements;
-};
-
-const toCanvasPoint = (clientX: number, clientY: number) => {
-  const canvas = canvasRef.value!;
-  const rect = canvas.getBoundingClientRect();
+const fallbackDependencyTypes = [
+  { value: 'depends', label: t('graphCanvas.depDepends'), icon: '🔗', color: '#1570ef', line_style: 'solid' },
+  { value: 'uses', label: t('graphCanvas.depUses'), icon: '📡', color: '#6366f1', line_style: 'dashed' },
+  { value: 'sync', label: t('graphCanvas.depSync'), icon: '🔄', color: '#06b6d4', line_style: 'dotted' },
+  { value: 'backup', label: t('graphCanvas.depBackup'), icon: '💾', color: '#10b981', line_style: 'long-dash' },
+];
+const dependencyTypes = computed(() => dependencyTypeCatalog.value
+  ? dependencyTypeCatalog.value.map(type => ({ value: type.name, label: type.label, icon: type.icon, color: type.color, line_style: type.line_style }))
+  : fallbackDependencyTypes);
+const dashStyles: Record<string, string | undefined> = { solid: undefined, dashed: '7 4', dotted: '2 4', 'long-dash': '12 5' };
+const flowEdges = computed<Edge<DependencyEdgeData>[]>(() => validLinks.value.map(link => {
+  const type = resolveDependencyType(link.dependencyType) || dependencyTypes.value.find(type => type.value === link.dependencyType);
+  const target = nodesById.value.get(link.target)!;
+  const status = target.status || target.data?.status || link.status;
+  const highlighted = selectedIds.value.has(link.source) || selectedIds.value.has(link.target);
+  const color = highlighted ? '#3568ed' : status === 'down' ? '#f04438' : status === 'warning' ? '#f79009' : type?.color || '#9babc3';
   return {
-    x: (clientX - rect.left - canvas.clientLeft - panOffset.value.x) / scale.value,
-    y: (clientY - rect.top - canvas.clientTop - panOffset.value.y) / scale.value
+    id: link.id, type: 'dependency',
+    source: link.linkDirection === 'reverse' ? link.target : link.source,
+    target: link.linkDirection === 'reverse' ? link.source : link.target,
+    markerEnd: { type: MarkerType.ArrowClosed, color },
+    selectable: false, focusable: editable.value, deletable: false,
+    data: {
+      lineStyle: lineStyle.value, direction: direction.value, color, label: `${link.isCrossProject ? `${t('graphCanvas.badgeXProject')} · ` : ''}${type?.label || link.dependencyType || ''}`,
+      dash: link.isCrossProject ? '6 4' : dashStyles[type?.line_style || 'solid'],
+      dimmed: selectedIds.value.size > 0 && !highlighted, route: routes.value.get(link.id),
+    },
   };
-};
+}));
 
-const syncFullscreen = () => {
-  isNativeFullscreen.value = document.fullscreenElement === canvasRef.value;
-};
-
-const toggleFullscreen = async () => {
-  if (isWindowFullscreen.value) {
-    isWindowFullscreen.value = false;
-    return;
-  }
-  const exiting = document.fullscreenElement === canvasRef.value;
-  try {
-    if (exiting) {
-      await document.exitFullscreen();
-    } else {
-      await canvasRef.value!.requestFullscreen();
-    }
-  } catch (error) {
-    if (exiting) {
-      syncFullscreen();
-      if (!isNativeFullscreen.value) return;
-      console.error('Failed to exit topology fullscreen mode:', error);
-      ElMessage.error({ message: t('graphCanvas.fullscreenError'), appendTo: canvasRef.value! });
-      return;
-    }
-    console.warn('Native topology fullscreen unavailable; using window fullscreen:', error);
-    isWindowFullscreen.value = true;
-    ElMessage.warning({ message: t('graphCanvas.fullscreenFallback'), appendTo: canvasRef.value! });
-  }
-};
-
-// Layout algorithm configuration
-const currentLayout = ref<'dagre' | 'layered' | 'force' | 'grid'>('dagre');
-const layoutDirection = ref<'TB' | 'LR' | 'BT' | 'RL'>('TB');
-const isInitialLoad = ref(true); // Track if this is the first data load
-
-// Snap alignment configuration
-const snapToGrid = ref(false);
-const snapToGuides = ref(true);
-const GRID_SIZE = 20;
-const GUIDE_SNAP_THRESHOLD = 8; // px distance to trigger snap
-const NODE_WIDTH = 180;
-const NODE_HEIGHT = 64;
-
-interface Guideline {
-  x1: number; y1: number;
-  x2: number; y2: number;
-  type: 'horizontal' | 'vertical';
+function cardData(service: ServiceNode): CardData {
+  return { service, editing: editable.value, highlighted: relatedIds.value.has(service.id), dimmed: selectedIds.value.size > 0 && !relatedIds.value.has(service.id) };
 }
-const activeGuidelines = ref<Guideline[]>([]);
+function minimapColor(node: GraphNode<CardData>) {
+  if ((node.data.service.enabled ?? node.data.service.data?.enabled) === 0) return '#98a2b3';
+  const status = node.data.service.status || node.data.service.data?.status;
+  return status === 'down' ? '#f9a39c' : status === 'warning' ? '#f7d288' : status === 'up' ? '#75dca5' : '#98a2b3';
+}
 
-const layoutOptions = computed(() => [
-  { value: 'layered', label: t('graphCanvas.layoutLayered'), icon: '📊', description: t('graphCanvas.layoutLayeredDesc') },
-  { value: 'dagre', label: t('graphCanvas.layoutDirected'), icon: '🔀', description: t('graphCanvas.layoutDirectedDesc') },
-  { value: 'force', label: t('graphCanvas.layoutForce'), icon: '🧲', description: t('graphCanvas.layoutForceDesc') },
-  { value: 'grid', label: t('graphCanvas.layoutGrid'), icon: '⊞', description: t('graphCanvas.layoutGridDesc') }
-]);
-
-const directionOptions = computed(() => [
-  { value: 'TB', label: t('graphCanvas.dirTopBottom'), icon: '↓' },
-  { value: 'LR', label: t('graphCanvas.dirLeftRight'), icon: '→' },
-  { value: 'BT', label: t('graphCanvas.dirBottomTop'), icon: '↑' },
-  { value: 'RL', label: t('graphCanvas.dirRightLeft'), icon: '←' }
-]);
-
-// Link direction options for individual link customization
-// Controls arrow direction: normal (A→B) or reverse (A←B)
-const linkDirectionOptions = computed(() => [
-  { value: 'normal', label: t('graphCanvas.edgeDirNormal'), shortLabel: 'A→B', icon: '→' },
-  { value: 'reverse', label: t('graphCanvas.edgeDirReverse'), shortLabel: 'A←B', icon: '←' }
-]);
-
-// Dependency types - dynamically loaded from API
-const dependencyTypes = ref<{ value: string; label: string; icon: string; description: string; color: string; line_style: string }[]>([
-  // Default fallback types
-  { value: 'depends', label: t('graphCanvas.depDepends'), icon: '🔗', description: t('graphCanvas.depDependsDesc'), color: '#ef4444', line_style: 'solid' },
-  { value: 'uses', label: t('graphCanvas.depUses'), icon: '📡', description: t('graphCanvas.depUsesDesc'), color: '#6366f1', line_style: 'dashed' },
-  { value: 'sync', label: t('graphCanvas.depSync'), icon: '🔄', description: t('graphCanvas.depSyncDesc'), color: '#06b6d4', line_style: 'dotted' },
-  { value: 'backup', label: t('graphCanvas.depBackup'), icon: '💾', description: t('graphCanvas.depBackupDesc'), color: '#10b981', line_style: 'long-dash' }
-]);
-
-// Load dependency types from API
-const loadDependencyTypes = async () => {
-  try {
-    const types = await getDependencyTypes();
-    dependencyTypes.value = types.map(t => ({
-      value: t.name,
-      label: t.label,
-      icon: t.icon,
-      description: t.description || '',
-      color: t.color,
-      line_style: t.line_style || 'solid'
-    }));
-  } catch (error) {
-    console.error('Failed to load dependency types:', error);
-    // Keep default fallback types
-  }
-};
-
-// Node helper functions
-const getNodeLayer = (node: Node | undefined): string => {
-  if (!node) return 'backend';
-  return node.layer || node.data?.layer || 'backend';
-};
-
-const getNodeStatus = (node: Node | undefined): string => {
-  if (!node) return 'unknown';
-  return node.status || node.data?.status || 'unknown';
-};
-
-const getNodePort = (node: Node | undefined): number | undefined => {
-  if (!node) return undefined;
-  return node.port || node.data?.port;
-};
-
-const getNodeResponseTime = (node: Node | undefined): number | undefined => {
-  if (!node) return undefined;
-  return node.responseTime || node.data?.responseTime;
-};
-
-// Icons mapping
-const getNodeIcon = (node: any) => {
-  // Use custom icon from service data
-  if (node?.data?.icon) return node.data.icon;
-  if (node?.icon) return node.icon;
-  
-  // Fallback to default service icon
-  return '🔧';
-};
-
-// Get actual node dimensions from DOM
-const getNodeDimensions = (nodeId: string) => {
-  return nodeDimensions.value.get(nodeId) ?? { width: NODE_WIDTH, height: NODE_HEIGHT };
-};
-
-const resolveNodeOverlaps = () => {
-  const gap = 24;
-  const rectangles = props.nodes.map(node => ({
-    x: node.x ?? 100,
-    y: node.y ?? 100,
-    ...getNodeDimensions(node.id)
+// Keep Vue Flow's local drag state separate from API refreshes and emitted snapshots.
+watch(() => props.nodes, services => {
+  const ids = new Set(services.map(service => service.id));
+  const existing = new Map(flowNodes.value.map(node => [node.id, node]));
+  flowNodes.value = services.map(service => ({
+    ...existing.get(service.id), id: service.id, type: 'service',
+    position: draggingIds.has(service.id) && existing.has(service.id)
+      ? { ...existing.get(service.id)!.position } : { x: service.x ?? 0, y: service.y ?? 0 },
+    data: cardData(service),
   }));
-  let changed = false;
-  const updatedNodes = props.nodes.map((node, index) => {
-    const rectangle = rectangles[index]!;
-    const overlaps = (other: typeof rectangle) =>
-      rectangle.x < other.x + other.width &&
-      rectangle.x + rectangle.width > other.x &&
-      rectangle.y < other.y + other.height &&
-      rectangle.y + rectangle.height > other.y;
+  if (menu.value?.link && !props.links.some(link => link.id === menu.value?.link?.id)) menu.value = null;
+  if (props.selectedNodeId && !ids.has(props.selectedNodeId)) clearSelection();
+}, { deep: true, immediate: false });
 
-    if (!rectangles.slice(0, index).some(overlaps)) return node;
-
-    let blockers = rectangles.filter((other, otherIndex) => otherIndex !== index && overlaps(other));
-    while (blockers.length > 0) {
-      rectangle.x = Math.max(...blockers.map(other => other.x + other.width)) + gap;
-      blockers = rectangles.filter((other, otherIndex) => otherIndex !== index && overlaps(other));
-    }
-    changed = true;
-    return { ...node, x: rectangle.x, y: rectangle.y };
-  });
-  if (changed) emit('update:nodes', updatedNodes);
-};
-
-// Link Path Calculation with intelligent anchor point selection
-// Adaptive Rule: Adjust connection strategy based on global layout direction
-// Per-link direction setting controls arrow direction (normal vs reverse)
-const calculateLinkPath = (link: Link) => {
-  const sourceNode = nodesById.value.get(link.source);
-  const targetNode = nodesById.value.get(link.target);
-  
-  if (!sourceNode || !targetNode) return '';
-  
-  // Get actual node dimensions from DOM
-  const sourceDim = getNodeDimensions(link.linkDirection === 'reverse' ? targetNode.id : sourceNode.id);
-  const targetDim = getNodeDimensions(link.linkDirection === 'reverse' ? sourceNode.id : targetNode.id);
-  const nodeWidth = sourceDim.width;
-  const nodeHeight = sourceDim.height;
-  const targetWidth = targetDim.width;
-  const targetHeight = targetDim.height;
-  
-  // Determine if we should reverse the path direction
-  const isReversed = link.linkDirection === 'reverse';
-  
-  // When reversed, swap source and target for path calculation
-  const effectiveSource = isReversed ? targetNode : sourceNode;
-  const effectiveTarget = isReversed ? sourceNode : targetNode;
-  
-  // Calculate node positions
-  const sourceX = effectiveSource.x ?? 100;
-  const sourceY = effectiveSource.y ?? 100;
-  const targetX = effectiveTarget.x ?? 100;
-  const targetY = effectiveTarget.y ?? 100;
-  
-  // Calculate center positions
-  const sourceCenterX = sourceX + nodeWidth / 2;
-  const sourceCenterY = sourceY + nodeHeight / 2;
-  const targetCenterX = targetX + targetWidth / 2;
-  const targetCenterY = targetY + targetHeight / 2;
-  
-  // Calculate relative position
-  const dx = targetCenterX - sourceCenterX;
-  const dy = targetCenterY - sourceCenterY;
-  const absVerticalGap = Math.abs(dy);
-  const absHorizontalGap = Math.abs(dx);
-  
-  let startX, startY, endX, endY;
-  let connectionType: 'vertical' | 'horizontal';
-  
-  // Anchor point selection based on GLOBAL layout direction
-  const isVerticalLayout = layoutDirection.value === 'TB' || layoutDirection.value === 'BT';
-  
-  const alignmentThreshold = 20;
-  
-  if (isVerticalLayout) {
-    // VERTICAL LAYOUT (TB/BT): Prefer vertical connections
-    if (absVerticalGap < alignmentThreshold) {
-      connectionType = 'horizontal';
-      if (dx > 0) {
-        startX = sourceX + nodeWidth;
-        startY = sourceCenterY;
-        endX = targetX;
-        endY = targetCenterY;
-      } else {
-        startX = sourceX;
-        startY = sourceCenterY;
-        endX = targetX + targetWidth;
-        endY = targetCenterY;
-      }
-    } else {
-      connectionType = 'vertical';
-      if (dy > 0) {
-        startX = sourceCenterX;
-        startY = sourceY + nodeHeight;
-        endX = targetCenterX;
-        endY = targetY;
-      } else {
-        startX = sourceCenterX;
-        startY = sourceY;
-        endX = targetCenterX;
-        endY = targetY + targetHeight;
-      }
-    }
-  } else {
-    // HORIZONTAL LAYOUT (LR/RL): Prefer horizontal connections
-    if (absHorizontalGap < alignmentThreshold) {
-      connectionType = 'vertical';
-      if (dy > 0) {
-        startX = sourceCenterX;
-        startY = sourceY + nodeHeight;
-        endX = targetCenterX;
-        endY = targetY;
-      } else {
-        startX = sourceCenterX;
-        startY = sourceY;
-        endX = targetCenterX;
-        endY = targetY + targetHeight;
-      }
-    } else {
-      connectionType = 'horizontal';
-      if (dx > 0) {
-        startX = sourceX + nodeWidth;
-        startY = sourceCenterY;
-        endX = targetX;
-        endY = targetCenterY;
-      } else {
-        startX = sourceX;
-        startY = sourceCenterY;
-        endX = targetX + targetWidth;
-        endY = targetCenterY;
-      }
-    }
+watch([editable, relatedIds], () => {
+  for (const node of getNodes.value) {
+    const service = nodesById.value.get(node.id);
+    if (service) updateNode(node.id, { data: cardData(service) });
   }
-  
-  // Generate smooth bezier curve
-  if (connectionType === 'vertical') {
-    const verticalDistance = Math.abs(endY - startY);
-    const controlOffset = Math.max(verticalDistance * 0.35, 40);
-    const horizontalOffset = Math.abs(endX - startX);
-    const curveDir = startY < endY ? 1 : -1;
-    
-    if (horizontalOffset > 50) {
-      const midControlOffset = controlOffset * 0.6;
-      return `M ${startX} ${startY} C ${startX} ${startY + curveDir * midControlOffset}, ${endX} ${endY - curveDir * midControlOffset}, ${endX} ${endY}`;
-    } else {
-      return `M ${startX} ${startY} C ${startX} ${startY + curveDir * controlOffset}, ${endX} ${endY - curveDir * controlOffset}, ${endX} ${endY}`;
-    }
-  } else {
-    const horizontalDistance = Math.abs(endX - startX);
-    const controlOffset = Math.max(horizontalDistance * 0.35, 40);
-    const verticalOffset = Math.abs(endY - startY);
-    const curveDir = startX < endX ? 1 : -1;
-    
-    if (verticalOffset > 15) {
-      const midControlOffset = controlOffset * 0.6;
-      return `M ${startX} ${startY} C ${startX + curveDir * midControlOffset} ${startY}, ${endX - curveDir * midControlOffset} ${endY}, ${endX} ${endY}`;
-    } else {
-      return `M ${startX} ${startY} C ${startX + curveDir * controlOffset} ${startY}, ${endX - curveDir * controlOffset} ${endY}, ${endX} ${endY}`;
-    }
+  if (!editable.value) { menu.value = null; guides.value = []; }
+});
+
+// Key only on graph structure: polling status must not reset the viewport or layout.
+const structure = computed(() => JSON.stringify([props.nodes.map(node => node.id).sort(), validLinks.value.map(link => [link.id, link.source, link.target, link.linkDirection]).sort()]));
+watch(structure, () => {
+  layoutRequest++;
+  layoutBusy.value = false;
+  routes.value = new Map();
+  menu.value = null;
+  const newKey = props.nodes.map(node => node.id).sort().join('|');
+  if (newKey !== graphKey) {
+    graphKey = newKey;
+    nodesReady.value = false;
+    pendingFit = true;
+    removeSelectedNodes(getSelectedNodes.value);
   }
-};
+}, { flush: 'sync' });
 
-// Get link label position (midpoint of the curve)
-const calculateLinkLabelPosition = (link: Link) => {
-  const sourceNode = nodesById.value.get(link.source);
-  const targetNode = nodesById.value.get(link.target);
-  
-  if (!sourceNode || !targetNode) return { x: 0, y: 0 };
-  
-  // Get actual node dimensions from DOM
-  const sourceDim = getNodeDimensions(sourceNode.id);
-  const targetDim = getNodeDimensions(targetNode.id);
-  
-  const sourceX = (sourceNode.x ?? 100) + sourceDim.width / 2;
-  const sourceY = (sourceNode.y ?? 100) + sourceDim.height;
-  const targetX = (targetNode.x ?? 100) + targetDim.width / 2;
-  const targetY = targetNode.y ?? 100;
-  
-  return {
-    x: (sourceX + targetX) / 2,
-    y: (sourceY + targetY) / 2
-  };
-};
+let graphKey = '';
+let pendingFit = true;
+let layoutRequest = 0;
+let engine: ReturnType<typeof createLayoutEngine> | undefined;
+let unmounted = false;
+const menu = ref<{
+  kind: 'create' | 'edit'; x: number; y: number; link?: ServiceLink; connection?: Connection;
+} | null>(null);
 
-const linkGeometry = computed(() => new Map(props.links.map(link => [
-  link.id,
-  { path: calculateLinkPath(link), label: calculateLinkLabelPosition(link) }
-])));
-const getLinkPath = (link: Link) => linkGeometry.value.get(link.id)?.path ?? '';
-const getLinkLabelPosition = (link: Link) => linkGeometry.value.get(link.id)?.label ?? { x: 0, y: 0 };
+// Initial data must also work when the canvas mounts after API loading.
+flowNodes.value = props.nodes.map(service => ({
+  id: service.id, type: 'service', position: { x: service.x ?? 0, y: service.y ?? 0 }, data: cardData(service),
+}));
+graphKey = props.nodes.map(node => node.id).sort().join('|');
 
-const getLinkTypeLabel = (type?: string): string => {
-  const typeInfo = dependencyTypes.value.find(t => t.value === type);
-  return typeInfo?.label || type || '';
-};
-
-// Check if link has valid source and target nodes
-const isLinkValid = (link: Link): boolean => {
-  const sourceNode = nodesById.value.get(link.source);
-  const targetNode = nodesById.value.get(link.target);
-  return !!(sourceNode && targetNode && sourceNode.x !== undefined && targetNode.x !== undefined);
-};
-
-// Handle mouse wheel for zoom
-const handleWheel = (event: WheelEvent) => {
-  if (props.isDetailsOpen) return;
-  event.preventDefault();
-  const delta = event.deltaY > 0 ? -0.1 : 0.1;
-  const rect = canvasRef.value?.getBoundingClientRect();
-  if (!rect) return;
-  zoomAt(delta, event.clientX - rect.left - canvasRef.value!.clientLeft, event.clientY - rect.top - canvasRef.value!.clientTop);
-};
-
-const zoomAt = (delta: number, mouseX: number, mouseY: number) => {
-  const newScale = Math.max(minScale, Math.min(maxScale, scale.value + delta));
-  const scaleDiff = newScale - scale.value;
-  panOffset.value = {
-    x: panOffset.value.x - (mouseX - panOffset.value.x) * (scaleDiff / scale.value),
-    y: panOffset.value.y - (mouseY - panOffset.value.y) * (scaleDiff / scale.value)
-  };
-  
-  scale.value = newScale;
-};
-
-const zoomAtCenter = (delta: number) => {
-  const canvas = canvasRef.value;
-  if (canvas) zoomAt(delta, canvas.clientWidth / 2, canvas.clientHeight / 2);
-};
-
-// Fit view to show all nodes
-const fitView = () => {
-  if (props.nodes.length === 0) return;
-  
-  const rect = canvasRef.value?.getBoundingClientRect();
-  if (!rect) return;
-  
-  // Find bounding box of all nodes
-  const padding = 40; // 减小边距使布局更紧凑
-  
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  
-  props.nodes.forEach(node => {
-    const x = node.x ?? 100;
-    const y = node.y ?? 100;
-    const dimensions = getNodeDimensions(node.id);
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x + dimensions.width);
-    maxY = Math.max(maxY, y + dimensions.height);
-  });
-  
-  const contentWidth = maxX - minX + padding * 2;
-  const contentHeight = maxY - minY + padding * 2;
-  
-  // Calculate scale to fit - 优化缩放范围使内容更紧凑可见
-  const scaleX = rect.width / contentWidth;
-  const scaleY = rect.height / contentHeight;
-  // 最大缩放到 1.2，确保节点较多时仍能看到所有内容
-  const newScale = Math.max(minScale, Math.min(1.2, Math.min(scaleX, scaleY)));
-  
-  // Calculate pan to center
-  const scaledWidth = contentWidth * newScale;
-  const scaledHeight = contentHeight * newScale;
-  
-  scale.value = newScale;
-  panOffset.value = {
-    x: (rect.width - scaledWidth) / 2 - (minX - padding) * newScale,
-    y: (rect.height - scaledHeight) / 2 - (minY - padding) * newScale
-  };
-};
-
-// Get link status based on source/target node status
-const getLinkStatus = (link: Link): string => {
-  const targetNode = nodesById.value.get(link.target);
-  const sourceNode = nodesById.value.get(link.source);
-  const targetStatus = getNodeStatus(targetNode as Node);
-  const sourceStatus = getNodeStatus(sourceNode as Node);
-  
-  // Priority: down > warning > up
-  if (targetStatus === 'down' || sourceStatus === 'down') return 'down';
-  if (targetStatus === 'warning' || sourceStatus === 'warning') return 'warning';
-  return targetStatus;
-};
-
-// Get particle animation duration based on response time
-const getParticleDuration = (link: Link): string => {
-  const targetNode = nodesById.value.get(link.target);
-  const responseTime = getNodeResponseTime(targetNode as Node);
-  // Faster particles for faster response times
-  if (responseTime && responseTime < 100) return '2s';
-  if (responseTime && responseTime < 300) return '3s';
-  return '4s';
-};
-
-// Dynamic link class based on status
-const getLinkClass = (link: Link) => {
-  const targetNode = nodesById.value.get(link.target);
-  const sourceNode = nodesById.value.get(link.source);
-  const targetStatus = getNodeStatus(targetNode as Node);
-  const sourceStatus = getNodeStatus(sourceNode as Node);
-  
-  const classes = ['link'];
-  
-  // Highlight effect when node is selected
-  const isHighlighted = highlightedLinks.value.has(link.id);
-  const hasHighlights = highlightedLinks.value.size > 0;
-  
-  if (isHighlighted) {
-    classes.push('link-highlighted');
-  } else if (hasHighlights) {
-    classes.push('link-dimmed');
+function fit() {
+  if (getNodes.value.length) void fitView({ padding: 0.15, minZoom: 0.15, maxZoom: 1.2, duration: 0 });
+}
+async function onInitialized() {
+  nodesReady.value = true;
+  if (props.selectedNodeId && !selectedIds.value.has(props.selectedNodeId)) {
+    const selected = findNode(props.selectedNodeId);
+    if (selected) addSelectedNodes([selected]);
   }
-  
-  // Status-based styling (priority)
-  if (targetStatus === 'down' || sourceStatus === 'down') {
-    classes.push('link-down');
-  } else if (targetStatus === 'warning' || sourceStatus === 'warning') {
-    classes.push('link-warning');
-  } else {
-    classes.push('link-normal');
-  }
-  
-  // Dependency type styling
-  if (link.dependencyType) {
-    classes.push(`link-type-${link.dependencyType}`);
-  }
-  
-  // Selected state
-  if (linkContextMenu.value.link?.id === link.id) {
-    classes.push('link-selected');
-  }
-  
-  return classes.join(' ');
-};
-
-// Get dynamic line style based on dependency type
-const getLinkStyle = (link: Link): Record<string, string> => {
-  const typeInfo = dependencyTypes.value.find(t => t.value === link.dependencyType);
-  
-  // Default style for links without a matching type
-  const defaultColor = '#10b981';
-  const defaultLineStyle = 'solid';
-  
-  const color = typeInfo?.color || defaultColor;
-  const lineStyle = typeInfo?.line_style || defaultLineStyle;
-  
-  const dashArrayMap: Record<string, string> = {
-    'solid': 'none',
-    'dashed': '8,4',
-    'dotted': '2,4',
-    'long-dash': '12,6'
-  };
-  
-  const dashArray = dashArrayMap[lineStyle] || 'none';
-  return {
-    'stroke-dasharray': dashArray,
-    'stroke': color
-  };
-};
-
-// Get dynamic label background style based on dependency type
-const getLinkLabelBgStyle = (link: Link): Record<string, string> => {
-  const typeInfo = dependencyTypes.value.find(t => t.value === link.dependencyType);
-  if (!typeInfo) return {};
-  
-  // Generate a lighter fill color from the main color
-  const color = typeInfo.color;
-  return {
-    'stroke': color,
-    'fill': `${color}20`  // 20 = 12.5% opacity in hex
-  };
-};
-
-const getLinkMarker = (link: Link) => {
-  const targetNode = nodesById.value.get(link.target);
-  const targetStatus = getNodeStatus(targetNode as Node);
-  
-  if (targetStatus === 'down') return 'url(#arrowDown)';
-  if (targetStatus === 'warning') return 'url(#arrowWarning)';
-  if (linkContextMenu.value.link?.id === link.id) return 'url(#arrowSelected)';
-  return 'url(#arrowNormal)';
-};
-
-// Canvas Panning Logic
-const isPanning = ref(false);
-const panStart = ref({ x: 0, y: 0 });
-let panFrame = 0;
-let pendingPan: MouseEvent | null = null;
-
-const startPan = (e: MouseEvent) => {
-  if (props.isDetailsOpen) return;
-  // Only start panning with left mouse button
-  if (e.button !== 0) return;
-  
-  // Don't pan if clicking on a node, link, or interactive element
-  const target = e.target as HTMLElement;
-  if (target.closest('.service-node') || 
-      target.closest('.link-hitarea') || 
-      target.closest('.context-menu') ||
-      target.closest('.link-context-menu') ||
-      target.closest('.link-type-selector') ||
-      target.closest('.layout-toolbar') ||
-      target.closest('button')) {
-    return;
-  }
-  
-  const point = toCanvasPoint(e.clientX, e.clientY);
-  
-  // Check if Shift key is pressed for box selection in edit mode
-  if (props.isEditMode && e.shiftKey) {
-    // Start box selection
-    isBoxSelecting.value = true;
-    boxSelectionStart.value = point;
-    boxSelectionEnd.value = point;
-    
-    window.addEventListener('mousemove', onBoxSelect);
-    window.addEventListener('mouseup', stopBoxSelect);
-    return;
-  }
-  
-  // Clicking on blank canvas - clear highlights and deselect all
-  selectedNodeIds.value.clear();
-  highlightedLinks.value.clear();
-  highlightedNodes.value.clear();
+  if (pendingFit) { pendingFit = false; await nextTick(); if (!unmounted) fit(); }
+}
+function clearSelection() {
+  removeSelectedNodes(getSelectedNodes.value);
+  menu.value = null;
   emit('select-node', null);
-  
-  isPanning.value = true;
-  panStart.value = {
-    x: e.clientX - panOffset.value.x,
-    y: e.clientY - panOffset.value.y
-  };
-  
-  window.addEventListener('mousemove', onPan);
-  window.addEventListener('mouseup', stopPan);
-};
-
-const onPan = (e: MouseEvent) => {
-  if (!isPanning.value) return;
-  pendingPan = e;
-  if (!panFrame) panFrame = requestAnimationFrame(flushPan);
-};
-
-const flushPan = () => {
-  panFrame = 0;
-  const e = pendingPan;
-  pendingPan = null;
-  if (!e || !isPanning.value) return;
-  panOffset.value = {
-    x: e.clientX - panStart.value.x,
-    y: e.clientY - panStart.value.y
-  };
-};
-
-const stopPan = () => {
-  cancelAnimationFrame(panFrame);
-  flushPan();
-  isPanning.value = false;
-  window.removeEventListener('mousemove', onPan);
-  window.removeEventListener('mouseup', stopPan);
-};
-
-// Box Selection Logic
-const onBoxSelect = (e: MouseEvent) => {
-  if (!isBoxSelecting.value) return;
-  
-  boxSelectionEnd.value = toCanvasPoint(e.clientX, e.clientY);
-};
-
-const stopBoxSelect = () => {
-  if (!isBoxSelecting.value) return;
-  
-  isBoxSelecting.value = false;
-  window.removeEventListener('mousemove', onBoxSelect);
-  window.removeEventListener('mouseup', stopBoxSelect);
-  
-  // Select all nodes within the box
-  const rect = boxSelectionRect.value;
-  const nodeWidth = 180;
-  const nodeHeight = 64;
-  
-  selectedNodeIds.value.clear();
-  
-  props.nodes.forEach(node => {
-    const nodeX = node.x ?? 100;
-    const nodeY = node.y ?? 100;
-    
-    // Check if node intersects with selection box
-    const nodeRight = nodeX + nodeWidth;
-    const nodeBottom = nodeY + nodeHeight;
-    const boxRight = rect.x + rect.width;
-    const boxBottom = rect.y + rect.height;
-    
-    const intersects = !(nodeRight < rect.x || 
-                        nodeX > boxRight || 
-                        nodeBottom < rect.y || 
-                        nodeY > boxBottom);
-    
-    if (intersects) {
-      selectedNodeIds.value.add(node.id);
-    }
-  });
-  
-  // Update highlights
-  if (selectedNodeIds.value.size > 0) {
-    updateHighlightsForMultiSelection();
-    // Set the first selected node as primary
-    const firstNode = props.nodes.find(n => selectedNodeIds.value.has(n.id));
-    if (firstNode) {
-      emit('select-node', firstNode);
-    }
+}
+let selectionBeforePointer = new Set<string>();
+function onNodeClick({ node, event }: NodeMouseEvent) {
+  canvas.value?.focus({ preventScroll: true });
+  const multi = event.ctrlKey || event.metaKey;
+  if (!multi && selectionBeforePointer.size === 1 && selectionBeforePointer.has(node.id)) clearSelection();
+  else {
+    const primary = selectedIds.value.has(node.id) ? node.id : getSelectedNodes.value[getSelectedNodes.value.length - 1]?.id;
+    emit('select-node', primary ? nodesById.value.get(primary) ?? null : null);
   }
-};
-
-// Select all nodes (Ctrl/Cmd + A)
-const selectAllNodes = () => {
-  if (!props.isEditMode) return;
-  
-  selectedNodeIds.value.clear();
-  props.nodes.forEach(node => {
-    selectedNodeIds.value.add(node.id);
-  });
-  
-  updateHighlightsForMultiSelection();
-  
-  if (selectedNodeIds.value.size > 0) {
-    const firstNode = props.nodes[0];
-    if (firstNode) {
-      emit('select-node', firstNode);
-    }
-  }
-};
-
-// Keyboard shortcuts
-const handleKeyDown = (e: KeyboardEvent) => {
-  if (props.isDetailsOpen) return;
-  // Ctrl/Cmd + A: Select all
-  if ((e.ctrlKey || e.metaKey) && e.key === 'a' && props.isEditMode) {
-    e.preventDefault();
-    selectAllNodes();
-  }
-  
-  // Escape: Clear selection
-  if (e.key === 'Escape') {
-    isWindowFullscreen.value = false;
-    if (document.fullscreenElement === canvasRef.value) void toggleFullscreen();
-    selectedNodeIds.value.clear();
-    highlightedLinks.value.clear();
-    highlightedNodes.value.clear();
-    emit('select-node', null);
-  }
-};
-
-// Dragging Logic - supports multi-node dragging
-const draggingNode = ref<Node | null>(null);
-const dragOffset = ref({ x: 0, y: 0 });
-const dragStartPositions = ref<Map<string, { x: number, y: number }>>(new Map());
-let dragFrame = 0;
-let pendingDrag: MouseEvent | null = null;
-
-const startDragNode = (e: MouseEvent, node: Node) => {
-  if (!props.isEditMode || e.button !== 0) return;
-  e.preventDefault();
-  const point = toCanvasPoint(e.clientX, e.clientY);
-  draggingNode.value = node;
-  dragOffset.value = {
-    x: point.x - (node.x ?? 100),
-    y: point.y - (node.y ?? 100)
-  };
-  
-  // If this node is part of multi-selection, prepare to drag all selected nodes
-  if (selectedNodeIds.value.has(node.id) && selectedNodeIds.value.size > 1) {
-    // Store initial positions of all selected nodes
-    dragStartPositions.value.clear();
-    selectedNodeIds.value.forEach(nodeId => {
-      const selectedNode = nodesById.value.get(nodeId);
-      if (selectedNode) {
-        dragStartPositions.value.set(nodeId, {
-          x: selectedNode.x ?? 100,
-          y: selectedNode.y ?? 100
-        });
-      }
-    });
-  } else {
-    // Single node drag
-    dragStartPositions.value.clear();
-  }
-  
-  window.addEventListener('mousemove', onDragNode);
-  window.addEventListener('mouseup', stopDragNode);
-};
-
-// Snap a position to grid
-const snapPositionToGrid = (x: number, y: number): { x: number; y: number } => {
-  return {
-    x: Math.round(x / GRID_SIZE) * GRID_SIZE,
-    y: Math.round(y / GRID_SIZE) * GRID_SIZE
-  };
-};
-
-// Calculate smart alignment guidelines and snap positions
-const calcGuideSnap = (nodeId: string, rawX: number, rawY: number): { x: number; y: number; guidelines: Guideline[] } => {
-  const guidelines: Guideline[] = [];
-  let snappedX = rawX;
-  let snappedY = rawY;
-  const { width, height } = getNodeDimensions(nodeId);
-  
-  // Current node edges and center
-  const curLeft = rawX;
-  const curCenterX = rawX + width / 2;
-  const curRight = rawX + width;
-  const curTop = rawY;
-  const curCenterY = rawY + height / 2;
-  const curBottom = rawY + height;
-  
-  let bestDx = GUIDE_SNAP_THRESHOLD + 1;
-  let bestDy = GUIDE_SNAP_THRESHOLD + 1;
-  let snapXTarget = rawX;
-  let snapYTarget = rawY;
-  let snapXType: 'left' | 'center' | 'right' = 'left';
-  let snapYType: 'top' | 'center' | 'bottom' = 'top';
-  
-  // Compare against all other nodes
-  for (const other of props.nodes) {
-    if (other.id === nodeId) continue;
-    const ox = other.x ?? 100;
-    const oy = other.y ?? 100;
-    const otherDimensions = getNodeDimensions(other.id);
-    const oLeft = ox;
-    const oCenterX = ox + otherDimensions.width / 2;
-    const oRight = ox + otherDimensions.width;
-    const oTop = oy;
-    const oCenterY = oy + otherDimensions.height / 2;
-    const oBottom = oy + otherDimensions.height;
-    
-    // X-axis alignment checks: left-left, center-center, right-right, left-right, right-left
-    const xChecks: Array<{ cur: number; ref: number; type: 'left' | 'center' | 'right'; offset: number }> = [
-      { cur: curLeft, ref: oLeft, type: 'left', offset: 0 },
-      { cur: curCenterX, ref: oCenterX, type: 'center', offset: -width / 2 },
-      { cur: curRight, ref: oRight, type: 'right', offset: -width },
-      { cur: curLeft, ref: oRight, type: 'left', offset: 0 },
-      { cur: curRight, ref: oLeft, type: 'right', offset: -width },
-    ];
-    
-    for (const check of xChecks) {
-      const dx = Math.abs(check.cur - check.ref);
-      if (dx < bestDx) {
-        bestDx = dx;
-        snapXTarget = check.ref + check.offset;
-        snapXType = check.type;
-      }
-    }
-    
-    // Y-axis alignment checks: top-top, center-center, bottom-bottom, top-bottom, bottom-top
-    const yChecks: Array<{ cur: number; ref: number; type: 'top' | 'center' | 'bottom'; offset: number }> = [
-      { cur: curTop, ref: oTop, type: 'top', offset: 0 },
-      { cur: curCenterY, ref: oCenterY, type: 'center', offset: -height / 2 },
-      { cur: curBottom, ref: oBottom, type: 'bottom', offset: -height },
-      { cur: curTop, ref: oBottom, type: 'top', offset: 0 },
-      { cur: curBottom, ref: oTop, type: 'bottom', offset: -height },
-    ];
-    
-    for (const check of yChecks) {
-      const dy = Math.abs(check.cur - check.ref);
-      if (dy < bestDy) {
-        bestDy = dy;
-        snapYTarget = check.ref + check.offset;
-        snapYType = check.type;
-      }
-    }
-  }
-  
-  // Apply X snap if within threshold
-  if (bestDx <= GUIDE_SNAP_THRESHOLD) {
-    snappedX = snapXTarget;
-    // Determine the guide line X coordinate
-    let guideX: number;
-    if (snapXType === 'left') guideX = snappedX;
-    else if (snapXType === 'center') guideX = snappedX + width / 2;
-    else guideX = snappedX + width;
-    guidelines.push({ x1: guideX, y1: -5000, x2: guideX, y2: 5000, type: 'vertical' });
-  }
-  
-  // Apply Y snap if within threshold
-  if (bestDy <= GUIDE_SNAP_THRESHOLD) {
-    snappedY = snapYTarget;
-    let guideY: number;
-    if (snapYType === 'top') guideY = snappedY;
-    else if (snapYType === 'center') guideY = snappedY + height / 2;
-    else guideY = snappedY + height;
-    guidelines.push({ x1: -5000, y1: guideY, x2: 5000, y2: guideY, type: 'horizontal' });
-  }
-  
-  return { x: snappedX, y: snappedY, guidelines };
-};
-
-const onDragNode = (e: MouseEvent) => {
-  pendingDrag = e;
-  if (!dragFrame) dragFrame = requestAnimationFrame(flushDrag);
-};
-
-const flushDrag = () => {
-  dragFrame = 0;
-  const e = pendingDrag;
-  pendingDrag = null;
-  if (e) updateDragNode(e);
-};
-
-const updateDragNode = (e: MouseEvent) => {
-  if (!draggingNode.value) return;
-  const point = toCanvasPoint(e.clientX, e.clientY);
-  let newX = point.x - dragOffset.value.x;
-  let newY = point.y - dragOffset.value.y;
-  
-  // Apply grid snap
-  if (snapToGrid.value) {
-    const gridSnapped = snapPositionToGrid(newX, newY);
-    newX = gridSnapped.x;
-    newY = gridSnapped.y;
-  }
-  
-  // Apply smart guide snap (single node only)
-  if (snapToGuides.value && dragStartPositions.value.size <= 1) {
-    const guideResult = calcGuideSnap(draggingNode.value.id, newX, newY);
-    newX = guideResult.x;
-    newY = guideResult.y;
-    activeGuidelines.value = guideResult.guidelines;
-  } else {
-    activeGuidelines.value = [];
-  }
-  
-  // If multi-selection, move all selected nodes together
-  if (dragStartPositions.value.size > 1) {
-    const deltaX = newX - (dragStartPositions.value.get(draggingNode.value.id)?.x ?? 0);
-    const deltaY = newY - (dragStartPositions.value.get(draggingNode.value.id)?.y ?? 0);
-    
-    // Move all selected nodes by the same delta
-    selectedNodeIds.value.forEach(nodeId => {
-      const node = nodesById.value.get(nodeId);
-      const startPos = dragStartPositions.value.get(nodeId);
-      if (node && startPos) {
-        node.x = startPos.x + deltaX;
-        node.y = startPos.y + deltaY;
-      }
-    });
-  } else {
-    // Single node drag
-    draggingNode.value.x = newX;
-    draggingNode.value.y = newY;
-  }
-};
-
-const stopDragNode = () => {
-  cancelAnimationFrame(dragFrame);
-  flushDrag();
-  draggingNode.value = null;
-  dragStartPositions.value.clear();
-  activeGuidelines.value = []; // Clear guidelines on drop
-  window.removeEventListener('mousemove', onDragNode);
-  window.removeEventListener('mouseup', stopDragNode);
-  // Emit update to parent to save if needed
-  emit('update:nodes', props.nodes);
-};
-
-// Link Creation Logic
-const tempLink = ref<{ startX: number, startY: number, endX: number, endY: number } | null>(null);
-const sourceNodeForLink = ref<Node | null>(null);
-const pendingLinkTarget = ref<string | null>(null);
-const showLinkTypeSelector = ref(false);
-const linkTypeSelectorPos = ref({ x: 0, y: 0 });
-
-const startDragLink = (e: MouseEvent, node: Node, position: 'top' | 'bottom' | 'left' | 'right') => {
-  if (!props.isEditMode || e.button !== 0) return;
-  
-  sourceNodeForLink.value = node;
-  const rect = (e.target as HTMLElement).getBoundingClientRect();
-  const { x: startX, y: startY } = toCanvasPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-  
-  tempLink.value = {
-    startX,
-    startY,
-    endX: startX,
-    endY: startY
-  };
-  
-  window.addEventListener('mousemove', onDragLink);
-  window.addEventListener('mouseup', stopDragLink);
-};
-
-const onDragLink = (e: MouseEvent) => {
-  if (!tempLink.value) return;
-  const point = toCanvasPoint(e.clientX, e.clientY);
-  tempLink.value.endX = point.x;
-  tempLink.value.endY = point.y;
-};
-
-const stopDragLink = (e: MouseEvent) => {
-  window.removeEventListener('mousemove', onDragLink);
-  window.removeEventListener('mouseup', stopDragLink);
-  
-  // Check if dropped on a node
-  const element = document.elementFromPoint(e.clientX, e.clientY);
-  const nodeEl = element?.closest('.service-node') as HTMLElement;
-  
-  if (nodeEl && sourceNodeForLink.value) {
-    const targetId = nodeEl.dataset.id;
-    if (targetId && targetId !== sourceNodeForLink.value.id) {
-      // Show link type selector
-      pendingLinkTarget.value = targetId;
-      showLinkTypeSelector.value = true;
-      linkTypeSelectorPos.value = {
-        x: e.clientX - canvasRef.value!.getBoundingClientRect().left,
-        y: e.clientY - canvasRef.value!.getBoundingClientRect().top
-      };
-      // Keep tempLink visible until type is selected
-      return;
-    }
-  }
-  
-  tempLink.value = null;
-  sourceNodeForLink.value = null;
-};
-
-const confirmNewLink = (dependencyType: string) => {
-  if (sourceNodeForLink.value && pendingLinkTarget.value) {
-    emit('add-link', {
-      source: sourceNodeForLink.value.id,
-      target: pendingLinkTarget.value,
-      dependencyType
-    });
-  }
-  cancelNewLink();
-};
-
-const cancelNewLink = () => {
-  tempLink.value = null;
-  sourceNodeForLink.value = null;
-  pendingLinkTarget.value = null;
-  showLinkTypeSelector.value = false;
-};
-
-const getTempLinkPath = () => {
-  if (!tempLink.value) return '';
-  const { startX, startY, endX, endY } = tempLink.value;
-  const dist = Math.abs(endY - startY);
-  const controlOffset = Math.max(dist * 0.3, 30);
-  return `M ${startX} ${startY} C ${startX} ${startY + controlOffset}, ${endX} ${endY - controlOffset}, ${endX} ${endY}`;
-};
-
-// Link Context Menu
-const linkContextMenu = ref<{
-  visible: boolean;
-  x: number;
-  y: number;
-  link: Link | null;
-}>({
-  visible: false,
-  x: 0,
-  y: 0,
-  link: null
-});
-
-// Highlight related dependencies when clicking a node
-const highlightedLinks = ref<Set<string>>(new Set());
-const highlightedNodes = ref<Set<string>>(new Set());
-
-// Multi-selection support
-const selectedNodeIds = ref<Set<string>>(new Set());
-
-// Box selection state
-const isBoxSelecting = ref(false);
-const boxSelectionStart = ref({ x: 0, y: 0 });
-const boxSelectionEnd = ref({ x: 0, y: 0 });
-const boxSelectionRect = computed(() => {
-  const x1 = Math.min(boxSelectionStart.value.x, boxSelectionEnd.value.x);
-  const y1 = Math.min(boxSelectionStart.value.y, boxSelectionEnd.value.y);
-  const x2 = Math.max(boxSelectionStart.value.x, boxSelectionEnd.value.x);
-  const y2 = Math.max(boxSelectionStart.value.y, boxSelectionEnd.value.y);
-  return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
-});
-
-const onLinkClick = (e: MouseEvent, link: Link) => {
-  if (!props.isEditMode) return;
-  // Select the link
-  linkContextMenu.value.link = link;
-};
-
-const onLinkContextMenu = (e: MouseEvent, link: Link) => {
-  if (!props.isEditMode) return;
-  
-  const canvasRect = canvasRef.value!.getBoundingClientRect();
-  linkContextMenu.value = {
-    visible: true,
-    x: e.clientX - canvasRect.left,
-    y: e.clientY - canvasRect.top,
-    link
-  };
-};
-
-const updateLinkType = (type: string) => {
-  if (linkContextMenu.value.link) {
-    emit('update-link', {
-      id: linkContextMenu.value.link.id,
-      dependencyType: type
-    });
-    // Don't update local state here - let parent component handle it after API call succeeds
-  }
-  closeLinkContextMenu();
-};
-
-const updateLinkDirection = (direction: string) => {
-  if (linkContextMenu.value.link) {
-    emit('update-link', {
-      id: linkContextMenu.value.link.id,
-      linkDirection: direction
-    });
-    // Update local state immediately for visual feedback
-    linkContextMenu.value.link.linkDirection = direction as 'normal' | 'reverse';
-  }
-  closeLinkContextMenu();
-};
-
-const deleteLink = () => {
-  if (linkContextMenu.value.link) {
-    emit('delete-link', linkContextMenu.value.link);
-  }
-  closeLinkContextMenu();
-};
-
-const closeLinkContextMenu = () => {
-  linkContextMenu.value = {
-    visible: false,
-    x: 0,
-    y: 0,
-    link: null
-  };
-};
-
-let nodePointerStart: { x: number; y: number } | null = null;
-
-const startNodeInteraction = (event: MouseEvent, node: Node) => {
-  nodePointerStart = { x: event.clientX, y: event.clientY };
-  startDragNode(event, node);
-};
-
-const handleNodeClick = (node: Node, event: MouseEvent) => {
-  const moved = nodePointerStart && Math.hypot(event.clientX - nodePointerStart.x, event.clientY - nodePointerStart.y) > 5;
-  nodePointerStart = null;
-  if (moved) return;
-  selectNode(node, event);
-};
-
-const selectNode = (node: Node, event?: MouseEvent) => {
-  closeLinkContextMenu();
-  
-  const isMultiSelect = event && (event.ctrlKey || event.metaKey);
-  
-  if (isMultiSelect) {
-    // Multi-select mode: toggle node selection
-    if (selectedNodeIds.value.has(node.id)) {
-      // Deselect this node
-      selectedNodeIds.value.delete(node.id);
-    } else {
-      // Add to selection
-      selectedNodeIds.value.add(node.id);
-    }
-    
-    // Update highlights for all selected nodes
-    updateHighlightsForMultiSelection();
-    
-    // If selection is empty, clear everything
-    if (selectedNodeIds.value.size === 0) {
-      emit('select-node', null);
-    } else {
-      // Keep the last selected node as primary
-      emit('select-node', node);
-    }
-  } else {
-    // Single select mode
-    // Toggle: if clicking the same node (and it's the only one selected), clear
-    if (selectedNodeIds.value.size === 1 && selectedNodeIds.value.has(node.id)) {
-      selectedNodeIds.value.clear();
-      highlightedLinks.value.clear();
-      highlightedNodes.value.clear();
-      emit('select-node', null);
-      return;
-    }
-    
-    // Clear previous selection and select this node
-    selectedNodeIds.value.clear();
-    selectedNodeIds.value.add(node.id);
-    
-    // Highlight related dependencies for single node
-    const relatedLinks = props.links.filter(link => 
-      link.source === node.id || link.target === node.id
-    );
-    
-    highlightedLinks.value = new Set(relatedLinks.map(link => link.id));
-    
-    // Highlight connected nodes
-    const connectedNodes = new Set<string>();
-    relatedLinks.forEach(link => {
-      if (link.source === node.id) connectedNodes.add(link.target);
-      if (link.target === node.id) connectedNodes.add(link.source);
-    });
-    highlightedNodes.value = connectedNodes;
-    
-    emit('select-node', node);
-  }
-};
-
-// Update highlights for multi-selection
-const updateHighlightsForMultiSelection = () => {
-  const allRelatedLinks = new Set<string>();
-  const allConnectedNodes = new Set<string>();
-  
-  selectedNodeIds.value.forEach(nodeId => {
-    const relatedLinks = props.links.filter(link => 
-      link.source === nodeId || link.target === nodeId
-    );
-    
-    relatedLinks.forEach(link => {
-      allRelatedLinks.add(link.id);
-      if (link.source === nodeId) allConnectedNodes.add(link.target);
-      if (link.target === nodeId) allConnectedNodes.add(link.source);
-    });
-  });
-  
-  highlightedLinks.value = allRelatedLinks;
-  highlightedNodes.value = allConnectedNodes;
-};
-
-// Apply layout algorithm
-const applyLayout = (layoutType: 'dagre' | 'layered' | 'force' | 'grid') => {
-  currentLayout.value = layoutType;
-  
-  // Create a copy of nodes to modify
-  const updatedNodes = props.nodes.map(n => ({ ...n }));
-  
-  switch (layoutType) {
-    case 'layered':
-      applyLayeredLayoutToNodes(updatedNodes);
-      break;
-    case 'dagre':
-      applyDagreLayoutToNodes(updatedNodes);
-      break;
-    case 'force':
-      applyForceLayoutToNodes(updatedNodes);
-      break;
-    case 'grid':
-      applyGridLayoutToNodes(updatedNodes);
-      break;
-  }
-  
-  emit('update:nodes', updatedNodes);
-};
-
-// Layered layout - organize by service layer (frontend, backend, database, external)
-const applyLayeredLayoutToNodes = (nodes: Node[]) => {
-  const layers: Record<string, Node[]> = {
-    frontend: [],
-    backend: [],
-    database: [],
-    external: []
-  };
-  
-  nodes.forEach(node => {
-    const layer = getNodeLayer(node);
-    if (layers[layer]) {
-      layers[layer].push(node);
-    } else {
-      layers.backend.push(node);
-    }
-  });
-  
-  const layerOrder = layoutDirection.value === 'TB' || layoutDirection.value === 'BT' 
-    ? ['frontend', 'backend', 'database', 'external']
-    : ['external', 'database', 'backend', 'frontend'];
-  
-  if (layoutDirection.value === 'BT' || layoutDirection.value === 'RL') {
-    layerOrder.reverse();
-  }
-  
-  const nodeWidth = 190;
-  const nodeHeight = 70;
-  const horizontalGap = 30; // 减小横向间距
-  const verticalGap = 80;  // 减小纵向间距
-  const canvasWidth = canvasRef.value?.clientWidth || 800;
-  const canvasHeight = canvasRef.value?.clientHeight || 600;
-  
-  const isHorizontal = layoutDirection.value === 'LR' || layoutDirection.value === 'RL';
-  
-  if (isHorizontal) {
-    let currentX = 40;
-    layerOrder.forEach(layerName => {
-      const nodesInLayer = layers[layerName];
-      if (nodesInLayer.length === 0) return;
-      
-      const totalHeight = nodesInLayer.length * nodeHeight + (nodesInLayer.length - 1) * verticalGap / 2;
-      let startY = Math.max(30, (canvasHeight - totalHeight) / 2);
-      
-      nodesInLayer.forEach((node, index) => {
-        node.x = currentX;
-        node.y = startY + index * (nodeHeight + verticalGap / 2);
-      });
-      
-      currentX += nodeWidth + horizontalGap * 1.2;
-    });
-  } else {
-    let currentY = 40;
-    layerOrder.forEach(layerName => {
-      const nodesInLayer = layers[layerName];
-      if (nodesInLayer.length === 0) return;
-      
-      const totalWidth = nodesInLayer.length * nodeWidth + (nodesInLayer.length - 1) * horizontalGap;
-      let startX = Math.max(30, (canvasWidth - totalWidth) / 2);
-      
-      nodesInLayer.forEach((node, index) => {
-        node.x = startX + index * (nodeWidth + horizontalGap);
-        node.y = currentY;
-      });
-      
-      currentY += nodeHeight + verticalGap;
-    });
-  }
-};
-
-// Dagre-like layout - topological sort based on dependencies
-const applyDagreLayoutToNodes = (nodes: Node[]) => {
-  // Build adjacency list
-  const inDegree: Record<string, number> = {};
-  const adjList: Record<string, string[]> = {};
-  
-  nodes.forEach(node => {
-    inDegree[node.id] = 0;
-    adjList[node.id] = [];
-  });
-  
-  props.links.forEach(link => {
-    if (adjList[link.source] && inDegree[link.target] !== undefined) {
-      adjList[link.source].push(link.target);
-      inDegree[link.target]++;
-    }
-  });
-  
-  // Topological sort with levels
-  const levels: Node[][] = [];
-  const visited = new Set<string>();
-  
-  while (visited.size < nodes.length) {
-    const currentLevel: Node[] = [];
-    nodes.forEach(node => {
-      if (!visited.has(node.id) && inDegree[node.id] === 0) {
-        currentLevel.push(node);
-        visited.add(node.id);
-      }
-    });
-    
-    if (currentLevel.length === 0) {
-      // Handle cycles - add remaining nodes
-      nodes.forEach(node => {
-        if (!visited.has(node.id)) {
-          currentLevel.push(node);
-          visited.add(node.id);
-        }
-      });
-    }
-    
-    levels.push(currentLevel);
-    
-    // Reduce in-degree for next level
-    currentLevel.forEach(node => {
-      adjList[node.id]?.forEach(targetId => {
-        if (inDegree[targetId] !== undefined) {
-          inDegree[targetId]--;
-        }
-      });
-    });
-  }
-  
-  // Position nodes
-  const nodeWidth = 190;
-  const nodeHeight = 70;
-  const horizontalGap = 35; // 减小横向间距
-  const verticalGap = 85;   // 减小纵向间距
-  const canvasWidth = canvasRef.value?.clientWidth || 800;
-  const canvasHeight = canvasRef.value?.clientHeight || 600;
-  
-  const isHorizontal = layoutDirection.value === 'LR' || layoutDirection.value === 'RL';
-  
-  if (isHorizontal) {
-    const startX = layoutDirection.value === 'RL' ? canvasWidth - 240 : 40;
-    const xStep = layoutDirection.value === 'RL' ? -(nodeWidth + horizontalGap) : (nodeWidth + horizontalGap);
-    
-    levels.forEach((level, levelIndex) => {
-      const totalHeight = level.length * nodeHeight + (level.length - 1) * verticalGap / 2;
-      let startY = Math.max(30, (canvasHeight - totalHeight) / 2);
-      
-      level.forEach((node, nodeIndex) => {
-        node.x = startX + levelIndex * xStep;
-        node.y = startY + nodeIndex * (nodeHeight + verticalGap / 2);
-      });
-    });
-  } else {
-    const startY = layoutDirection.value === 'BT' ? canvasHeight - 120 : 40;
-    const yStep = layoutDirection.value === 'BT' ? -(nodeHeight + verticalGap) : (nodeHeight + verticalGap);
-    
-    levels.forEach((level, levelIndex) => {
-      const totalWidth = level.length * nodeWidth + (level.length - 1) * horizontalGap;
-      let startX = Math.max(30, (canvasWidth - totalWidth) / 2);
-      
-      level.forEach((node, nodeIndex) => {
-        node.x = startX + nodeIndex * (nodeWidth + horizontalGap);
-        node.y = startY + levelIndex * yStep;
-      });
-    });
-  }
-};
-
-// Force-directed layout simulation
-const applyForceLayoutToNodes = (nodes: Node[]) => {
-  const canvasWidth = canvasRef.value?.clientWidth || 800;
-  const canvasHeight = canvasRef.value?.clientHeight || 600;
-  
-  // Initialize random positions if not set
-  nodes.forEach(node => {
-    if (!node.x || !node.y) {
-      node.x = Math.random() * (canvasWidth - 200) + 100;
-      node.y = Math.random() * (canvasHeight - 100) + 50;
-    }
-  });
-  
-  const iterations = 100;
-  const k = Math.sqrt((canvasWidth * canvasHeight) / nodes.length) * 0.8;
-  
-  for (let iter = 0; iter < iterations; iter++) {
-    const temperature = 1 - iter / iterations;
-    
-    // Calculate repulsive forces between all nodes
-    const forces: Record<string, { fx: number; fy: number }> = {};
-    nodes.forEach(node => {
-      forces[node.id] = { fx: 0, fy: 0 };
-    });
-    
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const nodeA = nodes[i];
-        const nodeB = nodes[j];
-        
-        const dx = nodeB.x - nodeA.x;
-        const dy = nodeB.y - nodeA.y;
-        const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-        
-        const repulsiveForce = (k * k) / dist;
-        const fx = (dx / dist) * repulsiveForce;
-        const fy = (dy / dist) * repulsiveForce;
-        
-        forces[nodeA.id].fx -= fx;
-        forces[nodeA.id].fy -= fy;
-        forces[nodeB.id].fx += fx;
-        forces[nodeB.id].fy += fy;
-      }
-    }
-    
-    // Calculate attractive forces for connected nodes
-    props.links.forEach(link => {
-      const sourceNode = nodes.find(n => n.id === link.source);
-      const targetNode = nodes.find(n => n.id === link.target);
-      
-      if (sourceNode && targetNode) {
-        const dx = targetNode.x - sourceNode.x;
-        const dy = targetNode.y - sourceNode.y;
-        const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-        
-        const attractiveForce = (dist * dist) / k;
-        const fx = (dx / dist) * attractiveForce * 0.3;
-        const fy = (dy / dist) * attractiveForce * 0.3;
-        
-        forces[sourceNode.id].fx += fx;
-        forces[sourceNode.id].fy += fy;
-        forces[targetNode.id].fx -= fx;
-        forces[targetNode.id].fy -= fy;
-      }
-    });
-    
-    // Apply forces with damping
-    nodes.forEach(node => {
-      const force = forces[node.id];
-      const maxMove = 50 * temperature;
-      
-      node.x += Math.max(-maxMove, Math.min(maxMove, force.fx * 0.1));
-      node.y += Math.max(-maxMove, Math.min(maxMove, force.fy * 0.1));
-      
-      // Keep within bounds
-      node.x = Math.max(50, Math.min(canvasWidth - 200, node.x));
-      node.y = Math.max(50, Math.min(canvasHeight - 100, node.y));
-    });
-  }
-};
-
-// Grid layout
-const applyGridLayoutToNodes = (nodes: Node[]) => {
-  const nodeWidth = 190;
-  const nodeHeight = 70;
-  const horizontalGap = 30; // 减小横向间距
-  const verticalGap = 50;   // 减小纵向间距
-  const canvasWidth = canvasRef.value?.clientWidth || 800;
-  
-  const nodesPerRow = Math.max(1, Math.floor((canvasWidth - 40) / (nodeWidth + horizontalGap)));
-  
-  nodes.forEach((node, index) => {
-    const row = Math.floor(index / nodesPerRow);
-    const col = index % nodesPerRow;
-    
-    node.x = 40 + col * (nodeWidth + horizontalGap);
-    node.y = 40 + row * (nodeHeight + verticalGap);
-  });
-};
-
-// Auto arrange nodes (legacy compatibility)
-const autoArrangeNodes = () => {
-  applyLayout(currentLayout.value);
-};
-
-// Save layout to backend
-const saveCurrentLayout = () => {
-  emit('save-layout');
-};
-
-// Close menus when clicking outside
-const handleGlobalClick = (e: MouseEvent) => {
-  if (linkContextMenu.value.visible) {
-    const menuEl = document.querySelector('.link-context-menu');
-    if (menuEl && !menuEl.contains(e.target as HTMLElement)) {
-      closeLinkContextMenu();
-    }
-  }
-  if (showLinkTypeSelector.value) {
-    const selectorEl = document.querySelector('.link-type-selector');
-    if (selectorEl && !selectorEl.contains(e.target as HTMLElement)) {
-      cancelNewLink();
-    }
-  }
-};
-
-// Check if nodes have saved layout positions (from database)
-const hasSavedLayout = (): boolean => {
-  return props.nodes.some(node => {
-    const position = node.data && ('layout_x' in node.data || 'layout_y' in node.data)
-      ? { x: node.data.layout_x, y: node.data.layout_y }
-      : node;
-    return Number.isFinite(position.x) && Number.isFinite(position.y);
-  });
-};
-
-watch(
-  () => JSON.stringify(props.nodes.map(node => [node.id, node.x, node.y, node.name, node.project_name])),
-  async (_layout, _oldLayout, onCleanup) => {
-    if (props.nodes.length === 0 || props.isEditMode) return;
-    let cancelled = false;
-    onCleanup(() => { cancelled = true; });
+  selectionBeforePointer = new Set();
+}
+function rememberSelection(event: PointerEvent) {
+  if ((event.target as Element).closest('.vue-flow__node')) selectionBeforePointer = new Set(selectedIds.value);
+}
+function validConnection(connection: Connection) {
+  return editable.value && !layoutBusy.value && connection.source !== connection.target &&
+    nodesById.value.has(connection.source) && nodesById.value.has(connection.target) &&
+    !validLinks.value.some(link => link.source === connection.source && link.target === connection.target);
+}
+function validateConnection(connection: Connection) {
+  // Vue Flow also applies this predicate to already-persisted edges.
+  return 'id' in connection || validConnection(connection);
+}
+function onConnect(connection: Connection) {
+  if (!validConnection(connection)) return;
+  menu.value = { kind: 'create', connection, x: 16, y: 16 };
+}
+function onEdgeMenu({ edge, event }: EdgeMouseEvent) {
+  if (!editable.value || layoutBusy.value) return;
+  event.preventDefault();
+  const stage = canvas.value?.querySelector('.flow-stage')?.getBoundingClientRect();
+  const point = 'clientX' in event ? event : event.touches[0];
+  const link = validLinks.value.find(link => link.id === edge.id);
+  if (stage && point && link) menu.value = { kind: 'edit', link, x: Math.max(0, Math.min(point.clientX - stage.left, stage.width - 230)), y: Math.max(0, Math.min(point.clientY - stage.top, stage.height - 330)) };
+}
+function chooseType(dependencyType: string) {
+  if (!editable.value) return;
+  if (menu.value?.kind === 'create' && menu.value.connection) {
+    const { source, target } = menu.value.connection;
+    if (validConnection(menu.value.connection)) emit('add-link', { source, target, dependencyType });
+  } else if (menu.value?.link) emit('update-link', { id: menu.value.link.id, dependencyType });
+  menu.value = null;
+}
+function changeDirection(linkDirection: 'normal' | 'reverse') {
+  if (editable.value && menu.value?.link) emit('update-link', { id: menu.value.link.id, linkDirection });
+  menu.value = null;
+}
+function removeLink() {
+  if (editable.value && menu.value?.link) emit('delete-link', menu.value.link);
+  menu.value = null;
+}
+function nodeRect(node: GraphNode): Rect {
+  return { ...node.position, ...node.dimensions };
+}
+function onDragStart({ nodes }: NodeDragEvent) {
+  layoutRequest++;
+  routes.value = new Map();
+  menu.value = null;
+  guides.value = [];
+  draggingIds.clear();
+  for (const node of nodes) draggingIds.add(node.id);
+}
+function onDrag({ node, nodes }: NodeDragEvent) {
+  if (!editable.value) return;
+  const moving = new Set(nodes.map(node => node.id));
+  const rect = nodeRect(node);
+  const alignment = snapGuides.value
+    ? alignNode(rect, getNodes.value.filter(other => !moving.has(other.id) && !other.hidden).map(nodeRect), viewport.value.zoom)
+    : { x: rect.x, y: rect.y, alignedX: false, alignedY: false, guides: [] };
+  const x = snapGrid.value && !alignment.alignedX ? Math.round(alignment.x / 20) * 20 : alignment.x;
+  const y = snapGrid.value && !alignment.alignedY ? Math.round(alignment.y / 20) * 20 : alignment.y;
+  const correction = { x: x - node.position.x, y: y - node.position.y };
+  for (const movingNode of nodes) updateNode(movingNode.id, { position: { x: movingNode.position.x + correction.x, y: movingNode.position.y + correction.y } });
+  guides.value = alignment.guides;
+}
+function publishPositions() {
+  emit('update:nodes', props.nodes.map(service => {
+    const node = findNode(service.id);
+    return node ? { ...service, x: node.position.x, y: node.position.y } : service;
+  }));
+}
+function onDragStop() {
+  guides.value = [];
+  if (editable.value) publishPositions();
+  draggingIds.clear();
+}
+async function applyLayout() {
+  if (!editable.value || layoutBusy.value || !nodesReady.value || !props.nodes.length) return;
+  const request = ++layoutRequest;
+  const signature = JSON.stringify(getNodes.value.map(node => [node.id, node.position, node.dimensions]));
+  layoutBusy.value = true;
+  menu.value = null;
+  try {
+    engine ??= createLayoutEngine();
+    const result = await engine.layout(getNodes.value.map(node => ({ id: node.id, ...nodeRect(node) })), validLinks.value, layoutKind.value, direction.value);
+    if (unmounted || request !== layoutRequest || !editable.value ||
+      signature !== JSON.stringify(getNodes.value.map(node => [node.id, node.position, node.dimensions]))) return;
+    for (const [id, position] of result.positions) updateNode(id, { position: { x: position.x, y: position.y } });
+    routes.value = result.routes;
+    publishPositions();
     await nextTick();
-    if (cancelled || props.isEditMode) return;
-    measureNodes();
-    if (isInitialLoad.value && !hasSavedLayout()) {
-      applyLayout('dagre');
+    fit();
+  } catch (error) {
+    if (unmounted || request !== layoutRequest) return;
+    console.error('Topology ELK layout failed:', error);
+    ElMessage.error({ message: t('graphCanvas.layoutFailed'), appendTo: canvas.value });
+    engine?.destroy();
+    engine = undefined;
+  } finally {
+    if (request === layoutRequest) layoutBusy.value = false;
+  }
+}
+function onFlowError(error: Error) {
+  console.error('Topology rendering failed:', error);
+  ElMessage.error({ message: t('graphCanvas.renderFailed'), appendTo: canvas.value });
+}
+const nativeFullscreen = ref(false);
+const windowFullscreen = ref(false);
+const isFullscreen = computed(() => nativeFullscreen.value || windowFullscreen.value);
+function syncFullscreen() { nativeFullscreen.value = document.fullscreenElement === canvas.value; }
+async function toggleFullscreen() {
+  if (windowFullscreen.value) { windowFullscreen.value = false; return; }
+  const exiting = document.fullscreenElement === canvas.value;
+  try {
+    if (exiting) await document.exitFullscreen();
+    else await canvas.value!.requestFullscreen();
+  } catch (error) {
+    if (exiting) {
+      console.error('Unable to exit topology fullscreen:', error);
+      syncFullscreen();
+      ElMessage.error({ message: t('graphCanvas.fullscreenError'), appendTo: canvas.value });
+    } else {
+      console.warn('Using topology window fullscreen:', error);
+      windowFullscreen.value = true;
+      ElMessage.warning({ message: t('graphCanvas.fullscreenFallback'), appendTo: canvas.value });
     }
-    isInitialLoad.value = false;
-    await nextTick();
-    if (cancelled || props.isEditMode) return;
-    resolveNodeOverlaps();
-    await nextTick();
-    if (!cancelled && !props.isEditMode) fitView();
-  },
-  { immediate: true }
-);
-
-onMounted(() => {
-  nodeResizeObserver = new ResizeObserver(measureNodes);
-  nodeElements.forEach(element => nodeResizeObserver!.observe(element));
-  canvasResizeObserver = new ResizeObserver(([entry]) => {
+  }
+}
+function onKeyDown(event: KeyboardEvent) {
+  if ((event.target as Element).closest('input, select, textarea, .service-details-drawer')) return;
+  if (event.key === 'Escape') {
+    menu.value = null;
+    guides.value = [];
+    if (!props.isDetailsOpen) {
+      if (windowFullscreen.value) windowFullscreen.value = false;
+      else if (nativeFullscreen.value) void toggleFullscreen();
+      else clearSelection();
+    }
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a' && editable.value && !props.isDetailsOpen) {
+    event.preventDefault();
+    addSelectedNodes(getNodes.value.filter(node => !node.hidden));
+  }
+}
+let resizeObserver: ResizeObserver | undefined;
+let stageSize: { width: number; height: number } | undefined;
+onMounted(async () => {
+  document.addEventListener('fullscreenchange', syncFullscreen);
+  canvas.value?.addEventListener('pointerdown', rememberSelection, true);
+  const stage = canvas.value?.querySelector('.flow-stage');
+  resizeObserver = new ResizeObserver(([entry]) => {
     if (!entry) return;
     const { width, height } = entry.contentRect;
-    if (viewportSize.value && width > 0 && height > 0) {
-      panOffset.value = {
-        x: panOffset.value.x + (width - viewportSize.value.width) / 2,
-        y: panOffset.value.y + (height - viewportSize.value.height) / 2
-      };
-    }
-    viewportSize.value = { width, height };
+    if (stageSize) void setViewport({
+      ...viewport.value, x: viewport.value.x + (width - stageSize.width) / 2,
+      y: viewport.value.y + (height - stageSize.height) / 2,
+    });
+    stageSize = { width, height };
   });
-  if (canvasRef.value) canvasResizeObserver.observe(canvasRef.value);
-  document.addEventListener('fullscreenchange', syncFullscreen);
-  document.addEventListener('click', handleGlobalClick);
-  document.addEventListener('keydown', handleKeyDown);
-  // Load dependency types from API
-  loadDependencyTypes();
+  if (stage) resizeObserver.observe(stage);
+  try {
+    await getDependencyTypes();
+  } catch (error) {
+    if (unmounted) return;
+    console.error('Unable to load topology dependency types:', error);
+    ElMessage.warning({ message: t('graphCanvas.dependencyTypesFailed'), appendTo: canvas.value });
+  }
 });
-
-onUnmounted(() => {
-  cancelAnimationFrame(dragFrame);
-  cancelAnimationFrame(panFrame);
-  nodeResizeObserver?.disconnect();
-  canvasResizeObserver?.disconnect();
+watch(editable, () => { layoutRequest++; layoutBusy.value = false; draggingIds.clear(); });
+watch(layoutBusy, busy => emit('layout-busy', busy));
+watch(() => props.selectedNodeId, id => {
+  if (!id) removeSelectedNodes(getSelectedNodes.value);
+  else if (!selectedIds.value.has(id)) {
+    const node = findNode(id);
+    if (node) addSelectedNodes([node]);
+  }
+});
+onBeforeUnmount(() => {
+  unmounted = true;
+  emit('layout-busy', false);
+  layoutRequest++;
+  engine?.destroy();
+  resizeObserver?.disconnect();
   document.removeEventListener('fullscreenchange', syncFullscreen);
-  document.removeEventListener('click', handleGlobalClick);
-  document.removeEventListener('keydown', handleKeyDown);
-  window.removeEventListener('mousemove', onPan);
-  window.removeEventListener('mouseup', stopPan);
-  window.removeEventListener('mousemove', onDragNode);
-  window.removeEventListener('mouseup', stopDragNode);
-  window.removeEventListener('mousemove', onBoxSelect);
-  window.removeEventListener('mouseup', stopBoxSelect);
-  window.removeEventListener('mousemove', onDragLink);
-  window.removeEventListener('mouseup', stopDragLink);
+  canvas.value?.removeEventListener('pointerdown', rememberSelection, true);
 });
 </script>
 
 <style scoped>
-/* Graph Canvas */
-.graph-canvas {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    flex: 1;
-    background: 
-        linear-gradient(90deg, #f8fafc 1px, transparent 1px),
-        linear-gradient(#f8fafc 1px, transparent 1px),
-        #fff;
-    background-size: 30px 30px;
-    overflow: clip;
-    cursor: grab;
-    box-sizing: border-box;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    user-select: none;
-}
-
-.graph-canvas:fullscreen {
-    border-radius: 0;
-    width: 100vw;
-    height: 100vh;
-}
-
-.graph-canvas.window-fullscreen {
-    position: fixed;
-    inset: 0;
-    z-index: 10000;
-    border-radius: 0;
-    width: 100vw;
-    height: 100vh;
-}
-
-.viewport-controls {
-    position: absolute;
-    right: 12px;
-    bottom: 12px;
-    z-index: 40;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-
-.viewport-controls button {
-    padding: 6px 8px;
-    border: 1px solid #e4e7ec;
-    border-radius: 4px;
-    background: #fff;
-    color: #344054;
-    cursor: pointer;
-}
-
-.viewport-controls button:hover:not(:disabled),
-.viewport-controls button:focus-visible {
-    background: #eff6ff;
-    border-color: #409eff;
-}
-
-.viewport-controls button:disabled {
-    opacity: 0.4;
-    cursor: default;
-}
-
-.zoom-level {
-    min-width: 42px;
-    text-align: center;
-    font-size: 12px;
-}
-
-.viewport-hint {
-    position: absolute;
-    left: 12px;
-    bottom: 64px;
-    max-width: calc(100% - 24px);
-    z-index: 30;
-    padding: 4px 8px;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.9);
-    color: #667085;
-    font-size: 12px;
-    pointer-events: none;
-}
-
-.graph-canvas.panning {
-    cursor: grabbing;
-}
-
-.graph-canvas.edit-mode {
-    cursor: default;
-}
-
-.graph-canvas.edit-mode.panning {
-    cursor: grabbing;
-}
-
-/* Zoom/Pan Container */
-.zoom-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-    will-change: transform;
-}
-
-/* Service Node */
-.service-node {
-    position: absolute;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 36px 10px 14px;
-    background: #fff;
-    border-radius: 10px;
-    border: 2px solid #e4e7ec;
-    cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-    z-index: 20;
-    min-width: 180px;
-    max-width: 350px;
-}
-
-.service-node:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.1);
-}
-
-.node-details-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 3px;
-    border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    background: #fff;
-    color: #175cd3;
-    font: inherit;
-    font-size: 12px;
-    cursor: pointer;
-}
-
-.node-details-btn svg {
-    width: 14px;
-    height: 14px;
-}
-
-.node-details-btn:hover,
-.node-details-btn:focus-visible {
-    background: #eff6ff;
-    border-color: #409eff;
-}
-
-.graph-canvas.dragging .service-node {
-    transform: none;
-}
-
-.service-node.selected {
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
-}
-
-.service-node.highlighted {
-    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4);
-    transform: scale(1.02);
-}
-
-.service-node.dimmed {
-    opacity: 0.3;
-}
-
-/* Node Layer Colors */
-.layer-frontend { border-color: #3b82f6; }
-.layer-backend { border-color: #10b981; }
-.layer-database { border-color: #f59e0b; }
-.layer-external { border-color: #8b5cf6; }
-
-/* Node Status */
-.status-down {
-    background: #fef3f2;
-    border-color: #f04438 !important;
-}
-.status-warning {
-    border-color: #f79009 !important;
-}
-.status-unknown {
-    border-color: #98a2b3;
-}
-
-/* Node Status Indicator */
-.node-status-indicator {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    border: 2px solid #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-}
-.node-status-indicator.status-up { background: #12b76a; }
-.node-status-indicator.status-warning { background: #f79009; }
-.node-status-indicator.status-down { background: #f04438; animation: pulse-down 1.5s infinite; }
-.node-status-indicator.status-unknown { background: #98a2b3; }
-
-/* Multi-select badge */
-.multi-select-badge {
-    position: absolute;
-    top: -8px;
-    left: -8px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid #fff;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
-    z-index: 10;
-}
-
-/* Box Selection Visual */
-.box-selection {
-    position: absolute;
-    border: 2px dashed #667eea;
-    background: rgba(102, 126, 234, 0.1);
-    pointer-events: none;
-    z-index: 100;
-    border-radius: 4px;
-    box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.2);
-}
-
-@keyframes pulse-down {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.2); opacity: 0.8; }
-}
-
-.node-icon {
-    width: 32px; height: 32px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-}
-
-.layer-frontend .node-icon { background: #eff6ff; color: #3b82f6; }
-.layer-backend .node-icon { background: #ecfdf5; color: #10b981; }
-.layer-database .node-icon { background: #fffbeb; color: #f59e0b; }
-.layer-external .node-icon { background: #f5f3ff; color: #8b5cf6; }
-
-.node-info { display: flex; flex-direction: column; flex: 1; }
-.node-name { font-size: 13px; font-weight: 600; color: #101828; word-break: break-word; }
-.node-meta { font-size: 11px; color: #667085; display: flex; gap: 6px; flex-wrap: wrap; }
-
-/* SVG Connections */
-.connections-layer { 
-    position: absolute; 
-    top: 0; 
-    left: 0; 
-    width: 100%;
-    height: 100%;
-    pointer-events: none; 
-    z-index: 1;
-    overflow: visible;
-}
-
-/* Grid Background */
-.grid-background {
-    pointer-events: none;
-    opacity: 0.7;
-}
-
-/* In edit mode, raise connections above nodes for easier editing */
-.connections-layer.edit-mode-layer {
-    z-index: 30;
-}
-
-/* Link Styles */
-.link { 
-    fill: none; 
-    stroke-width: 2.5;
-    transition: stroke 0.3s, stroke-width 0.3s;
-}
-
-.link-hitarea {
-    fill: none;
-    stroke: transparent;
-    stroke-width: 20;
-    cursor: pointer;
-    pointer-events: stroke;
-}
-
-.link-hitarea:hover + .link {
-    stroke-width: 3.5;
-    filter: drop-shadow(0 0 4px currentColor);
-}
-
-.link-normal { 
-    stroke-width: 2.5;
-}
-
-.link-warning { 
-    stroke: #f79009; 
-    stroke-dasharray: 8,4; 
-    animation: dash-warning 1s linear infinite;
-    stroke-width: 3;
-    filter: drop-shadow(0 0 2px #f79009);
-}
-
-.link-down { 
-    stroke: #f04438; 
-    stroke-width: 3.5;
-    stroke-dasharray: 6,3;
-    animation: dash-down 0.5s linear infinite;
-    filter: drop-shadow(0 0 3px #f04438);
-}
-
-.link-selected {
-    stroke: #409EFF !important;
-    stroke-width: 3 !important;
-    filter: drop-shadow(0 0 4px rgba(64, 158, 255, 0.5));
-}
-
-.link-highlighted {
-    stroke-width: 4 !important;
-    filter: drop-shadow(0 0 8px currentColor);
-    animation: highlight-pulse 1.5s ease-in-out infinite;
-}
-
-.link-dimmed {
-    opacity: 0.2;
-    stroke-width: 1.5 !important;
-}
-
-@keyframes highlight-pulse {
-    0%, 100% { 
-        stroke-width: 4;
-        filter: drop-shadow(0 0 8px currentColor);
-    }
-    50% { 
-        stroke-width: 4.5;
-        filter: drop-shadow(0 0 12px currentColor);
-    }
-}
-
-/* Dependency Type Styles - now dynamically applied via getLinkStyle */
-
-.link-drag { 
-    stroke: #409EFF; 
-    stroke-dasharray: 6,4;
-    stroke-width: 2;
-    fill: none;
-}
-
-.link-label {
-    font-size: 11px;
-    font-weight: 600;
-    fill: #1f2937;
-    text-anchor: middle;
-    pointer-events: none;
-    text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
-}
-
-@keyframes dash-warning {
-    to { stroke-dashoffset: -12; }
-}
-
-@keyframes dash-down {
-    to { stroke-dashoffset: -9; }
-}
-
-/* Controls */
-/* Graph controls removed */
-
-/* Connection Handles */
-.node-handle {
-    position: absolute;
-    width: 12px; height: 12px;
-    background: #fff;
-    border: 2px solid #409EFF;
-    border-radius: 50%;
-    z-index: 25;
-    display: none;
-    cursor: crosshair;
-    transition: transform 0.15s, background 0.15s;
-}
-.node-handle:hover {
-    background: #409EFF;
-    transform: scale(1.2);
-}
-.edit-mode .node-handle { display: block; }
-.handle-top { top: -6px; left: 50%; transform: translateX(-50%); }
-.handle-bottom { bottom: -6px; left: 50%; transform: translateX(-50%); }
-.handle-left { left: -6px; top: 50%; transform: translateY(-50%); }
-.handle-right { right: -6px; top: 50%; transform: translateY(-50%); }
-
-/* Link Context Menu */
-.link-context-menu {
-    position: absolute;
-    background: #fff;
-    border: 1px solid #e4e7ec;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-    min-width: 200px;
-    z-index: 100;
-    overflow: hidden;
-}
-
-.context-menu-header {
-    padding: 12px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #101828;
-    background: #f9fafb;
-    border-bottom: 1px solid #e4e7ec;
-}
-
-.context-menu-section {
-    padding: 12px 16px;
-}
-
-.context-menu-label {
-    font-size: 11px;
-    font-weight: 500;
-    color: #667085;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-}
-
-.context-menu-options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-}
-
-.type-option {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 10px;
-    border: 1px solid #e4e7ec;
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 12px;
-    color: #344054;
-    transition: all 0.15s;
-}
-.type-option:hover {
-    background: #f9fafb;
-    border-color: #d0d5dd;
-}
-.type-option.active {
-    background: #eff6ff;
-    border-color: #409EFF;
-    color: #409EFF;
-}
-.type-icon {
-    font-size: 14px;
-}
-
-.context-menu-divider {
-    height: 1px;
-    background: #e4e7ec;
-}
-
-.context-menu-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    font-size: 13px;
-    color: #344054;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-.context-menu-item:hover {
-    background: #f9fafb;
-}
-.context-menu-item.danger {
-    color: #f04438;
-}
-.context-menu-item.danger:hover {
-    background: #fef3f2;
-}
-.menu-icon {
-    font-size: 14px;
-}
-
-/* Link Type Selector */
-.link-type-selector {
-    position: absolute;
-    background: #fff;
-    border: 1px solid #e4e7ec;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-    min-width: 240px;
-    z-index: 100;
-    overflow: hidden;
-}
-
-.selector-header {
-    padding: 12px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #101828;
-    background: #f9fafb;
-    border-bottom: 1px solid #e4e7ec;
-}
-
-.selector-options {
-    padding: 8px;
-}
-
-.selector-option {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 12px;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    cursor: pointer;
-    width: 100%;
-    text-align: left;
-    transition: background 0.15s;
-}
-.selector-option:hover {
-    background: #f9fafb;
-}
-.option-icon {
-    font-size: 18px;
-    margin-top: 2px;
-}
-.option-info {
-    display: flex;
-    flex-direction: column;
-}
-.option-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: #101828;
-}
-.option-desc {
-    font-size: 11px;
-    color: #667085;
-    margin-top: 2px;
-}
-
-.selector-cancel {
-    display: block;
-    width: calc(100% - 16px);
-    margin: 8px;
-    padding: 10px;
-    border: 1px solid #e4e7ec;
-    border-radius: 8px;
-    background: #fff;
-    color: #667085;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.selector-cancel:hover {
-    background: #f9fafb;
-    color: #344054;
-}
-
-/* Layout Toolbar */
-.layout-toolbar {
-    position: absolute;
-    top: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #fff;
-    padding: 8px 16px;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
-    border: 1px solid #e4e7ec;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    z-index: 30;
-}
-
-.layout-section {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.toolbar-label {
-    font-size: 12px;
-    color: #667085;
-    font-weight: 500;
-}
-
-.toolbar-divider {
-    width: 1px;
-    height: 28px;
-    background: #e4e7ec;
-}
-
-.layout-options {
-    display: flex;
-    gap: 6px;
-}
-
-.layout-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border: 1px solid #e4e7ec;
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 12px;
-    color: #344054;
-    transition: all 0.15s;
-}
-
-.layout-btn:hover {
-    background: #f9fafb;
-    border-color: #d0d5dd;
-}
-
-.layout-btn.active {
-    background: #eff6ff;
-    border-color: #409EFF;
-    color: #409EFF;
-}
-
-.layout-icon {
-    font-size: 14px;
-}
-
-.direction-options {
-    display: flex;
-    gap: 4px;
-}
-
-.direction-btn {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #e4e7ec;
-    border-radius: 6px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 14px;
-    color: #667085;
-    transition: all 0.15s;
-}
-
-.direction-btn:hover {
-    background: #f9fafb;
-    border-color: #d0d5dd;
-}
-
-.direction-btn.active {
-    background: #eff6ff;
-    border-color: #409EFF;
-    color: #409EFF;
-}
-
-/* Snap alignment controls */
-.snap-options {
-    display: flex;
-    gap: 6px;
-}
-
-.snap-btn {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 6px 10px;
-    border: 1px solid #e4e7ec;
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 12px;
-    color: #344054;
-    transition: all 0.15s;
-}
-
-.snap-btn:hover {
-    background: #f9fafb;
-    border-color: #d0d5dd;
-}
-
-.snap-btn.active {
-    background: #f0fdf4;
-    border-color: #10b981;
-    color: #10b981;
-}
-
-.snap-icon {
-    font-size: 14px;
-}
-
-/* Alignment Guidelines */
-.guidelines-layer {
-    pointer-events: none;
-    z-index: 100;
-}
-
-.alignment-guideline {
-    stroke-width: 1;
-    stroke-dasharray: 6 3;
-    opacity: 0.8;
-    pointer-events: none;
-}
-
-.alignment-guideline.vertical {
-    stroke: #f04438;
-}
-
-.alignment-guideline.horizontal {
-    stroke: #3b82f6;
-}
-
-/* Direction options in link context menu */
-.direction-options-menu {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.direction-option {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 10px;
-    border: 1px solid #e4e7ec;
-    border-radius: 6px;
-    background: #fff;
-    cursor: pointer;
-    font-size: 12px;
-    color: #667085;
-    transition: all 0.15s;
-}
-
-.direction-option:hover {
-    background: #f9fafb;
-    border-color: #d0d5dd;
-}
-
-.direction-option.active {
-    background: #eff6ff;
-    border-color: #409EFF;
-    color: #409EFF;
-}
-
-.direction-icon {
-    font-size: 14px;
-}
-
-.direction-text {
-    font-size: 11px;
-    font-weight: 500;
-}
-
-.save-layout-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: linear-gradient(135deg, #10b981, #059669);
-    border: none;
-    border-radius: 8px;
-    color: #fff;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-}
-
-.save-layout-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
-
-/* Link Glow Effects */
-.link-glow {
-    fill: none;
-    stroke-width: 8;
-    opacity: 0.3;
-    filter: blur(4px);
-}
-
-.link-glow-warning {
-    stroke: #f79009;
-    animation: glow-pulse-warning 2s ease-in-out infinite;
-}
-
-.link-glow-down {
-    stroke: #f04438;
-    animation: glow-pulse-down 1s ease-in-out infinite;
-}
-
-@keyframes glow-pulse-warning {
-    0%, 100% { opacity: 0.2; stroke-width: 6; }
-    50% { opacity: 0.4; stroke-width: 10; }
-}
-
-@keyframes glow-pulse-down {
-    0%, 100% { opacity: 0.3; stroke-width: 8; }
-    50% { opacity: 0.5; stroke-width: 12; }
-}
-
-/* Link Label Background */
-.link-label-bg {
-    fill: #ffffff;
-    stroke: #d1d5db;
-    stroke-width: 1;
-    opacity: 1;
-    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.12));
-}
-
-/* Dependency type label backgrounds - now dynamically applied via getLinkLabelBgStyle */
-
-/* Link Status Indicator */
-.link-status-indicator {
-    stroke: #fff;
-    stroke-width: 2;
-}
-
-.link-status-indicator.status-warning {
-    fill: #f79009;
-    animation: status-pulse 1.5s ease-in-out infinite;
-}
-
-.link-status-indicator.status-down {
-    fill: #f04438;
-    animation: status-pulse 0.8s ease-in-out infinite;
-}
-
-@keyframes status-pulse {
-    0%, 100% { r: 8; opacity: 1; }
-    50% { r: 10; opacity: 0.8; }
-}
-
-.link-status-icon {
-    fill: #fff;
-    font-size: 10px;
-    font-weight: bold;
-    text-anchor: middle;
-    pointer-events: none;
-}
-
-/* Link Particle */
-.link-particle {
-    filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.5));
-}
-
-/* Cross-project dependency indicator */
-.cross-project-badge-bg {
-    fill: #f79009;
-    opacity: 0.9;
-}
-
-.cross-project-badge-text {
-    fill: #fff;
-    font-size: 10px;
-    font-weight: 600;
-    text-anchor: middle;
-    pointer-events: none;
-}
-
-.cross-project-indicator {
-    cursor: pointer;
-}
-
-/* Cross-project node styling */
-.cross-project-node {
-    border: 2px dashed #f79009 !important;
-    background: linear-gradient(135deg, #fff9f0 0%, #fff 100%) !important;
-}
-
-.cross-project-node-badge {
-    position: absolute;
-    top: -10px;
-    right: -10px;
-    background: #f79009;
-    color: white;
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 8px;
-    z-index: 10;
-    box-shadow: 0 2px 4px rgba(247, 144, 9, 0.3);
-}
-
-/* Layer style for external (cross-project) services */
-.service-node.layer-external {
-    border-left: 4px solid #f79009;
-}
-
-.service-node.layer-external .node-icon {
-    background: linear-gradient(135deg, #f79009, #fbbf24);
-}
-
-/* Link type styles are now dynamically applied via getLinkStyle() */
+.graph-canvas { display: flex; flex: 1; flex-direction: column; position: relative; width: 100%; height: 100%; min-height: 360px; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 9px; background: white; outline: none; }
+.graph-canvas:fullscreen, .graph-canvas.window-fullscreen { width: 100vw; height: 100vh; border-radius: 0; }
+.window-fullscreen { position: fixed; inset: 0; z-index: 10000; }
+.layout-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-bottom: 1px solid #e4e7ec; background: white; z-index: 5; }
+button, select { border: 1px solid #d7deea; border-radius: 6px; padding: 6px 9px; color: #344054; background: white; font: inherit; font-size: 12px; }
+button { cursor: pointer; }
+button:hover:not(:disabled), button.active { background: #eff5ff; border-color: #9ab8f7; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #9ab8f7; outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.layout-toolbar { background: #f8faff; font-size: 12px; }
+.layout-toolbar label { display: flex; align-items: center; gap: 5px; }
+.flow-stage { flex: 1; min-height: 0; position: relative; background-color: #fbfcfe; background-image: radial-gradient(#cdd5e2 .8px, transparent .8px); background-size: 20px 20px; }
+.flow-stage.show-grid { background-image: linear-gradient(to right, #b8c6dc 1px, transparent 1px), linear-gradient(to bottom, #b8c6dc 1px, transparent 1px); }
+.alignment-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; overflow: hidden; }
+.viewport-controls { position: absolute; bottom: 12px; left: 12px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; max-width: calc(100% - 24px); box-sizing: border-box; background: white; border: 1px solid #d7deea; border-radius: 7px; padding: 4px; z-index: 5; }
+.viewport-controls span { min-width: 43px; font-size: 12px; text-align: center; color: #667085; }
+.viewport-controls button { border: none; }
+.viewport-hint { padding: 8px 12px; color: #98a2b3; font-size: 11px; border-top: 1px solid #e4e7ec; }
+.selection-summary { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; white-space: nowrap; padding: 6px 10px; background: white; border: 1px solid #d6e2fb; border-radius: 7px; font-size: 11px; z-index: 5; }
+.selection-summary button { font-size: 10px; padding: 3px 6px; }
+.link-menu { position: absolute; width: 220px; max-height: calc(100% - 16px); overflow-y: auto; z-index: 8; display: flex; flex-direction: column; gap: 5px; padding: 10px; border: 1px solid #d7deea; border-radius: 8px; background: white; box-shadow: 0 5px 20px #18223020; }
+.menu-heading { font-weight: 600; font-size: 12px; padding: 4px; }
+.link-menu button { text-align: left; }
+.link-menu .danger { color: #d92d20; }
+.link-menu hr { border: none; border-top: 1px solid #e4e7ec; width: 100%; }
+:deep(.vue-flow__node-service) { border: none; padding: 0; width: max-content; max-width: 350px; background: none; }
+:deep(.vue-flow__handle) { width: 8px; height: 8px; border: 2px solid white; background: #729cf4; }
+:deep(.vue-flow__edge-path) { transition: stroke .15s; }
+:deep(.vue-flow__minimap) { border: 1px solid #d7deea; border-radius: 7px; overflow: hidden; }
+@media (max-width: 700px) { :deep(.vue-flow__minimap) { display: none; } }
+@media (max-width: 600px) { .viewport-hint { font-size: 10px; } .selection-summary { max-width: calc(100% - 12px); } }
 </style>

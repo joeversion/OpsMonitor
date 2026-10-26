@@ -941,7 +941,7 @@ function runMigrations() {
       );
       
       INSERT OR IGNORE INTO dependency_types (id, name, label, icon, description, color, is_system, sort_order) VALUES
-        ('type-depends', 'depends', 'Depends', '🔗', 'Strong dependency, must be available', '#ef4444', 1, 1),
+        ('type-depends', 'depends', 'Depends', '🔗', 'Strong dependency, must be available', '#1570ef', 1, 1),
         ('type-uses', 'uses', 'Uses', '📡', 'Weak dependency, can degrade', '#6366f1', 1, 2),
         ('type-sync', 'sync', 'Sync', '🔄', 'Data synchronization relationship', '#06b6d4', 1, 3),
         ('type-backup', 'backup', 'Backup', '💾', 'Backup/redundancy relationship', '#10b981', 1, 4);

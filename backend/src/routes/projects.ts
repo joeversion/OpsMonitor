@@ -19,6 +19,8 @@ interface ProjectWithStats extends Project {
   healthy_count: number;
   warning_count: number;
   down_count: number;
+  unknown_count: number;
+  unmonitored_count: number;
 }
 
 // 获取所有项目（带统计信息）
@@ -36,18 +38,16 @@ router.get('/', (req: Request, res: Response) => {
         COUNT(DISTINCT s.id) as service_count,
         COALESCE(SUM(CASE WHEN s.enabled = 1 AND latest.status = 'up' THEN 1 ELSE 0 END), 0) as healthy_count,
         COALESCE(SUM(CASE WHEN s.enabled = 1 AND latest.status = 'warning' THEN 1 ELSE 0 END), 0) as warning_count,
-        COALESCE(SUM(CASE WHEN s.enabled = 1 AND latest.status = 'down' THEN 1 ELSE 0 END), 0) as down_count
+        COALESCE(SUM(CASE WHEN s.enabled = 1 AND latest.status = 'down' THEN 1 ELSE 0 END), 0) as down_count,
+        COALESCE(SUM(CASE WHEN s.enabled = 1 AND (latest.status IS NULL OR latest.status NOT IN ('up', 'warning', 'down')) THEN 1 ELSE 0 END), 0) as unknown_count,
+        COALESCE(SUM(CASE WHEN s.enabled = 0 THEN 1 ELSE 0 END), 0) as unmonitored_count
       FROM projects p
       LEFT JOIN services s ON s.project_id = p.id
-      LEFT JOIN (
-        SELECT cr1.service_id, cr1.status
-        FROM check_records cr1
-        INNER JOIN (
-          SELECT service_id, MAX(checked_at) as max_checked_at
-          FROM check_records
-          GROUP BY service_id
-        ) cr2 ON cr1.service_id = cr2.service_id AND cr1.checked_at = cr2.max_checked_at
-      ) latest ON s.id = latest.service_id
+      LEFT JOIN check_records latest ON latest.rowid = (
+        SELECT cr.rowid FROM check_records cr
+        WHERE cr.service_id = s.id
+        ORDER BY cr.checked_at DESC, cr.rowid DESC LIMIT 1
+      )
       GROUP BY p.id, p.name, p.description, p.icon_color, p.created_at, p.updated_at
       ORDER BY p.name
     `).all() as ProjectWithStats[];
@@ -288,6 +288,7 @@ router.get('/:id/graph', (req: Request, res: Response) => {
       id: s.id,
       name: s.name,
       status: s.current_status || 'unknown',
+      enabled: s.enabled,
       responseTime: s.last_response_time,
       host: s.host,
       port: s.port,

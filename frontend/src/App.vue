@@ -235,7 +235,7 @@
 import { computed, ref, onMounted, onUnmounted, provide, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Monitor, Odometer, Box, Bell, Connection, Setting, Tools, ArrowDown, Key, FolderOpened, Share, DataBoard, Expand, Fold, UserFilled, User, SwitchButton, Lock } from '@element-plus/icons-vue';
+import { Monitor, Odometer, Box, Bell, Tools, ArrowDown, Key, FolderOpened, Share, DataBoard, Expand, Fold, UserFilled, User, SwitchButton } from '@element-plus/icons-vue';
 import { useI18n } from 'vue-i18n';
 import api from './api';
 import authApi from './api/auth';
@@ -420,8 +420,8 @@ function handleProjectsLoaded(projects: ProjectWithStats[]) {
 }
 
 // Set project from child components (e.g., ProjectsView)
-function setCurrentProject(projectId: number | null) {
-  currentProjectId.value = projectId;
+function setCurrentProject(projectId: string | number | null) {
+  currentProjectId.value = projectId == null ? undefined : String(projectId);
 }
 
 // Refresh project selector dropdown
@@ -466,15 +466,6 @@ async function onAlertPopoverShow() {
       alertCount.value = 0;
       api.post('/alerts/acknowledge').catch(() => {});
     }
-  } catch { /* ignore */ }
-}
-
-async function acknowledgeAlerts() {
-  try {
-    await api.post('/alerts/acknowledge');
-    alertCount.value = 0;
-    // Mark local list as read
-    recentAlerts.value = recentAlerts.value.map(a => ({ ...a, acknowledged: 1 }));
   } catch { /* ignore */ }
 }
 

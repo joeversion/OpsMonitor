@@ -58,7 +58,7 @@ export function installFrontendLogging(app: App): void {
     if (previousErrorHandler) previousErrorHandler(error, instance, info)
     else originalError(error)
   }
-  window.addEventListener('error', event => {
+  window.addEventListener('error', (event: Event) => {
     if (event instanceof ErrorEvent) record('error', [event.error || event.message])
     else if (event.target instanceof HTMLElement) record('error', ['Resource load failed', event.target.tagName])
   }, true)

@@ -53,14 +53,14 @@ router.get('/', (req: Request, res: Response) => {
       }
       
       // Get aggregated health status from services
-      // Note: disabled services (enabled=0) are counted as unknown regardless of check records
       const healthStats = db.prepare(`
         SELECT 
           COUNT(*) as total_services,
           SUM(CASE WHEN enabled = 1 AND last_status = 'down' THEN 1 ELSE 0 END) as down_count,
           SUM(CASE WHEN enabled = 1 AND last_status = 'warning' THEN 1 ELSE 0 END) as warning_count,
           SUM(CASE WHEN enabled = 1 AND last_status = 'up' THEN 1 ELSE 0 END) as up_count,
-          SUM(CASE WHEN enabled = 0 OR last_status IS NULL OR last_status NOT IN ('up', 'down', 'warning') THEN 1 ELSE 0 END) as unknown_count
+          SUM(CASE WHEN enabled = 1 AND (last_status IS NULL OR last_status NOT IN ('up', 'down', 'warning')) THEN 1 ELSE 0 END) as unknown_count,
+          SUM(CASE WHEN enabled = 0 THEN 1 ELSE 0 END) as unmonitored_count
         FROM (
           SELECT 
             s.id,
@@ -295,14 +295,14 @@ router.get('/:id', (req: Request, res: Response) => {
     host.services = services;
     
     // 计算健康统计（与列表接口保持一致）
-    // Note: disabled services (enabled=0) are counted as unknown regardless of check records
     const healthStats = db.prepare(`
       SELECT 
         COUNT(*) as total_services,
         SUM(CASE WHEN enabled = 1 AND last_status = 'down' THEN 1 ELSE 0 END) as down_count,
         SUM(CASE WHEN enabled = 1 AND last_status = 'warning' THEN 1 ELSE 0 END) as warning_count,
         SUM(CASE WHEN enabled = 1 AND last_status = 'up' THEN 1 ELSE 0 END) as up_count,
-        SUM(CASE WHEN enabled = 0 OR last_status IS NULL OR last_status NOT IN ('up', 'down', 'warning') THEN 1 ELSE 0 END) as unknown_count
+        SUM(CASE WHEN enabled = 1 AND (last_status IS NULL OR last_status NOT IN ('up', 'down', 'warning')) THEN 1 ELSE 0 END) as unknown_count,
+        SUM(CASE WHEN enabled = 0 THEN 1 ELSE 0 END) as unmonitored_count
       FROM (
         SELECT 
           s.id,

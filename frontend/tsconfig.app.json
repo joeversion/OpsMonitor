@@ -3,6 +3,11 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./src/*"],
+      // The package publishes declarations but omits them from its exports map.
+      "@wangeditor/editor-for-vue": ["./node_modules/@wangeditor/editor-for-vue/dist/src/index.d.ts"]
+    },
 
     /* Linting */
     "strict": true,

@@ -55,7 +55,7 @@
     </div>
     
     <!-- 统计卡片 -->
-    <el-row :gutter="12" class="stats-grid">
+    <el-row :gutter="12" class="stats-grid summary-cards">
       <el-col :span="6">
         <div class="stat-card total">
           <div class="stat-header">
@@ -119,18 +119,18 @@
       <el-col :span="6">
         <div class="stat-card down">
           <div class="stat-header">
-            <div class="stat-label">{{ $t('home.downUnknown') }}</div>
+            <div class="stat-label">{{ $t('home.downUnknownUnmonitored') }}</div>
             <div class="stat-icon down">❌</div>
           </div>
           <div class="stat-value-section">
-            <div class="stat-value">{{ stats.down + stats.unknown }}</div>
+            <div class="stat-value">{{ stats.down + stats.unknown + stats.unmonitored }}</div>
           </div>
           <div class="stat-progress-section">
             <div class="progress-bar">
               <div class="progress-fill" :style="{ width: downPercent + '%', background: '#F56C6C' }"></div>
             </div>
             <div class="stat-progress">
-              <span v-if="stats.unknown > 0">{{ stats.down }} {{ $t('home.down') }}, {{ stats.unknown }} {{ $t('home.unknown') }}</span>
+              <span v-if="stats.unknown > 0 || stats.unmonitored > 0">{{ stats.down }} {{ $t('home.down') }}, {{ stats.unknown }} {{ $t('home.unknown') }}, {{ stats.unmonitored }} {{ $t('common.notMonitored') }}</span>
               <span v-else>{{ downPercent }}{{ $t('home.percentOfTotal') }}</span>
             </div>
           </div>
@@ -250,7 +250,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, inject, watch, reactive, nextTick, type Ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { Refresh, Loading, ArrowDown } from '@element-plus/icons-vue';
 import { getProjects, type ProjectWithStats } from '../api/projects';
@@ -262,14 +261,13 @@ import { getSystemStats } from '../api/checks';
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 
-const router = useRouter();
 const { t, locale } = useI18n();
-const currentProjectId = inject<Ref<number | null>>('currentProjectId');
+const currentProjectId = inject<Ref<string | undefined>>('currentProjectId');
 
 // 数据状态
 const loading = ref(false);
 const projects = ref<ProjectWithStats[]>([]);
-const stats = reactive({ total: 0, up: 0, warning: 0, down: 0, unknown: 0 });
+const stats = reactive({ total: 0, up: 0, warning: 0, down: 0, unknown: 0, unmonitored: 0 });
 const securityConfigs = ref<SecurityConfig[]>([]);
 const metrics = reactive({
   projects: 0,
@@ -302,7 +300,7 @@ const warningPercent = computed(() => {
 });
 
 const downPercent = computed(() => {
-  return stats.total ? Math.round(((stats.down + stats.unknown) / stats.total) * 100) : 0;
+  return stats.total ? Math.round(((stats.down + stats.unknown + stats.unmonitored) / stats.total) * 100) : 0;
 });
 
 const progressPercent = computed(() => {
@@ -373,7 +371,8 @@ const updateStatusChart = () => {
           { value: stats.up, name: t('statusLabels.healthy'), itemStyle: { color: '#67C23A' } },
           { value: stats.warning, name: t('statusLabels.warning'), itemStyle: { color: '#E6A23C' } },
           { value: stats.down, name: t('statusLabels.down'), itemStyle: { color: '#F56C6C' } },
-          { value: stats.unknown, name: t('statusLabels.unknown'), itemStyle: { color: '#909399' } }
+          { value: stats.unknown, name: t('statusLabels.unknown'), itemStyle: { color: '#909399' } },
+          { value: stats.unmonitored, name: t('statusLabels.unmonitored'), itemStyle: { color: '#cbd5e1' } }
         ].filter(d => d.value > 0)
       }
     ]
@@ -466,7 +465,7 @@ const refreshData = async () => {
     stats.warning = statsData.warning;
     stats.down = statsData.down;
     stats.unknown = statsData.unknown || 0;
-    stats.last24h = statsData.last24h;
+    stats.unmonitored = statsData.unmonitored;
     
     // 获取项目列表（用于资源分布图）
     if (!projectId) {
@@ -578,7 +577,7 @@ onBeforeUnmount(() => {
 });
 
 // 监听项目切换
-watch(currentProjectId, () => {
+watch(() => currentProjectId?.value, () => {
   refreshData();
 }, { deep: true });
 

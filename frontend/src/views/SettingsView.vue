@@ -305,7 +305,7 @@ import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Setting, FolderOpened, Download, Upload, Share, Plus } from '@element-plus/icons-vue';
 import api from '../api';
-import { getDependencyTypes, createDependencyType, updateDependencyType, deleteDependencyType as apiDeleteType } from '../api/dependency-types';
+import { getDependencyTypes, createDependencyType, updateDependencyType, deleteDependencyType as apiDeleteType, type DependencyType } from '../api/dependency-types';
 import { getGeneralSettings, updateGeneralSettings } from '../api/config';
 import authUtils from '../utils/auth';
 
@@ -313,16 +313,6 @@ import authUtils from '../utils/auth';
 const isAdmin = computed(() => authUtils.isAdmin());
 
 const { t } = useI18n();
-
-interface DependencyType {
-  id?: number;
-  name: string;
-  label: string;
-  icon: string;
-  color?: string;
-  line_style?: string;
-  is_system: boolean;
-}
 
 const settings = ref({
   timezone: 'UTC',
@@ -473,7 +463,7 @@ const typeForm = ref({
   line_style: 'solid' as 'solid' | 'dashed' | 'dotted' | 'long-dash'
 });
 
-const availableLineStyles = computed(() => [
+const availableLineStyles = computed<{ value: DependencyType['line_style']; label: string; dasharray: string }[]>(() => [
   { value: 'solid', label: t('settings.styleSolid'), dasharray: 'none' },
   { value: 'dashed', label: t('settings.styleDashed'), dasharray: '8,4' },
   { value: 'dotted', label: t('settings.styleDotted'), dasharray: '2,4' },
@@ -556,7 +546,7 @@ const saveType = async () => {
       // 格式化 name
       const formattedName = typeForm.value.name.toLowerCase().replace(/\s+/g, '_');
       
-      await updateDependencyType(editingType.value.id!, {
+      await updateDependencyType(editingType.value.id, {
         name: formattedName,
         label: typeForm.value.label,
         icon: typeForm.value.icon,
@@ -595,7 +585,7 @@ const deleteDependencyType = async (type: DependencyType) => {
       }
     );
     
-    await apiDeleteType(type.id!);
+    await apiDeleteType(type.id);
     ElMessage.success(t('settings.msgDepTypeDeleted'));
     await loadDependencyTypes();
   } catch (error: any) {

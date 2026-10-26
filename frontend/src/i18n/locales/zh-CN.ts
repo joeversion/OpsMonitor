@@ -34,6 +34,7 @@ export default {
     actions: '操作',
     enabled: '已启用',
     disabled: '已禁用',
+    notMonitored: '未监控',
     status: '状态',
     name: '名称',
     type: '类型',
@@ -64,6 +65,7 @@ export default {
 
   // ==================== 状态标签 ====================
   statusLabels: {
+    unmonitored: '未监控',
     up: '正常',
     down: '故障',
     warning: '告警',
@@ -223,6 +225,7 @@ export default {
     totalServices: '服务总数',
     healthy: '健康',
     warning: '告警',
+    downUnknownUnmonitored: '故障 / 未知 / 未监控',
     downUnknown: '故障 / 未知',
     allServices: '全部服务',
     percentOfTotal: '占总数',
@@ -392,6 +395,7 @@ export default {
     riskMediumSimple: '中',
     riskHighSimple: '高',
     tagXProject: '跨项目',
+    crossProjectTypeHint: '跨项目依赖使用默认类型，连线固定为虚线。',
     // 批量编辑对话框
     batchEditTitle: '批量编辑服务',
     batchEditInfo: '正在编辑 {n} 个服务。仅修改的字段会被更新。',
@@ -1545,6 +1549,17 @@ export default {
 
   // 交互图画布
   graphCanvas: {
+    statusRefreshFailed: '状态刷新失败，当前显示的状态可能已过期。',
+    retryStatus: '重试',
+    nodeCount: '{count} 个服务',
+    selectedCount: '已选择 {count} 个服务',
+    lineBezier: '连线：曲线',
+    lineOrthogonal: '连线：直角',
+    applyLayout: '应用布局',
+    layoutRunning: '正在排列…',
+    layoutFailed: '布局计算失败，原有位置未改变，请重试。',
+    renderFailed: '拓扑渲染失败，请刷新后重试。',
+    dependencyTypesFailed: '依赖类型加载失败，当前显示内置类型。',
     viewServiceDetails: '查看 {name} 的服务详情',
     viewportHint: '拖动空白处平移 · 滚轮缩放 · 卡片移动无边界限制',
     zoomIn: '放大',
@@ -1569,8 +1584,8 @@ export default {
     dirBottomTop: '从下到上',
     dirRightLeft: '从右到左',
     snapLabel: '对齐：',
-    snapGrid: '网格',
-    snapGridDesc: '对齐到网格（20px）',
+    snapGrid: '网格吸附',
+    snapGridDesc: '显示网格线并按 20 个坐标单位吸附；对齐标线优先',
     snapAlign: '对齐',
     snapAlignDesc: '智能对齐辅助线',
     // 连线上下文菜单

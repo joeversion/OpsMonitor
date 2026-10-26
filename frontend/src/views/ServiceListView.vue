@@ -1,8 +1,8 @@
 <template>
   <div class="service-list">
     <!-- Stats Cards -->
-    <el-row v-if="!hideStats" :gutter="20" class="stats-row">
-      <el-col :span="6">
+    <el-row v-if="!hideStats" :gutter="20" class="stats-row summary-cards">
+      <el-col class="service-stat-column">
         <div class="stat-card">
           <div class="stat-icon" style="background: #ecf5ff; color: #409EFF;">
             <el-icon :size="24"><Monitor /></el-icon>
@@ -13,7 +13,7 @@
           </div>
         </div>
       </el-col>
-      <el-col :span="6">
+      <el-col class="service-stat-column">
         <div class="stat-card">
           <div class="stat-icon" style="background: #f0f9eb; color: #67C23A;">
             <el-icon :size="24"><CircleCheckFilled /></el-icon>
@@ -24,7 +24,7 @@
           </div>
         </div>
       </el-col>
-      <el-col :span="6">
+      <el-col class="service-stat-column">
         <div class="stat-card">
           <div class="stat-icon" style="background: #fdf6ec; color: #E6A23C;">
             <el-icon :size="24"><WarningFilled /></el-icon>
@@ -35,14 +35,15 @@
           </div>
         </div>
       </el-col>
-      <el-col :span="6">
+      <el-col class="service-stat-column">
         <div class="stat-card">
           <div class="stat-icon" style="background: #fef0f0; color: #F56C6C;">
             <el-icon :size="24"><CircleCloseFilled /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-label">{{ $t('services.downUnknown') }}</div>
-            <div class="stat-value" style="color: #F56C6C">{{ services.filter(s => getLiveStatus(s) === 'down' || getLiveStatus(s) === 'unknown').length }}</div>
+            <div class="stat-label">{{ $t('home.downUnknownUnmonitored') }}</div>
+            <div class="stat-value" style="color: #F56C6C">{{ inactiveStats.down + inactiveStats.unknown + inactiveStats.unmonitored }}</div>
+            <div class="stat-detail">{{ inactiveStats.down }} {{ $t('home.down') }}, {{ inactiveStats.unknown }} {{ $t('home.unknown') }}, {{ inactiveStats.unmonitored }} {{ $t('common.notMonitored') }}</div>
           </div>
         </div>
       </el-col>
@@ -117,6 +118,7 @@
           <el-option :label="$t('services.statusWarning')" value="warning" />
           <el-option :label="$t('services.statusDown')" value="down" />
           <el-option :label="$t('services.statusUnknown')" value="unknown" />
+          <el-option :label="$t('common.notMonitored')" value="unmonitored" />
         </el-select>
       </div>
 
@@ -994,7 +996,7 @@
                         type="textarea"
                         :rows="2"
                         :placeholder="$t('services.placeholderDepImpact')"
-                        @input="(val) => { scope.row.impact_description = val; }"
+                        @input="(val: string) => { scope.row.impact_description = val; }"
                         @blur="updateDependencyInList(scope.$index, 'impact_description', scope.row.impact_description)"
                       />
                     </el-form-item>
@@ -1002,7 +1004,7 @@
                       <el-input
                         :model-value="scope.row.custom_alert_template"
                         :placeholder="$t('services.placeholderDepAlertTemplate')"
-                        @input="(val) => { scope.row.custom_alert_template = val; }"
+                        @input="(val: string) => { scope.row.custom_alert_template = val; }"
                         @blur="updateDependencyInList(scope.$index, 'custom_alert_template', scope.row.custom_alert_template)"
                       />
                       <div style="font-size: 12px; color: #909399; margin-top: 4px;">
@@ -1032,6 +1034,8 @@
                 <el-select 
                   v-model="scope.row.dependency_type" 
                   size="small"
+                  :disabled="isCrossProjectDependency(scope.row.target_service_id)"
+                  :title="isCrossProjectDependency(scope.row.target_service_id) ? $t('services.crossProjectTypeHint') : undefined"
                   @change="updateDependencyInList(scope.$index, 'dependency_type', scope.row.dependency_type)"
                 >
                   <el-option 
@@ -1101,7 +1105,9 @@
             </el-select>
           </el-col>
           <el-col :span="6">
-            <el-select v-model="newDependency.dependency_type" :placeholder="$t('services.placeholderDepType')" style="width: 100%;">
+            <el-select v-model="newDependency.dependency_type" :placeholder="$t('services.placeholderDepType')" style="width: 100%;"
+              :disabled="isCrossProjectDependency(newDependency.target_service_id)"
+              :title="isCrossProjectDependency(newDependency.target_service_id) ? $t('services.crossProjectTypeHint') : undefined">
               <el-option 
                 v-for="type in dependencyTypes" 
                 :key="type.name" 
@@ -1109,6 +1115,7 @@
                 :value="type.name"
               />
             </el-select>
+            <div v-if="isCrossProjectDependency(newDependency.target_service_id)" class="form-hint">{{ $t('services.crossProjectTypeHint') }}</div>
           </el-col>
           <el-col :span="5">
             <el-select v-model="newDependency.risk_level" :placeholder="$t('services.colRisk')" style="width: 100%;">
@@ -1290,7 +1297,7 @@
       v-model="wizardDialogVisible"
       :is-edit="isEdit"
       :is-copy="isCopy"
-      :edit-data="(isEdit || isCopy) ? services.find(s => s.id === currentId) : null"
+      :edit-data="isEdit ? editingService : isCopy ? services.find(s => s.id === currentId) : null"
       :projects="projects"
       :hosts="hosts"
       :all-services="allServices"
@@ -1304,9 +1311,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, reactive, computed, inject, watch, nextTick, toRaw, type Ref } from 'vue';
+import { ref, onMounted, onUnmounted, reactive, computed, inject, watch, watchEffect, nextTick, toRaw, type Ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getServices, getAllServices, createService, updateService, deleteService } from '../api/services';
+import { getService, getServices, getAllServices, createService, updateService, deleteService } from '../api/services';
 import { getProjects, type ProjectWithStats } from '../api/projects';
 import { getLatestCheck, runCheck } from '../api/checks';
 import { getDependencyTypes, type DependencyType } from '../api/dependency-types';
@@ -1428,7 +1435,8 @@ const scriptPlaceholder = computed(() => {
 });
 
 // Inject current project context
-const currentProjectId = inject<Ref<number | null>>('currentProjectId');
+const currentProjectId = inject<Ref<string | undefined>>('currentProjectId');
+const setCurrentProject = inject<(id: string | null) => void>('setCurrentProject');
 const notifyProjectsUpdated = inject<() => void>('notifyProjectsUpdated');
 
 // Dependency types
@@ -1493,8 +1501,17 @@ const services = ref<ServiceWithStatus[]>([]);
 // so el-table's internal deep watcher is NOT triggered → selection never cleared.
 const liveStatus = reactive(new Map<string, { latestStatus: string; latestCheck: any }>());
 const getLiveStatus = (row: ServiceWithStatus): string =>
-  liveStatus.get(row.id)?.latestStatus ?? row.latestStatus ?? 'unknown';
+  row.enabled === 0 ? 'unmonitored' : liveStatus.get(row.id)?.latestStatus || row.latestStatus || 'unknown';
+const inactiveStats = computed(() => {
+  const counts = { down: 0, unknown: 0, unmonitored: 0 };
+  for (const service of services.value) {
+    const status = getLiveStatus(service);
+    if (status === 'down' || status === 'unknown' || status === 'unmonitored') counts[status]++;
+  }
+  return counts;
+});
 const getLiveCheck = (row: ServiceWithStatus) => {
+  if (row.enabled === 0) return null;
   const live = liveStatus.get(row.id);
   if (!live) return row.latestCheck ?? null;
   return row.latestCheck
@@ -1509,12 +1526,14 @@ const wizardDialogVisible = ref(false);
 const isEdit = ref(false);
 const isCopy = ref(false);
 const currentId = ref<string | null>(null);
+const editingService = ref<Service | null>(null);
 
 // General Settings
 const generalSettings = ref({
   defaultInterval: 60,
   warningThreshold: 3,
   errorThreshold: 5,
+  failureThreshold: 3,
   dataRetentionDays: 30
 });
 
@@ -1640,9 +1659,6 @@ const scheduleConfig = ref<ScheduleConfig>({
   timeRanges: []
 });
 
-// SSH configs for dropdown
-const sshConfigs = ref<any[]>([]);
-
 // Helper function to convert max_age_minutes to max_age_value + max_age_unit
 const convertMaxAgeToDisplay = (maxAgeMinutes: number) => {
   if (maxAgeMinutes === 0) {
@@ -1676,15 +1692,6 @@ const convertCheckIntervalToDisplay = (intervalSeconds: number) => {
   } else {
     // Keep in seconds
     return { value: intervalSeconds, unit: 'seconds' as const };
-  }
-};
-
-const fetchSSHConfigs = async () => {
-  try {
-    const response = await axios.get('/api/security-configs');
-    sshConfigs.value = response.data.filter((c: any) => c.type === 'ssh');
-  } catch (error) {
-    console.error('Failed to fetch SSH configs:', error);
   }
 };
 
@@ -1728,10 +1735,6 @@ const handleCheckTypeChange = () => {
     fileCheckConfig.timeout_seconds = 30;
   }
 };
-
-const availableServices = computed(() => {
-  return services.value.filter(s => s.id !== currentId.value);
-});
 
 // Available services for new dependency (exclude already added) - use allServices for cross-project support
 const availableServicesForDep = computed(() => {
@@ -1792,10 +1795,24 @@ const formatServiceLabel = (service: Service): string => {
 // Check if a dependency is cross-project
 const isCrossProjectDependency = (targetServiceId: string): boolean => {
   const targetService = allServices.value.find(s => s.id === targetServiceId);
-  const currentService = services.value.find(s => s.id === currentId.value);
-  if (!targetService || !currentService) return false;
-  return targetService.project_id !== currentService.project_id;
+  if (!targetService) return false;
+  return (targetService.project_id || null) !== (form.project_id || null);
 };
+
+const defaultDependencyType = computed(() => dependencyTypes.value.find(type => type.id === 'type-depends')?.name || 'depends');
+
+watchEffect(() => {
+  if (!dialogVisible.value || !dependencyTypes.value.length) return;
+  if (isCrossProjectDependency(newDependency.target_service_id)) {
+    newDependency.dependency_type = defaultDependencyType.value;
+  }
+  for (const dependency of serviceDependencies.value) {
+    if (isCrossProjectDependency(dependency.target_service_id) && dependency.dependency_type !== defaultDependencyType.value) {
+      dependency.dependency_type = defaultDependencyType.value;
+      if (!dependency.isNew) dependency.isModified = true;
+    }
+  }
+});
 
 // Add dependency to list
 const addDependencyToList = () => {
@@ -1824,11 +1841,17 @@ const removeDependencyFromList = (index: number) => {
 };
 
 // Update dependency in list
-const updateDependencyInList = (index: number, field: string, value: string) => {
-  (serviceDependencies.value[index] as any)[field] = value;
+const updateDependencyInList = (index: number, field: 'dependency_type' | 'risk_level' | 'impact_description' | 'custom_alert_template', value: string) => {
+  const dependency = serviceDependencies.value[index];
+  if (!dependency) {
+    console.error('Cannot update dependency: invalid index', index);
+    ElMessage.error(t('services.msgOperationFailed'));
+    return;
+  }
+  dependency[field] = value;
   // Mark as modified if it's an existing dependency
-  if (!serviceDependencies.value[index].isNew) {
-    serviceDependencies.value[index].isModified = true;
+  if (!dependency.isNew) {
+    dependency.isModified = true;
   }
 };
 
@@ -1885,11 +1908,7 @@ const filteredServices = computed(() => {
     // 如果传入了 filterHostId，则只显示该 host 的服务
     const matchHost = !props.filterHostId || s.host_id === props.filterHostId;
     const matchProject = !filterProject.value || s.project_id === filterProject.value;
-    // unknown 筛选需要匹配 latestStatus 为 'unknown'、undefined、null 或空的情况
-    const matchStatus = !filterStatus.value || 
-      (filterStatus.value === 'unknown' 
-        ? (!s.latestStatus || s.latestStatus === 'unknown')
-        : s.latestStatus === filterStatus.value);
+    const matchStatus = !filterStatus.value || getLiveStatus(s) === filterStatus.value;
     const matchQuery = !searchQuery.value || 
       s.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       s.host.toLowerCase().includes(searchQuery.value.toLowerCase());
@@ -1903,15 +1922,15 @@ const filteredServices = computed(() => {
 
       switch (sortBy.value) {
         case 'status':
-          // 状态排序: down > warning > unknown > up
           const statusOrder: Record<string, number> = {
             'down': 0,
             'warning': 1,
             'unknown': 2,
-            'up': 3
+            'up': 3,
+            'unmonitored': 4
           };
-          aValue = statusOrder[a.latestStatus || 'unknown'];
-          bValue = statusOrder[b.latestStatus || 'unknown'];
+          aValue = statusOrder[getLiveStatus(a)];
+          bValue = statusOrder[getLiveStatus(b)];
           break;
 
         case 'name':
@@ -2051,22 +2070,6 @@ const filteredHosts = computed(() => {
   if (!form.project_id) return hosts.value;
   return hosts.value.filter(h => h.project_id === form.project_id);
 });
-
-// Toggle new host form
-const toggleNewHostForm = () => {
-  isCreatingNewHost.value = !isCreatingNewHost.value;
-  if (isCreatingNewHost.value) {
-    selectedHostId.value = '';
-    selectedHostData.value = null;
-    // Sync project to new host form
-    if (form.project_id) {
-      newHostForm.project_id = form.project_id;
-    }
-  } else {
-    resetNewHostForm();
-    form.host = '';
-  }
-};
 
 // Cancel new host creation
 const cancelNewHost = () => {
@@ -2411,8 +2414,6 @@ const handleCopy = async (row: Service) => {
         filename_pattern: '',
         use_latest: true,
         freshness_days: 0,
-        max_age_value: 60,
-        max_age_unit: 'minutes',
         check_type: 'exists',
         expected_size_delta: 0,
         content_pattern: '',
@@ -2442,8 +2443,6 @@ const handleCopy = async (row: Service) => {
         filename_pattern: '',
         use_latest: true,
         freshness_days: 0,
-        max_age_value: 60,
-        max_age_unit: 'minutes',
         check_type: 'exists',
         expected_size_delta: 0,
         content_pattern: '',
@@ -2478,6 +2477,7 @@ const handleEdit = async (row: Service) => {
   
   try {
     isEdit.value = true;
+    editingService.value = row;
     isCopy.value = false;
     currentId.value = row.id;
     
@@ -2616,8 +2616,6 @@ const handleEdit = async (row: Service) => {
           filename_pattern: '',
           use_latest: true,
           freshness_days: 0,
-          max_age_value: 60,
-          max_age_unit: 'minutes',
           check_type: 'exists',
           expected_size_delta: 0,
           content_pattern: '',
@@ -2739,36 +2737,6 @@ const handleToggleAlerts = async (service: Service) => {
   }
 };
 
-const handleBatchEnable = async () => {
-  try {
-    const serviceIds = selectedServices.value.map(s => s.id);
-    await api.patch('/services/batch', {
-      serviceIds,
-      updates: { enabled: 1 }
-    });
-    ElMessage.success(t('services.msgEnabledN', { n: serviceIds.length }));
-    await fetchServices();
-    clearSelection();
-  } catch (error: any) {
-    ElMessage.error(t('services.msgEnableFailed'));
-  }
-};
-
-const handleBatchDisable = async () => {
-  try {
-    const serviceIds = selectedServices.value.map(s => s.id);
-    await api.patch('/services/batch', {
-      serviceIds,
-      updates: { enabled: 0 }
-    });
-    ElMessage.success(t('services.msgDisabledN', { n: serviceIds.length }));
-    await fetchServices();
-    clearSelection();
-  } catch (error: any) {
-    ElMessage.error(t('services.msgDisableFailed'));
-  }
-};
-
 const handleDelete = (row: Service) => {
   ElMessageBox.confirm(
     t('services.confirmDeleteMsg', { name: row.name }),
@@ -2837,7 +2805,7 @@ const submitBatchEdit = async () => {
     }
     
     const serviceIds = batchServiceIds.value;
-    const response = await api.patch('/services/batch', { serviceIds, updates });
+    await api.patch('/services/batch', { serviceIds, updates });
     
     ElMessage.success(t('services.msgUpdated'));
     batchEditDialogVisible.value = false;
@@ -2891,17 +2859,14 @@ const handleSubmit = async () => {
     // File Check configuration
     if (['file', 'log'].includes(form.check_type as string)) {
       // Convert max_age_value + max_age_unit to max_age_minutes
-      const configToSave = { ...fileCheckConfig };
-      let maxAgeMinutes = fileCheckConfig.max_age_value;
-      if (fileCheckConfig.max_age_unit === 'hours') {
-        maxAgeMinutes = fileCheckConfig.max_age_value * 60;
-      } else if (fileCheckConfig.max_age_unit === 'days') {
-        maxAgeMinutes = fileCheckConfig.max_age_value * 1440;
+      const { max_age_value, max_age_unit, ...fileConfig } = fileCheckConfig;
+      let maxAgeMinutes = max_age_value;
+      if (max_age_unit === 'hours') {
+        maxAgeMinutes = max_age_value * 60;
+      } else if (max_age_unit === 'days') {
+        maxAgeMinutes = max_age_value * 1440;
       }
-      configToSave.max_age_minutes = maxAgeMinutes;
-      // Remove UI-only fields
-      delete (configToSave as any).max_age_value;
-      delete (configToSave as any).max_age_unit;
+      const configToSave = { ...fileConfig, max_age_minutes: maxAgeMinutes };
       
       data.file_config = JSON.stringify(configToSave);
     }
@@ -2915,7 +2880,6 @@ const handleSubmit = async () => {
       // Handle dependency updates
       // First, get existing dependencies to compare
       const existingDeps = await getServiceDependencies(serviceId);
-      const existingIds = existingDeps.dependsOn.map((d: any) => d.id);
       const currentIds = serviceDependencies.value.filter(d => !d.isNew && d.id).map(d => d.id);
       
       // Delete removed dependencies
@@ -3225,9 +3189,16 @@ onMounted(async () => {
     if (editId) {
       await servicesReady;
       if (route.path !== '/services' || route.query.edit !== editId) return;
-      const service = services.value.find(s => s.id === editId);
-      if (service) {
+      try {
+        const service = services.value.find(s => s.id === editId) || await getService(editId);
+        if (route.path !== '/services' || route.query.edit !== editId) return;
+        if (currentProjectId?.value && String(currentProjectId.value) !== service.project_id) {
+          setCurrentProject?.(service.project_id || null);
+        }
         await handleEdit(service);
+      } catch (error) {
+        console.error('Failed to open service editor:', error);
+        ElMessage.error(t('services.msgOperationFailed'));
       }
     } else if (hostId) {
       // Add mode - wait for hosts to be loaded before opening dialog
@@ -3380,6 +3351,11 @@ watch(() => currentProjectId?.value, () => {
 
 .stats-row {
   margin-bottom: 20px;
+  row-gap: 12px;
+}
+.stats-row > .service-stat-column {
+  flex: 1 0 180px;
+  max-width: 100%;
 }
 .stat-card {
   background: #fff;
@@ -3417,6 +3393,11 @@ watch(() => currentProjectId?.value, () => {
   color: #303133;
   font-size: 24px;
   font-weight: 600;
+}
+.stat-detail {
+  color: #909399;
+  font-size: 11px;
+  margin-top: 4px;
 }
 .card-header {
   display: flex;

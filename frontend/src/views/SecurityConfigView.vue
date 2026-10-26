@@ -1,7 +1,7 @@
 <template>
   <div class="security-config-list">
     <!-- Stats Cards -->
-    <el-row :gutter="20" class="stats-row">
+    <el-row :gutter="20" class="stats-row summary-cards">
       <el-col :span="6">
         <div class="stat-card">
           <div class="stat-icon" style="background: #f0f9eb; color: #67C23A;">
